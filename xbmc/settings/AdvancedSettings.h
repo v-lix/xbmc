@@ -347,6 +347,8 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_guiSmartRedraw;
     bool m_guiVideoLayoutTransparent{false};
     unsigned int m_guiAVChangeFlagTimeout;
+
+    int32_t m_guiAnisotropicFiltering{0};
     unsigned int m_addonPackageFolderSize;
 
     bool m_jsonOutputCompact;
