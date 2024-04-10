@@ -180,8 +180,9 @@ void CGUIControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregio
 // 3. reset the animation transform
 void CGUIControl::DoRender()
 {
-  CRect hitRect(m_hitRect);
-  hitRect.Intersect(CServiceBroker::GetWinSystem()->GetGfxContext().GetScissors());
+  if (IsControlRenderable() &&
+      !m_renderRegion.Intersects(CServiceBroker::GetWinSystem()->GetGfxContext().GetScissors()))
+    return;
 
   if (IsVisible() && !m_isCulled)
   {
@@ -954,6 +955,25 @@ void CGUIControl::UpdateControlStats()
     ++m_controlStats->nCountTotal;
     if (IsVisible() && IsVisibleFromSkin())
       ++m_controlStats->nCountVisible;
+  }
+}
+
+
+bool CGUIControl::IsControlRenderable()
+{
+  switch (ControlType)
+  {
+    case GUICONTAINER_EPGGRID:
+    case GUICONTAINER_FIXEDLIST:
+    case GUICONTAINER_LIST:
+    case GUICONTAINER_PANEL:
+    case GUICONTAINER_WRAPLIST:
+    case GUICONTROL_GROUP:
+    case GUICONTROL_GROUPLIST:
+    case GUICONTROL_LISTGROUP:
+      return false;
+    default:
+      return true;
   }
 }
 
