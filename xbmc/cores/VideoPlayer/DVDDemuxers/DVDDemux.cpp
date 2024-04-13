@@ -15,9 +15,11 @@ std::string CDemuxStreamAudio::GetStreamType()
   std::string strInfo;
   switch (codec)
   {
-    //! @todo: With ffmpeg >= 6.1 add new AC4 codec
     case AV_CODEC_ID_AC3:
       strInfo = "AC3 ";
+      break;
+    case AV_CODEC_ID_AC4:
+      strInfo = "AC4";
       break;
     case AV_CODEC_ID_EAC3:
     {
@@ -29,7 +31,6 @@ std::string CDemuxStreamAudio::GetStreamType()
     }
     case AV_CODEC_ID_DTS:
     {
-      //! @todo: add DTS-HD HRA X profile when/if detection becomes available
       switch (profile)
       {
         case FF_PROFILE_DTS_96_24:
