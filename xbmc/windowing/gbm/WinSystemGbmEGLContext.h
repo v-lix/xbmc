@@ -34,6 +34,10 @@ public:
                        RESOLUTION_INFO& res) override;
   bool DestroyWindow() override;
 
+  bool BindTextureUploadContext() override;
+  bool UnbindTextureUploadContext() override;
+  bool HasContext() override;
+
 protected:
   CWinSystemGbmEGLContext(EGLenum platform, std::string const& platformExtension)
     : CWinSystemEGL{platform, platformExtension}
