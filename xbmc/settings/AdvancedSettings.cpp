@@ -1340,6 +1340,7 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     XMLUtils::GetInt(pElement, "anisotropicfiltering", m_guiAnisotropicFiltering);
     XMLUtils::GetBoolean(pElement, "fronttobackrendering", m_guiFrontToBackRendering);
     XMLUtils::GetBoolean(pElement, "geometryclear", m_guiGeometryClear);
+    XMLUtils::GetBoolean(pElement, "asynctextureupload", m_guiAsyncTextureUpload);
     XMLUtils::GetBoolean(pElement, "transparentvideolayout", m_guiVideoLayoutTransparent);
     XMLUtils::GetUInt(pElement, "avchangeflagtimeout", m_guiAVChangeFlagTimeout);
   }
