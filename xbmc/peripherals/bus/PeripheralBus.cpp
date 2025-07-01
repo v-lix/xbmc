@@ -68,6 +68,9 @@ void CPeripheralBus::Clear(void)
 
   std::unique_lock<CCriticalSection> lock(m_critSection);
 
+  for (auto& peripheral : m_peripherals)
+    peripheral->Deinitialize();
+
   m_peripherals.clear();
 }
 
