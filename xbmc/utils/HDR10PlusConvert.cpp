@@ -137,11 +137,20 @@ std::vector<uint8_t> create_rpu_nalu_for_hdr10plus(
 {
 
   uint16_t min_pq = 0;
-  if (hdrStaticMetadataInfo.min_lum <= 10) {
-    min_pq = 7;
-  } else if (hdrStaticMetadataInfo.min_lum == 50) {
-    min_pq = 62;
-  }
+  if (hdrStaticMetadataInfo.min_lum == 0)
+    min_pq = 0;
+  else if (hdrStaticMetadataInfo.min_lum < 2)
+    min_pq = 7;  // 0.0001
+  else if (hdrStaticMetadataInfo.min_lum < 5)
+    min_pq = 10; // 0.0002
+  else if (hdrStaticMetadataInfo.min_lum < 10)
+    min_pq = 17; // 0.0005
+  else if (hdrStaticMetadataInfo.min_lum < 20)
+    min_pq = 26; // 0.001
+  else if (hdrStaticMetadataInfo.min_lum < 50)
+    min_pq = 38; // 0.002
+  else
+    min_pq = 62; // 0.005
 
   uint16_t source_min_pq = min_pq;
   uint16_t source_max_pq = 3079;

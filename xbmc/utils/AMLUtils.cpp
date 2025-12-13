@@ -1497,6 +1497,10 @@ void aml_toogle_video_freerun_mode()
   }
 }
 
+void aml_dv_hdr10plus_conversion (bool hdr10plus_conversion) {
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10plus_conv", hdr10plus_conversion);
+}
+
 void aml_reset_audio_from_player_open()
 {
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetResetSync(true);
