@@ -2087,7 +2087,7 @@ bool CAMLCodec::OpenDecoder()
   if ((hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION) && aml_is_dv_enable())
   {
     am_private->gcodec.dv_enable = 1;
-    if (((hints.dovi.dv_profile == 4) || (hints.dovi.dv_profile == 7)) && (hints.dovi_el_type == DOVIELType::TYPE_FEL))
+    if (((hints.dovi.dv_profile == 4) || (hints.dovi.dv_profile == 7)) && (hints.dovi_el_type != DOVIELType::TYPE_MEL))
     {
       aml_dv_enable_fel();                              // Make sure enable fel is set.
       am_private->gcodec.dec_mode = STREAM_TYPE_STREAM; // Use stream path if FEL
