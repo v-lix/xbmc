@@ -175,11 +175,19 @@ void CAdvancedSettings::Initialize()
   m_videoDefaultLatency = 0.0;
 
   m_videoDecoderTimeout = 5;
-  m_videoDecoderBypassBufferReady = true;     // Alt SoC false
-  m_videoDecoderBuffer = 5.0f;                // Alt SoC 
-  m_videoDecoderStreamBuffer = 90.0f;         // Alt SoC
+  if (aml_get_cpufamily_id() == AML_G12B)
+  {
+    m_videoDecoderBypassBufferReady = true;
+    m_videoDecoderMinimumStreamBuffer = 10.0f;
+  }
+  else
+  {
+    m_videoDecoderBypassBufferReady = false;
+    m_videoDecoderMinimumStreamBuffer = 17.5f;
+  }
+  m_videoDecoderBuffer = 5.0f;
+  m_videoDecoderStreamBuffer = 90.0f;
   m_videoDecoderMinimumBuffer = 5.0f;
-  m_videoDecoderMinimumStreamBuffer = 5.0f;   // Alt SoC 17.5f
 
   m_musicUseTimeSeeking = true;
   m_musicTimeSeekForward = 10;

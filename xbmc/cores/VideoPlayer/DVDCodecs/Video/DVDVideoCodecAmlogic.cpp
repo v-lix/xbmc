@@ -569,7 +569,12 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
 
 void CDVDVideoCodecAmlogic::Reset(void)
 {
-  m_Codec->Reset();
+  if ((aml_get_cpufamily_id() != AML_G12B) && (m_hints.dovi_el_type == DOVIELType::TYPE_FEL) && (m_dataCacheCore.GetSpeed() == 1.0f))
+  {
+    m_Codec->CloseDecoder();
+    m_Codec->OpenDecoder();
+  }
+  else if (m_dataCacheCore.GetSpeed() == 1.0f) m_Codec->Reset();
 
   while (!m_packages.empty())
   {
