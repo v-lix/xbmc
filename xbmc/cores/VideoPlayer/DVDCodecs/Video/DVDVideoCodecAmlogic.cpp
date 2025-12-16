@@ -574,7 +574,10 @@ void CDVDVideoCodecAmlogic::Reset(void)
     m_Codec->CloseDecoder();
     m_Codec->OpenDecoder();
   }
-  else if (m_dataCacheCore.GetSpeed() == 1.0f) m_Codec->Reset();
+  else
+  {
+    m_Codec->Reset();
+  }
 
   while (!m_packages.empty())
   {

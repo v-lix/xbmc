@@ -178,7 +178,7 @@ void CAdvancedSettings::Initialize()
   if (aml_get_cpufamily_id() == AML_G12B)
   {
     m_videoDecoderBypassBufferReady = true;
-    m_videoDecoderMinimumStreamBuffer = 10.0f;
+    m_videoDecoderMinimumStreamBuffer = 5.0f;
   }
   else
   {
