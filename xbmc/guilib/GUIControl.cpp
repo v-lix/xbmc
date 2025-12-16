@@ -204,7 +204,7 @@ void CGUIControl::DoRender()
     {
       UTILS::COLOR::Color color =
           CServiceBroker::GetWinSystem()->GetGfxContext().MergeAlpha(m_hitColor);
-      CGUITexture::DrawQuad(CServiceBroker::GetWinSystem()->GetGfxContext().GenerateAABB(hitRect), color);
+      CGUITexture::DrawQuad(CServiceBroker::GetWinSystem()->GetGfxContext().GenerateAABB(m_hitRect), color);
     }
 
     Render();
