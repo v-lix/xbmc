@@ -2287,12 +2287,6 @@ std::string CDVDDemuxFFmpeg::GetStreamCodecName(int iStreamId)
 
       return strName;
     }
-    
-    if (stream->codec == AV_CODEC_ID_EAC3 && stream->profile == FF_PROFILE_EAC3_DDP_ATMOS)
-      return "eac3_ddp_atmos";
-
-    if (stream->codec == AV_CODEC_ID_TRUEHD && stream->profile == FF_PROFILE_TRUEHD_ATMOS)
-      return "truehd_atmos";
 
     if (stream->codec == AV_CODEC_ID_EAC3 && stream->profile == AV_PROFILE_EAC3_DDP_ATMOS)
       return "eac3_ddp_atmos";
