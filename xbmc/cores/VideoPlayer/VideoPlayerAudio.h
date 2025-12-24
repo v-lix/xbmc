@@ -37,7 +37,8 @@ public:
     CDVDClock* pClock, 
     CDVDMessageQueue& parent,
     CRenderManager& renderManager,
-    CProcessInfo &processInfo);
+    CProcessInfo &processInfo,
+    double messageQueueTimeSize);
   ~CVideoPlayerAudio() override;
 
   bool OpenStream(CDVDStreamInfo hints) override;

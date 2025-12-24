@@ -70,7 +70,8 @@ CVideoPlayerAudio::CVideoPlayerAudio(
     CDVDClock* pClock,
     CDVDMessageQueue& parent,
     CRenderManager& renderManager,
-    CProcessInfo &processInfo)
+    CProcessInfo &processInfo,
+    double messageQueueTimeSize)
 : CThread("VideoPlayerAudio"), IDVDStreamPlayerAudio(processInfo)
 , m_messageQueue("audio")
 , m_messageParent(parent)
@@ -88,9 +89,10 @@ CVideoPlayerAudio::CVideoPlayerAudio(
   m_prevskipped = false;
   m_maxspeedadjust = 0.0;
 
-  // 18 MB allows max bitrate of 18 Mbit/s (TrueHD max peak) during 8 seconds
-  m_messageQueue.SetMaxDataSize(32 * 1024 * 1024);
-  m_messageQueue.SetMaxTimeSize(8.0);
+  // allows max bitrate of 128 Mbit/s (e.g. UHD Blu-Ray) during messageQueueTimeSize seconds
+  m_messageQueue.SetMaxDataSize(18 * messageQueueTimeSize / 8 * 1024 * 1024);
+  m_messageQueue.SetMaxTimeSize(messageQueueTimeSize);
+
   m_disconAdjustTimeMs = processInfo.GetMaxPassthroughOffSyncDuration();
 }
 

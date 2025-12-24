@@ -120,6 +120,7 @@ public:
   int GetAudioQueueLevel();
   void SetAudioQueueDataLevel(int level);
   int GetAudioQueueDataLevel();
+  void SetAudioPts(double pts);
 
   // content info
 
@@ -300,6 +301,7 @@ protected:
     double liveBitRate = 0;
     int queueLevel = 0;
     int queueDataLevel = 0;
+    double pts = 0;
   } m_playerAudioInfo;
 
   mutable CCriticalSection m_contentSection;
