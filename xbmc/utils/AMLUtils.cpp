@@ -1517,9 +1517,9 @@ void aml_reset_audio_from_player_pause()
   if (aml_get_cpufamily_id() == AML_G12B)
   {
     CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetResetSync(true);
-    CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetResetSeek(false);
+    CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetResetSeek(true);
     CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetLastResetTime(0.0);
-    CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetAlgoForReset(0);
+    CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetAlgoForReset(1);
   }
 }
 
@@ -1528,10 +1528,7 @@ void aml_reset_audio_from_window_home()
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetResetSync(true);
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetResetSeek(true);
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetLastResetTime(0.0);
-  if (aml_get_cpufamily_id() == AML_G12B)
-    CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetAlgoForReset(1);
-  else
-    CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetAlgoForReset(0);
+  CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetAlgoForReset(1);
 }
 
 void aml_reset_audio_from_play_from_beginning()
