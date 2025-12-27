@@ -11,6 +11,7 @@
 #include "AEAudioFormat.h"
 
 #include <atomic>
+#include <chrono>
 #include <math.h>
 
 #include "PlatformDefs.h"
@@ -34,7 +35,7 @@ struct AEDelayStatus
 
   double delay = 0.0;  // delay in sink currently
   double maxcorrection = 0.0; // time correction must not be greater than sink delay
-  int64_t tick = 0;  // timestamp when delay was calculated
+  std::chrono::steady_clock::time_point startTime{};  // timestamp when delay was calculated
 };
 
 /**
@@ -173,6 +174,7 @@ public:
   static bool S16NeedsByteSwap(AEDataFormat in, AEDataFormat out);
 
   static uint64_t GetAVChannelLayout(const CAEChannelInfo &info);
+  static std::string GetAVChannelLayoutString(const CAEChannelInfo& info);
   static CAEChannelInfo GetAEChannelLayout(uint64_t layout);
   static AVSampleFormat GetAVSampleFormat(AEDataFormat format);
   static uint64_t GetAVChannelMask(enum AEChannel aechannel);

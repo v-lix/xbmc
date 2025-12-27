@@ -11,6 +11,7 @@
 #include "cores/AudioEngine/Utils/AEAudioFormat.h"
 #include "cores/VideoPlayer/Interface/DemuxPacket.h"
 #include "cores/VideoPlayer/Process/ProcessInfo.h"
+#include "ServiceBroker.h"
 
 #include <vector>
 
@@ -43,13 +44,17 @@ typedef struct stDVDAudioFrame
   int profile;
   bool hasDownmix;
   double centerMixLevel;
+
+  bool hasDiscontinuity; // Set when a timing discontinuity was detected (e.g., seamless branching)
+  double discontinuityCorrection; // Amount of PTS correction applied (for clock sync)
 } DVDAudioFrame;
 
 class CDVDAudioCodec
 {
 public:
 
-  explicit CDVDAudioCodec(CProcessInfo &processInfo) : m_processInfo(processInfo) {}
+  explicit CDVDAudioCodec(CProcessInfo &processInfo) : m_processInfo(processInfo),
+                                                       m_dataCacheCore(CServiceBroker::GetDataCacheCore()) {}
   virtual ~CDVDAudioCodec() = default;
 
   /*
@@ -120,4 +125,5 @@ public:
 
 protected:
   CProcessInfo &m_processInfo;
+  CDataCacheCore &m_dataCacheCore;
 };

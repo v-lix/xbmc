@@ -88,6 +88,11 @@ std::string CSystemGUIInfo::GetSystemHeatInfo(int info) const
       else
         text = g_localizeStrings.Get(10005); // Not available
       break;
+    case SYSTEM_CPU_ALT_USAGE:
+      if (CServiceBroker::GetCPUInfo()->SupportsCPUUsage())
+        return CServiceBroker::GetCPUInfo()->GetCoresUsageAltString();
+      else
+        return g_localizeStrings.Get(10005); // Not available
     default:
       break;
   }
@@ -146,6 +151,7 @@ bool CSystemGUIInfo::GetLabel(std::string& value,
     case SYSTEM_GPU_TEMPERATURE:
     case SYSTEM_FAN_SPEED:
     case SYSTEM_CPU_USAGE:
+    case SYSTEM_CPU_ALT_USAGE:
       value = GetSystemHeatInfo(info.GetInfo());
       return true;
     case SYSTEM_VIDEO_ENCODER_INFO:

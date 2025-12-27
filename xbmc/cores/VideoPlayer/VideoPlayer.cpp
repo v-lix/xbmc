@@ -44,6 +44,7 @@
 #include "input/actions/Action.h"
 #include "input/actions/ActionIDs.h"
 #include "interfaces/AnnouncementManager.h"
+#include "jobs/JobManager.h"
 #include "jobs/JobQueue.h"
 #include "messaging/ApplicationMessenger.h"
 #include "settings/AdvancedSettings.h"
@@ -685,6 +686,25 @@ int CSelectionStreams::CountType(StreamType type) const
 // main class
 //------------------------------------------------------------------------------
 
+void CVideoPlayer::SetAVChange(std::string from) const {
+  CLog::Log(LOGINFO, "VideoPlayer::SetAVChange true [{}]", from);
+  if (CServiceBroker::GetDataCacheCore().GetAVChange()) return; // already set, do not allow set again until done.
+
+  CServiceBroker::GetDataCacheCore().SetAVChange(true);
+  CServiceBroker::GetDataCacheCore().SetAVChangeExtended(true);
+
+  unsigned int timeout(CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_guiAVChangeFlagTimeout);
+
+  // Schedule set to false after the configured timeout in advanced settings - user can dial-in as preferred.
+  CServiceBroker::GetJobManager()->Submit([this, from, timeout]() {
+      usleep(timeout * 1000 * 1000);
+      CServiceBroker::GetDataCacheCore().SetAVChange(false);
+      CLog::Log(LOGINFO, "VideoPlayer::SetAVChange false [{}] after [{}] seconds", from, timeout);
+      usleep(2 * 1000 * 1000);
+      CServiceBroker::GetDataCacheCore().SetAVChangeExtended(false);
+  });
+}
+
 void CVideoPlayer::CreatePlayers()
 {
   if (m_players_created)
@@ -693,8 +713,8 @@ void CVideoPlayer::CreatePlayers()
   m_VideoPlayerVideo =
       std::make_unique<CVideoPlayerVideo>(&m_clock, &m_overlayContainer, m_messenger,
                                           m_renderManager, *m_processInfo, m_messageQueueTimeSize);
-  m_VideoPlayerAudio = std::make_unique<CVideoPlayerAudio>(&m_clock, m_messenger, *m_processInfo,
-                                                           m_messageQueueTimeSize);
+  m_VideoPlayerAudio = std::make_unique<CVideoPlayerAudio>(&m_clock, m_messenger, m_renderManager,
+                                                           *m_processInfo, m_messageQueueTimeSize);
   m_VideoPlayerSubtitle =
       std::make_unique<CVideoPlayerSubtitle>(&m_overlayContainer, *m_processInfo);
   m_VideoPlayerTeletext = std::make_unique<CDVDTeletextData>(*m_processInfo);
@@ -739,6 +759,7 @@ CVideoPlayer::CVideoPlayer(IPlayerCallback& callback)
 
   m_dvd.Clear();
   m_State.Clear();
+  m_demuxSeekBasePts = DVD_NOPTS_VALUE;
 
   m_bAbortRequest = false;
   m_offset_pts = 0.0;
@@ -748,10 +769,7 @@ CVideoPlayer::CVideoPlayer(IPlayerCallback& callback)
   m_HasVideo = false;
   m_HasAudio = false;
 
-  const int tenthsSeconds = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
-      CSettings::SETTING_VIDEOPLAYER_QUEUETIMESIZE);
-
-  m_messageQueueTimeSize = static_cast<double>(tenthsSeconds) / 10.0;
+  m_messageQueueTimeSize = 16; // 16 seconds for buffer at max bit rate.
 
   m_SkipCommercials = true;
 
@@ -1081,6 +1099,7 @@ void CVideoPlayer::OpenDefaultStreams(bool reset)
       }
 
       break;
+      aml_dv_set_subtitles(visible); //TODO: Maybe not needed here
     }
   }
 
@@ -1356,6 +1375,7 @@ void CVideoPlayer::Prepare()
   m_processInfo->SetTempo(1.0);
   m_processInfo->SetFrameAdvance(false);
   m_State.Clear();
+  m_demuxSeekBasePts = DVD_NOPTS_VALUE;
   m_CurrentVideo.hint.Clear();
   m_CurrentAudio.hint.Clear();
   m_CurrentSubtitle.hint.Clear();
@@ -1473,6 +1493,8 @@ void CVideoPlayer::Prepare()
 
   if (starttime > 0ms)
   {
+    m_clock.Discontinuity(DVD_MSEC_TO_TIME(static_cast<double>(starttime.count())));
+
     double startpts = DVD_NOPTS_VALUE;
     if (m_pDemuxer)
     {
@@ -1492,8 +1514,6 @@ void CVideoPlayer::Prepare()
         CLog::Log(LOGDEBUG, "{} - failed to start subtitle demuxing from: {}", __FUNCTION__,
                   starttime.count());
     }
-
-    m_clock.Discontinuity(DVD_MSEC_TO_TIME(starttime.count()));
   }
 
   UpdatePlayState(0);
@@ -1582,7 +1602,7 @@ void CVideoPlayer::Process()
       if (m_CurrentAudio.id >= 0)
         audioLevel = m_VideoPlayerAudio->GetLevel();
       if (m_CurrentVideo.id >= 0)
-        videoLevel = m_processInfo->GetLevelVQ();
+        videoLevel = m_VideoPlayerVideo->GetLevel();
       if (videoLevel < 85 && audioLevel < 85)
       {
         fillBuffer = true;
@@ -2105,7 +2125,7 @@ void CVideoPlayer::HandlePlaySpeed()
           if ((m_CurrentAudio.id >= 0 && m_CurrentAudio.syncState == IDVDStreamPlayer::SYNC_INSYNC &&
                m_VideoPlayerAudio->IsStalled()) ||
               (m_CurrentVideo.id >= 0 && m_CurrentVideo.syncState == IDVDStreamPlayer::SYNC_INSYNC &&
-               m_processInfo->GetLevelVQ() == 0))
+               (m_VideoPlayerVideo->GetLevel() == 0)))
           {
             CLog::Log(LOGDEBUG, "Stream stalled, start buffering. Audio: {} - Video: {}",
                       m_VideoPlayerAudio->GetLevel(), m_processInfo->GetLevelVQ());
@@ -2118,9 +2138,8 @@ void CVideoPlayer::HandlePlaySpeed()
         }
         else
         {
-          // start caching if audio and video have run dry
-          if (m_VideoPlayerAudio->GetLevel() <= 50 &&
-              m_processInfo->GetLevelVQ() <= 50)
+          // start caching if audio and video are running dry
+          if ((m_VideoPlayerAudio->GetLevel() <= 20) || (m_VideoPlayerVideo->GetLevel() <= 20))
           {
             SetCaching(CACHESTATE_FULL);
           }
@@ -2172,10 +2191,10 @@ void CVideoPlayer::HandlePlaySpeed()
 
     bool video = (m_CurrentVideo.syncState == IDVDStreamPlayer::SYNC_WAITSYNC) ||
                  (m_CurrentVideo.packets == 0 && m_CurrentAudio.packets > threshold) ||
-                 (!m_VideoPlayerAudio->AcceptsData() && m_processInfo->GetLevelVQ() < 10);
+                 (!m_VideoPlayerAudio->AcceptsData() && (m_VideoPlayerVideo->GetLevel() < 10));
     bool audio = m_CurrentAudio.id < 0 || (m_CurrentAudio.syncState == IDVDStreamPlayer::SYNC_WAITSYNC) ||
                  (m_CurrentAudio.packets == 0 && m_CurrentVideo.packets > threshold) ||
-                 (!m_VideoPlayerVideo->AcceptsData() && m_VideoPlayerAudio->GetLevel() < 10);
+                 (!m_VideoPlayerVideo->AcceptsData() && (m_VideoPlayerAudio->GetLevel() < 10));
 
     if (m_CurrentAudio.syncState == IDVDStreamPlayer::SYNC_WAITSYNC &&
         (m_CurrentAudio.avsync == CCurrentStream::AV_SYNC_CONT ||
@@ -2205,7 +2224,17 @@ void CVideoPlayer::HandlePlaySpeed()
                              m_CurrentAudio.starttime / DVD_TIME_BASE, m_CurrentAudio.cachetime / DVD_TIME_BASE, m_CurrentAudio.cachetotal / DVD_TIME_BASE, m_CurrentAudio.packets, m_VideoPlayerAudio->GetLevel());
       if (m_CurrentVideo.syncState == IDVDStreamPlayer::SYNC_WAITSYNC)
         CLog::Log(LOGDEBUG, "VideoPlayer::Sync - Video - pts: {:.3f}, cache: {:.3f}, totalcache: {:.3f}, packets:{:d} level:{:d}",
-                             m_CurrentVideo.starttime / DVD_TIME_BASE, m_CurrentVideo.cachetime / DVD_TIME_BASE, m_CurrentVideo.cachetotal / DVD_TIME_BASE, m_CurrentVideo.packets, m_processInfo->GetLevelVQ());
+                             m_CurrentVideo.starttime / DVD_TIME_BASE, m_CurrentVideo.cachetime / DVD_TIME_BASE, m_CurrentVideo.cachetotal / DVD_TIME_BASE, m_CurrentVideo.packets, m_VideoPlayerVideo->GetLevel());
+
+      //===============================================================
+      // LAV-style A/V sync fix: Don't send RESYNC to audio until video PTS valid
+      //===============================================================
+      // At video start, video may take longer to decode than audio.
+      // If we send RESYNC to audio before video has valid PTS, audio syncs to
+      // a clock that doesn't account for video latency, causing A/V desync.
+      // We still process video normally - only audio RESYNC is delayed.
+      //===============================================================
+      bool waitingForVideoPts = (m_CurrentVideo.id >= 0 && m_CurrentVideo.starttime == DVD_NOPTS_VALUE);
 
       if (m_CurrentVideo.starttime != DVD_NOPTS_VALUE && m_CurrentVideo.packets > 0 &&
           m_playSpeed == DVD_PLAYSPEED_PAUSE)
@@ -2228,8 +2257,8 @@ void CVideoPlayer::HandlePlaySpeed()
           else if (m_CurrentVideo.starttime > m_CurrentAudio.starttime &&
                    !m_pInputStream->IsRealtime())
           {
-            int audioLevel = m_VideoPlayerAudio->GetLevel();
-            //@todo hardcoded 8 seconds in message queue
+            int audioLevel = m_VideoPlayerAudio->GetLevel(); //@todo hardcoded 8
+                                                         // seconds in message queue
             double maxAudioTime = clock + DVD_MSEC_TO_TIME(40 * audioLevel);
             if ((m_CurrentVideo.starttime - m_CurrentVideo.cachetotal) > maxAudioTime)
               clock = maxAudioTime;
@@ -2244,14 +2273,21 @@ void CVideoPlayer::HandlePlaySpeed()
       }
 
       m_clock.Discontinuity(clock);
-      m_CurrentAudio.syncState = IDVDStreamPlayer::SYNC_INSYNC;
-      m_CurrentAudio.avsync = CCurrentStream::AV_SYNC_NONE;
       m_CurrentVideo.syncState = IDVDStreamPlayer::SYNC_INSYNC;
       m_CurrentVideo.avsync = CCurrentStream::AV_SYNC_NONE;
-      m_VideoPlayerAudio->SendMessage(
-          std::make_shared<CDVDMsgDouble>(CDVDMsg::GENERAL_RESYNC, clock), 1);
       m_VideoPlayerVideo->SendMessage(
           std::make_shared<CDVDMsgDouble>(CDVDMsg::GENERAL_RESYNC, clock), 1);
+
+      // Only send RESYNC to audio if video PTS is valid
+      // This prevents audio from syncing to garbage during video startup
+      if (!waitingForVideoPts)
+      {
+        m_CurrentAudio.syncState = IDVDStreamPlayer::SYNC_INSYNC;
+        m_CurrentAudio.avsync = CCurrentStream::AV_SYNC_NONE;
+        m_VideoPlayerAudio->SendMessage(
+            std::make_shared<CDVDMsgDouble>(CDVDMsg::GENERAL_RESYNC, clock), 1);
+      }
+
       SetCaching(CACHESTATE_DONE);
       UpdatePlayState(0);
 
@@ -3539,26 +3575,110 @@ bool CVideoPlayer::SeekScene(Direction seekDirection)
 
 void CVideoPlayer::GetGeneralInfo(std::string& strGeneralInfo)
 {
-  if (!m_bStop)
+
+  // Moving Average variables.
+  static const int BUFFER_SIZE = 128;
+  static int index = 0;
+  static bool bufferFilled = false;
+  static bool resetDone = false;
+
+  static double bufferAudio[BUFFER_SIZE] = {0};
+  static double bufferVideo[BUFFER_SIZE] = {0};
+  static double bufferDelta[BUFFER_SIZE] = {0};
+  static double bufferDelay[BUFFER_SIZE] = {0};
+
+  static double sumAudio = 0;
+  static double sumVideo = 0;
+  static double sumDelta = 0;
+  static double sumDelay = 0;
+
+  if (!m_bStop && (m_playSpeed == DVD_PLAYSPEED_NORMAL))
   {
+    resetDone = false;
+
+    double clock = m_clock.GetClock();
     double apts = m_VideoPlayerAudio->GetCurrentPts();
     double vpts = m_VideoPlayerVideo->GetCurrentPts();
-    double dDiff = 0;
+    double aPacketDelay = m_VideoPlayerAudio->GetCurrentPacketDelay();
 
-    if (apts != DVD_NOPTS_VALUE && vpts != DVD_NOPTS_VALUE)
-      dDiff = (apts - vpts) / DVD_TIME_BASE;
+    bool have_apts = (apts != DVD_NOPTS_VALUE);
+    bool have_vpts = (vpts != DVD_NOPTS_VALUE);
+
+    double dDiffAudio = (have_apts) ? (apts - clock) / DVD_TIME_BASE : 0;
+    double dDiffVideo = (have_vpts) ? (vpts - clock) / DVD_TIME_BASE : 0;
+
+    double dDiff = (have_apts && have_vpts) ? (apts - vpts) / DVD_TIME_BASE : 0;
+
+    // Moving Average Delta of Audio and Video
+    sumDelta -= bufferDelta[index];  // subtract "oldest" value from sum
+    sumDelta += dDiff;               // add new value to sum
+    bufferDelta[index] = dDiff;      // store new value at the index of "oldest"
+
+    // Moving Average Delta of Audio and Clock
+    sumAudio -= bufferAudio[index];  // subtract "oldest" value from sum
+    sumAudio += dDiffAudio;          // add new value to sum
+    bufferAudio[index] = dDiffAudio; // store new value at the index of "oldest"
+
+    // Moving Average Delta of Video and Clock
+    sumVideo -= bufferVideo[index];  // subtract "oldest" value from sum
+    sumVideo += dDiffVideo;          // add new value to sum
+    bufferVideo[index] = dDiffVideo; // store new value at the index of "oldest"
+
+    // Moving Average Packet Delay of Audio
+    sumDelay -= bufferDelay[index];      // subtract "oldest" value from sum
+    sumDelay += aPacketDelay;            // add new value to sum
+    bufferDelay[index] = aPacketDelay;   // store new value at the index of "oldest"
+
+    index = (index + 1) % BUFFER_SIZE;            // next slot in ring buffers, wraps back to 0 for last index entry @ 127
+    bufferFilled = bufferFilled || (index == 0);  // buffer already filled or index wrapped i.e. all buffer slots now have a value so filled
+    int filled = bufferFilled ? BUFFER_SIZE : index;
+
+    // calc moving average from sum and how many entries in buffer
+    double dDiffDeltaMovingAverage = sumDelta / filled;
+    double dDiffAudioMovingAverage = sumAudio / filled;
+    double dDiffVideoMovingAverage = sumVideo / filled;
+    double dPacketDelayMovingAverage = sumDelay / filled;
+
+    std::string extraBuf;
+    extraBuf += StringUtils::Format(", rm-q:{:d}/{:d}",
+                                    m_renderManager.GetQueuedFrames(),
+                                    m_renderManager.GetQueueSize());
 
     std::string strBuf;
-    std::unique_lock lock(m_StateSection);
+    std::lock_guard lock(m_StateSection);
+
     if (m_State.cache_bytes >= 0)
     {
-      strBuf += StringUtils::Format("forward: {} / {:2.0f}% / {:6.3f}s / {:.3f}%",
+      strBuf += StringUtils::Format("fwd: {} / {:2.0f}% / {:6.3f}s / {:.3f}%",
                                     StringUtils::SizeToString(m_State.cache_bytes),
                                     m_State.cache_level * 100.0, m_State.cache_time,
                                     m_State.cache_offset * 100.0);
     }
 
-    strGeneralInfo = StringUtils::Format("Player: a/v:{: 6.3f}, {}", dDiff, strBuf);
+    if (!strBuf.empty()) extraBuf += " " + strBuf;
+
+    strGeneralInfo = StringUtils::Format(
+        "P: a/v:{: 6.3f}, a/c:{: 6.3f}, v/c:{: 6.3f}, pd/c:{: 6.3f}{}",
+        dDiffDeltaMovingAverage, dDiffAudioMovingAverage, dDiffVideoMovingAverage,
+        dPacketDelayMovingAverage, extraBuf);
+  }
+  else if (!resetDone)
+  {
+    // Reset the Moving Average variables.
+    index = 0;
+    bufferFilled = false;
+
+    memset(bufferAudio, 0, sizeof(bufferAudio));
+    memset(bufferVideo, 0, sizeof(bufferVideo));
+    memset(bufferDelta, 0, sizeof(bufferDelta));
+    memset(bufferDelay, 0, sizeof(bufferDelay));
+
+    sumAudio = 0;
+    sumVideo = 0;
+    sumDelta = 0;
+    sumDelay = 0;
+
+    resetDone = true;
   }
 }
 
@@ -3631,6 +3751,7 @@ void CVideoPlayer::SetSubtitleVisible(bool bVisible)
   data["property"]["subtitleenabled"] = bVisible;
   CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "OnPropertyChanged",
                                                      data);
+  aml_dv_set_subtitles(bVisible);
 }
 
 void CVideoPlayer::SetEnableStream(CCurrentStream& current, bool isEnabled)
@@ -3647,6 +3768,7 @@ void CVideoPlayer::SetSubtitleVisibleInternal(bool bVisible)
     std::static_pointer_cast<CDVDInputStreamNavigator>(m_pInputStream)->EnableSubtitleStream(bVisible);
 
   CServiceBroker::GetDataCacheCore().SignalSubtitleInfoChange();
+  aml_dv_set_subtitles(bVisible);
 }
 
 void CVideoPlayer::SetSubtitleVerticalPosition(int value, bool save)
@@ -3888,12 +4010,10 @@ bool CVideoPlayer::OpenStream(CCurrentStream& current, int64_t demuxerId, int iS
       res = OpenAudioStream(hint, reset);
       break;
     case StreamType::VIDEO:
-      // fake Dolby Vision type when using Dolby Vision VS-Engine
-      if (aml_convert_to_dv_by_vs_engine(hint.hdrType))
-        hint.hdrType = StreamHdrType::HDR_TYPE_DOLBYVISION;
       res = OpenVideoStream(hint, reset);
       break;
     case StreamType::SUBTITLE:
+      hint.hdrType = m_CurrentVideo.hint.hdrType; // Set by Video Stream which is opened first
       res = OpenSubtitleStream(hint);
       break;
     case StreamType::TELETEXT:
@@ -3974,6 +4094,8 @@ bool CVideoPlayer::OpenAudioStream(CDVDStreamInfo& hint, bool reset)
 
   static_cast<IDVDStreamPlayerAudio*>(player)->SendMessage(
       std::make_shared<CDVDMsg>(CDVDMsg::PLAYER_REQUEST_STATE), 1);
+
+  SetAVChange("OpenAudioStream");
 
   return true;
 }
@@ -4083,6 +4205,8 @@ bool CVideoPlayer::OpenVideoStream(CDVDStreamInfo& hint, bool reset)
                                                  static_cast<int>(hint.extradata.GetSize()));
     m_SelectionStreams.Clear(StreamType::NONE, STREAM_SOURCE_VIDEOMUX);
   }
+
+  SetAVChange("OpenVideoStream");
 
   return true;
 }
@@ -4562,7 +4686,7 @@ int CVideoPlayer::OnDiscNavResult(void* pData, int iMessage)
       break;
     case DVDNAV_STOP:
       {
-        CLog::Log(LOGDEBUG, "DVDNAV_STOP");
+        logM(LOGDEBUG, "CVideoPlayer", "DVDNAV_STOP");
         m_dvd.state = DVDSTATE_NORMAL;
       }
       break;
@@ -4838,6 +4962,25 @@ bool CVideoPlayer::OnAction(const CAction &action)
     case ACTION_PLAYER_PROCESS_INFO:
       CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Player, "OnProcessInfo");
       return true;
+
+    case ACTION_VS10_ORIGINAL:
+      if (CServiceBroker::GetDataCacheCore().GetVideoHdrType() == StreamHdrType::HDR_TYPE_DOLBYVISION)
+        aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_IPT);
+      else
+        aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_BYPASS);
+      return true;
+
+    case ACTION_VS10_SDR:
+      aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_SDR10);
+      return true;
+
+    case ACTION_VS10_HDR10:
+      aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_HDR10);
+      return true;
+
+    case ACTION_VS10_DV:
+      aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_IPT);
+      return true;
   }
 
   // return false to inform the caller we didn't handle the message
@@ -4962,7 +5105,7 @@ int CVideoPlayer::GetCacheLevel() const
 double CVideoPlayer::GetQueueTime()
 {
   int a = m_VideoPlayerAudio->GetLevel();
-  int v = m_processInfo->GetLevelVQ();
+  int v = m_VideoPlayerVideo->GetLevel();
   return std::max(a, v) * m_messageQueueTimeSize * 1000.0 / 100.0;
 }
 
@@ -5143,6 +5286,7 @@ void CVideoPlayer::UpdatePlayState(double timeout)
     CDVDInputStream::IDisplayTime* pDisplayTime = m_pInputStream->GetIDisplayTime();
 
     CDVDInputStream::ITimes::Times times;
+    double candidateBasePts = DVD_NOPTS_VALUE;
     if (pTimes && pTimes->GetTimes(times))
     {
       state.startTime = times.startTime;
@@ -5150,6 +5294,7 @@ void CVideoPlayer::UpdatePlayState(double timeout)
       state.timeMax = (times.ptsEnd - times.ptsStart) * 1000 / DVD_TIME_BASE;
       state.timeMin = (times.ptsBegin - times.ptsStart) * 1000 / DVD_TIME_BASE;
       state.time_offset = -times.ptsStart;
+      candidateBasePts = times.ptsStart;
     }
     else if (pDisplayTime && pDisplayTime->GetTotalTime() > 0)
     {
@@ -5165,6 +5310,11 @@ void CVideoPlayer::UpdatePlayState(double timeout)
       }
       state.time += state.time_offset * 1000 / DVD_TIME_BASE;
       state.timeMax = pDisplayTime->GetTotalTime();
+    }
+    if ((candidateBasePts != DVD_NOPTS_VALUE) &&
+        (m_demuxSeekBasePts == DVD_NOPTS_VALUE))
+    {
+      m_demuxSeekBasePts = candidateBasePts;
     }
     else
     {
@@ -5272,6 +5422,13 @@ void CVideoPlayer::UpdatePlayState(double timeout)
 
   std::unique_lock lock(m_StateSection);
   m_State = state;
+
+  if (m_demuxSeekBasePts == DVD_NOPTS_VALUE && state.dts != DVD_NOPTS_VALUE)
+  {
+    const double base = state.dts - DVD_MSEC_TO_TIME(state.time);
+    if (std::isfinite(base))
+      m_demuxSeekBasePts = base;
+  }
 }
 
 int64_t CVideoPlayer::GetUpdatedTime()
@@ -5343,6 +5500,11 @@ void CVideoPlayer::TriggerUpdateResolution()
 {
   std::string stereomode;
   m_renderManager.TriggerUpdateResolution(0, 0, 0, stereomode);
+}
+
+void CVideoPlayer::TriggerUpdateResolutionHdr(StreamHdrType hdrType)
+{
+  m_renderManager.TriggerUpdateResolutionHdr(hdrType);
 }
 
 bool CVideoPlayer::IsRenderingVideo() const

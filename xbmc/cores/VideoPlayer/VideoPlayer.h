@@ -261,6 +261,8 @@ class CVideoPlayer : public IPlayer, public CThread, public IVideoPlayer,
     ALWAYS_UPDATE
   };
 
+  void SetAVChange(std::string from) const;
+
 public:
   explicit CVideoPlayer(IPlayerCallback& callback);
   ~CVideoPlayer() override;
@@ -354,6 +356,7 @@ public:
   void GetRects(CRect& source, CRect& dest, CRect& view) const override;
   unsigned int GetOrientation() const override;
   void TriggerUpdateResolution() override;
+  void TriggerUpdateResolutionHdr(StreamHdrType hdrType);
   bool IsRenderingVideo() const override;
   bool IsLiveStream() const override;
   bool Supports(EINTERLACEMETHOD method) const override;
@@ -553,6 +556,7 @@ protected:
   } m_SpeedState;
 
   double m_offset_pts;
+  double m_demuxSeekBasePts{DVD_NOPTS_VALUE};
 
   CDVDMessageQueue m_messenger;
   std::unique_ptr<CJobQueue> m_outboundEvents;

@@ -24,7 +24,7 @@ namespace AML
 class CWinSystemAmlogicGLESContext : public CWinSystemAmlogic, public CRenderSystemGLES
 {
 public:
-  CWinSystemAmlogicGLESContext();
+  CWinSystemAmlogicGLESContext() = default;
   virtual ~CWinSystemAmlogicGLESContext() = default;
 
   using CWinSystemAmlogic::Register;
@@ -46,7 +46,6 @@ public:
   virtual std::unique_ptr<CVideoSync> GetVideoSync(CVideoReferenceClock *clock) override;
 
   bool SupportsStereo(RENDER_STEREO_MODE mode) const override;
-  void PresentRender(bool rendered, bool videoLayer) override;
 
   EGLDisplay GetEGLDisplay() const;
   EGLSurface GetEGLSurface() const;
@@ -54,10 +53,10 @@ public:
   EGLConfig  GetEGLConfig() const;
 protected:
   void SetVSyncImpl(bool enable) override;
-  void PresentRenderImpl(bool rendered) override {};
+  void PresentRenderImpl(bool rendered) override;
 
 private:
-  std::unique_ptr<CEGLContextUtils> m_pGLContext;
+  CEGLContextUtils m_pGLContext;
   StreamHdrType m_hdrType = StreamHdrType::HDR_TYPE_NONE;
 };
 
