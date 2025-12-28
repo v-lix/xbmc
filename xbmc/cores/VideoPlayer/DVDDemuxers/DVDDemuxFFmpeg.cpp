@@ -1775,7 +1775,7 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
 
               // use dovi side data if available
               if (sideData && sideData->size)
-                bl_video_stream->dovi = *reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(sideData->data);	
+                bl_video_stream->dovi = *reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(sideData->data);
               // manual set dovi side data to P7
               else
               {
@@ -2732,15 +2732,44 @@ void CDVDDemuxFFmpeg::GetL16Parameters(int &channels, int &samplerate)
   }
 }
 
+// Dolby Vision Profile 7 dual-layer heuristic (BL + EL)
+bool CDVDDemuxFFmpeg::IsDoViP7DualLayer() const
+{
+  if ((m_pFormatContext == nullptr) ||
+      (m_pFormatContext->nb_streams < 2) ||
+      (m_pFormatContext->streams == nullptr)) return false;
+
+  // BL: index 0, HEVC video, PID != 0x1015.
+  const AVStream* bl = m_pFormatContext->streams[0];
+  if (bl == nullptr || bl->codecpar == nullptr)       return false;
+  if (bl->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) return false;
+  if (bl->codecpar->codec_id != AV_CODEC_ID_HEVC)     return false;
+  if (bl->id == 0x1015)                               return false;
+
+  // EL: can be on any other stream index, HEVC video, PID == 0x1015.
+  for (unsigned int i = 1; i < m_pFormatContext->nb_streams; ++i)
+  {
+    const AVStream* el = m_pFormatContext->streams[i];
+    if (el == nullptr || el->codecpar == nullptr)       continue;
+    if (el->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) continue;
+    if (el->codecpar->codec_id != AV_CODEC_ID_HEVC)     continue;
+    if (el->id != 0x1015)                               continue;
+
+    return true;
+  }
+
+  return false;
+}
+
 StreamHdrType CDVDDemuxFFmpeg::DetermineHdrType(AVStream* pStream)
 {
-  StreamHdrType hdrType = StreamHdrType::HDR_TYPE_NONE;
-  bool convert_dual_stream((pStream->id == 0x1015) && aml_dolby_vision_enabled());
-
+  auto hdrType = StreamHdrType::HDR_TYPE_NONE;
 
   if (av_packet_side_data_get(pStream->codecpar->coded_side_data,
                               pStream->codecpar->nb_coded_side_data,
                               AV_PKT_DATA_DOVI_CONF)) // DoVi
+    hdrType = StreamHdrType::HDR_TYPE_DOLBYVISION;
+  else if (IsDoViP7DualLayer()) // DoVi P7 Dual Layer
     hdrType = StreamHdrType::HDR_TYPE_DOLBYVISION;
   else if (pStream->codecpar->color_trc == AVCOL_TRC_SMPTE2084) // HDR10
     hdrType = StreamHdrType::HDR_TYPE_HDR10;
