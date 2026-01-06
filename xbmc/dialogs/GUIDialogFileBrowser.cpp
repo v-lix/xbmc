@@ -645,7 +645,7 @@ bool CGUIDialogFileBrowser::ShowAndGetImage(const CFileItemList &items, const VE
     result = browser->m_selectedPath;
     if (result == "image://Browse")
     { // "Browse for thumb"
-      CServiceBroker::GetGUI()->GetWindowManager().Remove(browser->GetID());
+      CServiceBroker::GetGUI()->GetWindowManager().Delete(browser->GetID());
       return ShowAndGetImage(shares, g_localizeStrings.Get(label), result);
     }
   }
@@ -653,7 +653,7 @@ bool CGUIDialogFileBrowser::ShowAndGetImage(const CFileItemList &items, const VE
   if (flip)
     *flip = browser->m_bFlip != 0;
 
-  CServiceBroker::GetGUI()->GetWindowManager().Remove(browser->GetID());
+  CServiceBroker::GetGUI()->GetWindowManager().Delete(browser->GetID());
   return confirmed;
 }
 
@@ -715,7 +715,7 @@ bool CGUIDialogFileBrowser::ShowAndGetFile(const VECSOURCES &shares, const std::
   bool confirmed(browser->IsConfirmed());
   if (confirmed)
     path = browser->m_selectedPath;
-  CServiceBroker::GetGUI()->GetWindowManager().Remove(browser->GetID());
+  CServiceBroker::GetGUI()->GetWindowManager().Delete(browser->GetID());
   return confirmed;
 }
 
@@ -771,13 +771,13 @@ bool CGUIDialogFileBrowser::ShowAndGetFile(const std::string &directory, const s
     path = browser->m_selectedPath;
   if (path == "file://Browse")
   { // "Browse for thumb"
-    CServiceBroker::GetGUI()->GetWindowManager().Remove(browser->GetID());
+    CServiceBroker::GetGUI()->GetWindowManager().Delete(browser->GetID());
     VECSOURCES shares;
     CServiceBroker::GetMediaManager().GetLocalDrives(shares);
 
     return ShowAndGetFile(shares, mask, heading, path, useThumbs,useFileDirectories);
   }
-  CServiceBroker::GetGUI()->GetWindowManager().Remove(browser->GetID());
+  CServiceBroker::GetGUI()->GetWindowManager().Delete(browser->GetID());
   return confirmed;
 }
 
@@ -804,7 +804,7 @@ bool CGUIDialogFileBrowser::ShowAndGetFileList(const VECSOURCES &shares, const s
     else
       path.push_back(browser->m_selectedPath);
   }
-  CServiceBroker::GetGUI()->GetWindowManager().Remove(browser->GetID());
+  CServiceBroker::GetGUI()->GetWindowManager().Delete(browser->GetID());
   return confirmed;
 }
 
@@ -871,7 +871,7 @@ bool CGUIDialogFileBrowser::ShowAndGetSource(std::string &path, bool allowNetwor
   if (confirmed)
     path = browser->m_selectedPath;
 
-  CServiceBroker::GetGUI()->GetWindowManager().Remove(browser->GetID());
+  CServiceBroker::GetGUI()->GetWindowManager().Delete(browser->GetID());
   return confirmed;
 }
 
