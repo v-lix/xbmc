@@ -1409,7 +1409,9 @@ msgctxt "#294"
 msgid "Create bookmark"
 msgstr ""
 
-#empty string with id 295
+msgctxt "#295"
+msgid "Low latency mode"
+msgstr ""
 
 msgctxt "#296"
 msgid "Clear bookmarks"
@@ -21316,7 +21318,11 @@ msgctxt "#36440"
 msgid "Enable hardware video decode using Amlogic decoder."
 msgstr ""
 
-#empty strings from id 36440 to 36441
+#. Description of setting with label #295 "Low latency mode"
+#: system/settings/settings.xml
+msgctxt "#36441"
+msgid "Reduces audio processing latency. Improves playback start, unpause and seek (the audio returns sooner).\nYou can disable this setting if you experience audio issues."
+msgstr ""
 
 #. Description of setting "System -> Audio output -> Volume control steps" with label #1302
 #: system/settings/settings.xml
