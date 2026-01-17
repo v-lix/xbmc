@@ -50,6 +50,7 @@ CGUIButtonControl::CGUIButtonControl(const CGUIButtonControl& control)
     m_imgNoFocus(control.m_imgNoFocus->Clone()),
     m_focusCounter(control.m_focusCounter),
     m_alpha(control.m_alpha),
+    m_lastFocusAlpha(control.m_lastFocusAlpha),
     m_minWidth(control.m_minWidth),
     m_maxWidth(control.m_maxWidth),
     m_info(control.m_info),
@@ -89,8 +90,14 @@ void CGUIButtonControl::Process(unsigned int currentTime, CDirtyRegionList &dirt
       alphaChannel += 192;
       alphaChannel = (unsigned int)((float)m_alpha * (float)alphaChannel / 255.0f);
     }
-    if (m_imgFocus->SetAlpha((unsigned char)alphaChannel))
-      MarkDirtyRegion();
+
+    unsigned char newAlpha = static_cast<unsigned char>(alphaChannel);
+    if (m_lastFocusAlpha != newAlpha)
+    {
+      if (m_imgFocus->SetAlpha(newAlpha))
+        MarkDirtyRegion();
+      m_lastFocusAlpha = newAlpha;
+    }
 
     m_imgFocus->SetVisible(true);
     m_imgNoFocus->SetVisible(false);
@@ -413,6 +420,7 @@ void CGUIButtonControl::OnFocus()
 void CGUIButtonControl::OnUnFocus()
 {
   m_unfocusActions.ExecuteActions(GetID(), GetParentID());
+  m_lastFocusAlpha = 0;
 }
 
 void CGUIButtonControl::SetSelected(bool bSelected)
