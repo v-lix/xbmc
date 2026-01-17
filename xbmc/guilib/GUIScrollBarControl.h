@@ -66,6 +66,11 @@ protected:
   bool m_showOnePage;
   ORIENTATION m_orientation;
 
+  // Cached values for UpdateBarSize() optimization
+  int m_lastOffset{-1};
+  int m_lastPageSize{-1};
+  int m_lastNumItems{-1};
+
 private:
   GUIScrollBarControl(const GUIScrollBarControl& control);
 };
