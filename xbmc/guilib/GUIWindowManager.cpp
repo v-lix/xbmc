@@ -1565,17 +1565,44 @@ void CGUIWindowManager::DispatchThreadMessages()
     int window = m_vecThreadMessages.front().second;
     m_vecThreadMessages.pop_front();
 
-    lock.unlock();
+    // Check for duplicate messages that would be superseded by later messages
+    int msgType = pMsg->GetMessage();
+    if (msgType == GUI_MSG_ITEM_SELECT ||
+        msgType == GUI_MSG_LABEL_SET ||
+        msgType == GUI_MSG_LABEL2_SET ||
+        msgType == GUI_MSG_SET_TEXT)
+    {
+      int controlId = pMsg->GetControlId();
+      // Check if there's a later message of same type to same control
+      for (auto it = m_vecThreadMessages.begin(); it != m_vecThreadMessages.end(); ++it)
+      {
+        CGUIMessage* laterMsg = it->first;
+        if (laterMsg->GetMessage() == msgType &&
+            laterMsg->GetControlId() == controlId &&
+            it->second == window)
+        {
+          // Skip this message, a later one will supersede it
+          delete pMsg;
+          pMsg = nullptr;
+          break;
+        }
+      }
+    }
 
-    // XXX: during SendMessage(), there could be a deeper 'xbmc main loop' inited by e.g. doModal
-    //      which may loop there and callback to DispatchThreadMessages() multiple times.
-    if (window)
-      SendMessage( *pMsg, window );
-    else
-      SendMessage( *pMsg );
-    delete pMsg;
+    if (pMsg)
+    {
+      lock.unlock();
 
-    lock.lock();
+      // XXX: during SendMessage(), there could be a deeper 'xbmc main loop' inited by e.g. doModal
+      //      which may loop there and callback to DispatchThreadMessages() multiple times.
+      if (window)
+        SendMessage( *pMsg, window );
+      else
+        SendMessage( *pMsg );
+      delete pMsg;
+
+      lock.lock();
+    }
   }
 }
 
