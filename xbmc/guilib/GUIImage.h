@@ -115,5 +115,8 @@ protected:
   unsigned int m_crossFadeTime;
   unsigned int m_currentFadeTime;
   unsigned int m_lastRenderTime;
+
+  // Cached diffuse color to avoid redundant UpdateDiffuseColor calls
+  UTILS::COLOR::Color m_lastDiffuseColor{0xFFFFFFFF};
 };
 

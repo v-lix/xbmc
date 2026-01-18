@@ -39,7 +39,8 @@ CGUIImage::CGUIImage(const CGUIImage& left)
     m_texture(left.m_texture->Clone()),
     m_fadingTextures(),
     m_currentTexture(),
-    m_currentFallback()
+    m_currentFallback(),
+    m_lastDiffuseColor(left.m_lastDiffuseColor)
 {
   m_crossFadeTime = left.m_crossFadeTime;
   // defaults
@@ -169,7 +170,15 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
   }
 
   if (!m_texture->GetDiffuseColor().HasInfo())
-    UpdateDiffuseColor(nullptr);
+  {
+    // Only update diffuse color if it has changed
+    UTILS::COLOR::Color currentColor = m_diffuseColor;
+    if (currentColor != m_lastDiffuseColor)
+    {
+      m_lastDiffuseColor = currentColor;
+      UpdateDiffuseColor(nullptr);
+    }
+  }
 
   if (m_texture->Process(currentTime))
     MarkDirtyRegion();
