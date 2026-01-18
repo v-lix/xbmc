@@ -111,6 +111,7 @@ CGUITexture::CGUITexture(const CGUITexture& right)
     m_width(right.m_width),
     m_height(right.m_height),
     m_use_cache(right.m_use_cache),
+    m_lastReadyState(right.m_lastReadyState),
     m_alpha(right.m_alpha),
     m_allocateDynamically(right.m_allocateDynamically),
     m_info(right.m_info),
@@ -166,7 +167,15 @@ bool CGUITexture::Process(unsigned int currentTime)
     changed |= CalculateSize();
 
   if (m_isAllocated)
-    changed |= !ReadyToRender();
+  {
+    // Only report change on ready state transition, not every frame while loading
+    bool ready = ReadyToRender();
+    if (ready != m_lastReadyState)
+    {
+      m_lastReadyState = ready;
+      changed = true;
+    }
+  }
 
   return changed;
 }
@@ -526,6 +535,7 @@ void CGUITexture::FreeResources(bool immediately /* = false */)
   Free();
 
   m_isAllocated = NO;
+  m_lastReadyState = true; // reset for next allocation cycle
 }
 
 void CGUITexture::DynamicResourceAlloc(bool allocateDynamically)
