@@ -21311,6 +21311,7 @@ msgstr ""
 #: system/settings/settings.xml
 msgctxt "#36439"
 msgid "Enable automatic playback of the next programme when playing past programmes (catchup) or for Video On Demand (VOD) channels. Please note that catchup and VOD only work if supported by the channel provider."
+msgstr ""
 
 #. Description of setting with label #13438 "Allow hardware acceleration (amcodec)"
 #: system/settings/settings.xml
@@ -25254,7 +25255,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60032"
-msgid "Set DV VSVDB to replace Display DV VSVDB EDID with your specified values for Display "Colour Space" and "Maximum Luminance". If Display does not have a DV VSVDB EDID then these settings values will be used even if the "Set DV VSVDB" is set to Off. Toggle this setting from Off-On-Off to show your Display DV VSVDB EDID values."
+msgid "Set DV VSVDB to replace Display DV VSVDB EDID with your specified values for Display \"Colour Space\" and \"Maximum Luminance\". If Display does not have a DV VSVDB EDID then these settings values will be used even if the \"Set DV VSVDB\" is set to Off. Toggle this setting from Off-On-Off to show your Display DV VSVDB EDID values."
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25404,7 +25405,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60072"
-msgid "Set DV Colour Space based on your Display capability. If Display does not have a DV VSVDB EDID then this setting value will be used even if the "Set DV VSVDB" is set to Off. Toggle the "Set DV VSVDB" setting from Off-On-Off to show your Display Colour Space DV VSVDB EDID value - DISPLAY will show if non-standard Colour Space."
+msgid "Set DV Colour Space based on your Display capability. If Display does not have a DV VSVDB EDID then this setting value will be used even if the \"Set DV VSVDB\" is set to Off. Toggle the \"Set DV VSVDB\" setting from Off-On-Off to show your Display Colour Space DV VSVDB EDID value - DISPLAY will show if non-standard Colour Space."
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25428,7 +25429,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60076"
-msgid "Set DV Maximum Luminance based on your Display capability. If Display does not have a DV VSVDB EDID then this setting value will be used even if the "Set DV VSVDB" is set to Off. Toggle the "Set DV VSVDB" setting from Off-On-Off to show your Display Maximum Luminance DV VSVDB EDID value."
+msgid "Set DV Maximum Luminance based on your Display capability. If Display does not have a DV VSVDB EDID then this setting value will be used even if the \"Set DV VSVDB\" is set to Off. Toggle the \"Set DV VSVDB\" setting from Off-On-Off to show your Display Maximum Luminance DV VSVDB EDID value."
 msgstr ""
 
 #. "Dolby Vision VSVDB"
