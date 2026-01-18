@@ -116,9 +116,10 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
 
   if (m_crossFadeTime)
   {
+    bool changed = false;
+
     // make sure our texture has started allocating
-    if (m_texture->AllocResources())
-      MarkDirtyRegion();
+    changed |= m_texture->AllocResources();
 
     // compute the frame time
     unsigned int frameTime = 0;
@@ -132,7 +133,7 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
     { // anything other than the last old texture needs to be faded out as per usual
       for (std::vector<CFadingTexture *>::iterator i = m_fadingTextures.begin(); i != m_fadingTextures.end() - 1;)
       {
-        if (!ProcessFading(*i, frameTime, currentTime))
+        if (!ProcessFading(*i, frameTime, currentTime, changed))
           i = m_fadingTextures.erase(i);
         else
           ++i;
@@ -140,7 +141,7 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
 
       if (m_texture->ReadyToRender() || m_texture->GetFileName().empty())
       { // fade out the last one as well
-        if (!ProcessFading(m_fadingTextures[m_fadingTextures.size() - 1], frameTime, currentTime))
+        if (!ProcessFading(m_fadingTextures[m_fadingTextures.size() - 1], frameTime, currentTime, changed))
           m_fadingTextures.erase(m_fadingTextures.end() - 1);
       }
       else
@@ -150,12 +151,9 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
         if (texture->m_fadeTime > m_crossFadeTime)
           texture->m_fadeTime = m_crossFadeTime;
 
-        if (texture->m_texture->SetAlpha(GetFadeLevel(texture->m_fadeTime)))
-          MarkDirtyRegion();
-        if (texture->m_texture->SetDiffuseColor(m_diffuseColor))
-          MarkDirtyRegion();
-        if (texture->m_texture->Process(currentTime))
-          MarkDirtyRegion();
+        changed |= texture->m_texture->SetAlpha(GetFadeLevel(texture->m_fadeTime));
+        changed |= texture->m_texture->SetDiffuseColor(m_diffuseColor);
+        changed |= texture->m_texture->Process(currentTime);
       }
     }
 
@@ -165,7 +163,9 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
       if (m_currentFadeTime > m_crossFadeTime || frameTime == 0) // for if we allocate straight away on creation
         m_currentFadeTime = m_crossFadeTime;
     }
-    if (m_texture->SetAlpha(GetFadeLevel(m_currentFadeTime)))
+    changed |= m_texture->SetAlpha(GetFadeLevel(m_currentFadeTime));
+
+    if (changed)
       MarkDirtyRegion();
   }
 
@@ -198,24 +198,21 @@ void CGUIImage::Render()
   CGUIControl::Render();
 }
 
-bool CGUIImage::ProcessFading(CGUIImage::CFadingTexture *texture, unsigned int frameTime, unsigned int currentTime)
+bool CGUIImage::ProcessFading(CGUIImage::CFadingTexture *texture, unsigned int frameTime, unsigned int currentTime, bool &changed)
 {
   assert(texture);
   if (texture->m_fadeTime <= frameTime)
   { // time to kill off the texture
-    MarkDirtyRegion();
+    changed = true;
     delete texture;
     return false;
   }
   // render this texture
   texture->m_fadeTime -= frameTime;
 
-  if (texture->m_texture->SetAlpha(GetFadeLevel(texture->m_fadeTime)))
-    MarkDirtyRegion();
-  if (texture->m_texture->SetDiffuseColor(m_diffuseColor))
-    MarkDirtyRegion();
-  if (texture->m_texture->Process(currentTime))
-    MarkDirtyRegion();
+  changed |= texture->m_texture->SetAlpha(GetFadeLevel(texture->m_fadeTime));
+  changed |= texture->m_texture->SetDiffuseColor(m_diffuseColor);
+  changed |= texture->m_texture->Process(currentTime);
 
   return true;
 }

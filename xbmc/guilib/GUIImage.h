@@ -93,7 +93,7 @@ protected:
   virtual void FreeTextures(bool immediately = false);
   void FreeResourcesButNotAnims();
   unsigned char GetFadeLevel(unsigned int time) const;
-  bool ProcessFading(CFadingTexture *texture, unsigned int frameTime, unsigned int currentTime);
+  bool ProcessFading(CFadingTexture *texture, unsigned int frameTime, unsigned int currentTime, bool &changed);
 
   /*!
    * \brief Update the diffuse color based on the current item infos
