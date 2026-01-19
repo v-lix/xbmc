@@ -665,6 +665,7 @@ CVideoPlayer::CVideoPlayer(IPlayerCallback& callback)
 
   m_bAbortRequest = false;
   m_offset_pts = 0.0;
+  m_demuxSeekBasePts = DVD_NOPTS_VALUE;
   m_playSpeed = DVD_PLAYSPEED_NORMAL;
   m_streamPlayerSpeed = DVD_PLAYSPEED_NORMAL;
   m_caching = CACHESTATE_DONE;
@@ -1270,6 +1271,7 @@ void CVideoPlayer::Prepare()
   m_CurrentAudioID3.hint.Clear();
   m_SpeedState.Reset(DVD_NOPTS_VALUE);
   m_offset_pts = 0;
+  m_demuxSeekBasePts = DVD_NOPTS_VALUE;
   m_CurrentAudio.lastdts = DVD_NOPTS_VALUE;
   m_CurrentVideo.lastdts = DVD_NOPTS_VALUE;
 
@@ -2770,14 +2772,19 @@ void CVideoPlayer::HandleMessages()
 
       time = msg.GetRestore() ? m_Edl.GetTimeAfterRestoringCuts(time) : time;
 
-      // if input stream doesn't support ISeekTime, convert back to pts
+      // if input stream doesn't support IPosTime, convert back to pts
       //! @todo
       //! After demuxer we add an offset to input pts so that displayed time and clock are
       //! increasing steadily. For seeking we need to determine the boundaries and offset
       //! of the desired segment. With the current approach calculated time may point
       //! to nirvana
       if (m_pInputStream->GetIPosTime() == nullptr)
-        time -= m_State.time_offset/1000l;
+      {
+        if (m_demuxSeekBasePts != DVD_NOPTS_VALUE)
+          time += static_cast<double>(DVD_TIME_TO_MSEC(m_demuxSeekBasePts));
+        else
+          time -= m_State.time_offset / 1000l;
+      }
 
       CLog::Log(LOGDEBUG, "demuxer seek to: {:f}", time);
       if (m_pDemuxer && m_pDemuxer->SeekTime(time, msg.GetBackward(), &start))
@@ -5123,6 +5130,14 @@ void CVideoPlayer::UpdatePlayState(double timeout)
           dispTime = m_CurrentAudio.dispTime;
 
         state.time_offset = DVD_MSEC_TO_TIME(dispTime) - state.dts;
+
+        // Capture demux base PTS for accurate seeking when IPosTime is unavailable
+        if (m_demuxSeekBasePts == DVD_NOPTS_VALUE)
+        {
+          const double base = state.dts - DVD_MSEC_TO_TIME(state.time);
+          if (std::isfinite(base))
+            m_demuxSeekBasePts = base;
+        }
       }
       state.time += state.time_offset * 1000 / DVD_TIME_BASE;
       state.timeMax = pDisplayTime->GetTotalTime();
