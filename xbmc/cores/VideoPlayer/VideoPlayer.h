@@ -536,6 +536,7 @@ protected:
   } m_SpeedState;
 
   double m_offset_pts;
+  double m_demuxSeekBasePts{DVD_NOPTS_VALUE};
 
   CDVDMessageQueue m_messenger;
   std::unique_ptr<CJobQueue> m_outboundEvents;
