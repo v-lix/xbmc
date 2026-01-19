@@ -2098,8 +2098,9 @@ bool CAMLCodec::OpenDecoder()
   CSysfsPath("/sys/module/amvdec_h264/parameters/dec_control", 4);
 
   // workaround to fix slow framerate for VC1 progressive (force interlace!)
-  bool vc1 = (am_private->video_format == VFORMAT_VC1);
-  CSysfsPath("/sys/class/deinterlace/di0/debug", vc1 ? "di_debug_flag0x10000" : "di_debug_flag0x0");
+  // Only needed for SoCs up to SC2; newer SoCs use ge2d copy which doesn't need this
+  if (am_private->video_format == VFORMAT_VC1 && aml_get_cpufamily_id() <= AML_SC2)
+    CSysfsPath("/sys/class/deinterlace/di0/debug", "di_debug_flag0x10000");
 
   switch(am_private->video_format)
   {
@@ -2302,6 +2303,10 @@ void CAMLCodec::CloseDecoder()
   m_dll->codec_close(&am_private->vcodec);
   dumpfile_close(am_private);
   m_opened = false;
+
+  // Reset VC1 deinterlace workaround
+  if (am_private->video_format == VFORMAT_VC1 && aml_get_cpufamily_id() <= AML_SC2)
+    CSysfsPath("/sys/class/deinterlace/di0/debug", "di_debug_flag0x0");
 
   am_packet_release(&am_private->am_pkt);
   am_private->extradata = {};
@@ -2635,10 +2640,33 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
 
     m_tp_last_frame = std::chrono::system_clock::now();
 
+    // Calculate frame duration with PTS validation and correction
+    const double rate_duration = static_cast<double>(am_private->video_rate * DVD_TIME_BASE) / UNIT_FREQ;
+    const double picture_duration = static_cast<double>(m_cur_pts - m_last_pts);
+    const double duration_ratio = picture_duration / rate_duration;
+    const bool is_vc1_25hz_interlaced = ((m_hints.codec == AV_CODEC_ID_VC1) &&
+                                         (m_processInfo.GetVideoFps() == 25.0f) &&
+                                         m_processInfo.GetVideoInterlaced());
+
     if (m_last_pts == DVD_NOPTS_VALUE)
-      videoPicture.iDuration = static_cast<double>(am_private->video_rate * DVD_TIME_BASE) / UNIT_FREQ;
+      videoPicture.iDuration = rate_duration;
+    else if ((m_speed == DVD_PLAYSPEED_NORMAL) &&
+             !is_vc1_25hz_interlaced &&
+             (m_cur_pts < m_last_pts))
+    {
+      // PTS reversal - correct it (but not for VC-1 25Hz interlaced which can have out-of-order PTS)
+      m_cur_pts = m_last_pts + rate_duration;
+      videoPicture.iDuration = rate_duration;
+    }
+    else if ((m_speed == DVD_PLAYSPEED_NORMAL) &&
+             (duration_ratio < 0.2 || (duration_ratio > 1.5 && duration_ratio < 4.0)))
+    {
+      // Anomalous duration ratio - use expected rate instead
+      m_cur_pts = m_last_pts + rate_duration;
+      videoPicture.iDuration = rate_duration;
+    }
     else
-      videoPicture.iDuration = static_cast<double>(m_cur_pts - m_last_pts);
+      videoPicture.iDuration = picture_duration;
 
     videoPicture.dts = DVD_NOPTS_VALUE;
     videoPicture.pts = static_cast<double>(m_cur_pts);
