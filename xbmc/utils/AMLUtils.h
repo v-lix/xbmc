@@ -70,7 +70,6 @@ enum DV_COLORIMETRY : int
 #define AML_G12A    0x28
 #define AML_G12B    0x29
 #define AML_SM1     0x2B
-#define AML_SC2     0x32
 
 #define FLAG_FORCE_DOVI_LL      (unsigned int)(0x4000)
 #define FLAG_TOGGLE_FRAME       (unsigned int)(0x80000000)
