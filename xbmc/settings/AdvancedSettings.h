@@ -419,6 +419,23 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool GetResetSeek() const;
     bool m_resetSeek;
 
+    // CD/CS (Color Depth/Color Space) management for DV/HDR10+ playback (avdvplus R6)
+    void SetForceCS(bool force_cs);
+    bool GetForceCS() const;
+    bool m_forceCS{false};
+
+    void SetLimitCD(bool limit_cd);
+    bool GetLimitCD() const;
+    bool m_limitCD{false};
+
+    void SetForceCSPrevVal(int val);
+    int GetForceCSPrevVal() const;
+    int m_forceCSPrevVal{0};
+
+    void SetLimitCDPrevVal(int val);
+    int GetLimitCDPrevVal() const;
+    int m_limitCDPrevVal{0};
+
   private:
     void Initialize();
     void Clear();

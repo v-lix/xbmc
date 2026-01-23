@@ -1399,6 +1399,47 @@ bool CAdvancedSettings::GetResetSeek() const
   return m_resetSeek;
 }
 
+// CD/CS (Color Depth/Color Space) management for DV/HDR10+ playback (avdvplus R6)
+void CAdvancedSettings::SetForceCS(bool force_cs)
+{
+  m_forceCS = force_cs;
+}
+
+bool CAdvancedSettings::GetForceCS() const
+{
+  return m_forceCS;
+}
+
+void CAdvancedSettings::SetLimitCD(bool limit_cd)
+{
+  m_limitCD = limit_cd;
+}
+
+bool CAdvancedSettings::GetLimitCD() const
+{
+  return m_limitCD;
+}
+
+void CAdvancedSettings::SetForceCSPrevVal(int val)
+{
+  m_forceCSPrevVal = val;
+}
+
+int CAdvancedSettings::GetForceCSPrevVal() const
+{
+  return m_forceCSPrevVal;
+}
+
+void CAdvancedSettings::SetLimitCDPrevVal(int val)
+{
+  m_limitCDPrevVal = val;
+}
+
+int CAdvancedSettings::GetLimitCDPrevVal() const
+{
+  return m_limitCDPrevVal;
+}
+
 void CAdvancedSettings::Clear()
 {
   m_videoCleanStringRegExps.clear();

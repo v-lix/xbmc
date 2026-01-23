@@ -469,7 +469,7 @@ std::string aml_dv_mode_to_string(enum DV_MODE mode)
 
 std::string aml_dv_type_to_string(enum DV_TYPE type)
 {
-  std::string type_string = "Unkown";
+  std::string type_string = "Unknown";
   switch (type) {
     case DV_TYPE::DV_TYPE_DISPLAY_LED:
       type_string = "0-Display Led (DV-Std)";
@@ -482,6 +482,9 @@ std::string aml_dv_type_to_string(enum DV_TYPE type)
       break;
     case DV_TYPE::DV_TYPE_VS10_ONLY:
       type_string = "3-VS10 Only";
+      break;
+    case DV_TYPE::DV_TYPE_PLAYER_LED_HDR2:
+      type_string = "4-Player Led (HDR2)";
       break;
   }
   return type_string;
@@ -1548,4 +1551,93 @@ void aml_reset_audio_from_play_from_resume()
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetResetSeek(true);
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetLastResetTime(0.0);
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetAlgoForReset(1);
+}
+
+// Static flag for kernel-side 422 forcing during DV/HDR10+ playback
+static bool aml_linux_force_422 = false;
+
+// CD/CS (Color Depth/Color Space) management for DV/HDR10+ playback (avdvplus R6)
+// Type 1: DV processing setup - force YUV422 and adjust CS/CD limits
+// Type 2: HDR10+ processing - limit color depth/space
+void aml_kodi_set_cd_cs(int cd_cs_type)
+{
+  auto advSettings = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings();
+
+  switch (cd_cs_type)
+  {
+    case 1: // DV video processor setup
+    {
+      enum DV_TYPE dv_type = static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE));
+
+      // For player-led modes (LLDV, HDR, HDR2), force YUV422 and set CS/CD limits
+      if (dv_type == DV_TYPE_PLAYER_LED_LLDV || dv_type == DV_TYPE_PLAYER_LED_HDR ||
+          dv_type == DV_TYPE_PLAYER_LED_HDR2)
+      {
+        if (!advSettings->GetForceCS())
+        {
+          // Save current values before changing
+          advSettings->SetForceCS(true);
+          advSettings->SetForceCSPrevVal(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS));
+          advSettings->SetLimitCDPrevVal(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD));
+        }
+        // Force YUV444 color space and no bit depth limit for DV processing
+        settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS, 3); // 444
+        settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD, 3); // 16bit (no limit)
+
+        // Enable kernel-side 422 forcing for lower frame rates
+        if (CServiceBroker::GetDataCacheCore().GetVideoFps() < 41.0f)
+          aml_linux_force_422 = true;
+      }
+      else
+      {
+        aml_linux_force_422 = false;
+      }
+
+      // Set kernel parameter for 422 forcing
+      CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
+      break;
+    }
+
+    case 2: // HDR10+ processing
+    {
+      StreamHdrType hdrType = CServiceBroker::GetDataCacheCore().GetVideoHdrType();
+
+      if (hdrType == StreamHdrType::HDR_TYPE_HDR10PLUS && !advSettings->GetLimitCD())
+      {
+        // Save current values before changing
+        advSettings->SetLimitCD(true);
+        advSettings->SetLimitCDPrevVal(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD));
+        advSettings->SetForceCSPrevVal(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS));
+
+        // Limit color depth and force color space for HDR10+ compatibility
+        settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD, 3); // 16bit
+        settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS, 3); // 444
+      }
+      break;
+    }
+
+    default:
+      break;
+  }
+}
+
+void aml_kodi_reset_cd_cs()
+{
+  auto advSettings = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings();
+
+  // Restore previous CD/CS settings if they were changed
+  if (advSettings->GetLimitCD() || advSettings->GetForceCS())
+  {
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD, advSettings->GetLimitCDPrevVal());
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS, advSettings->GetForceCSPrevVal());
+
+    advSettings->SetLimitCD(false);
+    advSettings->SetForceCS(false);
+    advSettings->SetLimitCDPrevVal(0);
+    advSettings->SetForceCSPrevVal(0);
+  }
+
+  // Reset kernel-side 422 forcing
+  aml_linux_force_422 = false;
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
 }

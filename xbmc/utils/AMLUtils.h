@@ -54,7 +54,8 @@ enum DV_TYPE : int
   DV_TYPE_DISPLAY_LED = 0,
   DV_TYPE_PLAYER_LED_LLDV,
   DV_TYPE_PLAYER_LED_HDR,
-  DV_TYPE_VS10_ONLY
+  DV_TYPE_VS10_ONLY,
+  DV_TYPE_PLAYER_LED_HDR2
 };
 
 enum DV_COLORIMETRY : int
@@ -156,3 +157,5 @@ void aml_reset_audio_from_player_pause();
 void aml_reset_audio_from_window_home();
 void aml_reset_audio_from_play_from_beginning();
 void aml_reset_audio_from_play_from_resume();
+void aml_kodi_set_cd_cs(int cd_cs_type);
+void aml_kodi_reset_cd_cs();

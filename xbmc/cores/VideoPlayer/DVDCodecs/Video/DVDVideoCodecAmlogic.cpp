@@ -429,6 +429,9 @@ void CDVDVideoCodecAmlogic::Close(void)
 {
   CLog::Log(LOGINFO, "{}::{}", __MODULE_NAME__, __FUNCTION__);
 
+  // Reset CD/CS settings that may have been changed during playback (avdvplus R6)
+  aml_kodi_reset_cd_cs();
+
   m_videoBufferPool = nullptr;
 
   if (m_Codec)

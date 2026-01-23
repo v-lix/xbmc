@@ -122,12 +122,12 @@ bool CPackerMAT::PackTrueHD(const uint8_t* data, int size)
 
       // Get the offset of this frame, so we can compare to the previous frame,
       // and determine the amount of padding that needs to be inserted
-      int currentFrameOutputOffset = static_cast<int>(prevOutput - frameTime);
+      int32_t currentFrameOutputOffset = static_cast<int32_t>(prevOutput - frameTime);
 
       // The previous offset should never be smaller than the incoming offset,
       // or we will lack the reserved space
       if (m_state.nOutputTimeOffset >= currentFrameOutputOffset)
-        m_state.padding += (m_state.nOutputTimeOffset - currentFrameOutputOffset) * (64 >> (m_state.ratebits & 7));
+        m_state.padding += (m_state.nOutputTimeOffset - currentFrameOutputOffset) * static_cast<int32_t>(64 >> (m_state.ratebits & 7));
 
       CLog::Log(LOGDEBUG, "CPackerMAT::PackTrueHD: carrying forward {} padding (offset {} - {})",
                 m_state.padding, m_state.nOutputTimeOffset, currentFrameOutputOffset);
@@ -169,7 +169,7 @@ bool CPackerMAT::PackTrueHD(const uint8_t* data, int size)
       if (prevOutput < frameTime) // wrap around, output is always in front of frame time
         prevOutput += UINT16_MAX;
 
-      m_state.nOutputTimeOffset = static_cast<int>(prevOutput - frameTime);
+      m_state.nOutputTimeOffset = static_cast<int32_t>(prevOutput - frameTime);
     }
   }
   else
@@ -319,15 +319,15 @@ void CPackerMAT::WriteHeader()
   if (m_state.padding > 0)
   {
     // if the header fits into the padding of the last frame, just reduce the amount of needed padding
-    if (m_state.padding > size)
+    if (m_state.padding > static_cast<int32_t>(size))
     {
-      m_state.padding -= size;
+      m_state.padding -= static_cast<int32_t>(size);
       m_state.matFramesize = 0;
     }
     else
     {
       // otherwise, consume all padding and set the size of the next MAT frame to the remaining data
-      m_state.matFramesize = (size - m_state.padding);
+      m_state.matFramesize = static_cast<uint32_t>(static_cast<int32_t>(size) - m_state.padding);
       m_state.padding = 0;
     }
   }
