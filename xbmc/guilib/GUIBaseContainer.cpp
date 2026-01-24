@@ -30,6 +30,7 @@
 #include "utils/XBMCTinyXML.h"
 #include "utils/log.h"
 
+#include <algorithm>
 #include <memory>
 
 using namespace KODI;
@@ -629,30 +630,28 @@ void CGUIBaseContainer::OnRight()
 
 void CGUIBaseContainer::OnNextLetter()
 {
-  int offset = CorrectOffset(GetOffset(), GetCursor());
-  for (unsigned int i = 0; i < m_letterOffsets.size(); i++)
-  {
-    if (m_letterOffsets[i].first > offset)
-    {
-      SelectItem(m_letterOffsets[i].first);
-      return;
-    }
-  }
+  const int offset = CorrectOffset(GetOffset(), GetCursor());
+  // Binary search for first letter offset greater than current position
+  auto it = std::upper_bound(m_letterOffsets.begin(), m_letterOffsets.end(), offset,
+                             [](int value, const std::pair<int, std::string>& elem) {
+                               return value < elem.first;
+                             });
+  if (it != m_letterOffsets.end())
+    SelectItem(it->first);
 }
 
 void CGUIBaseContainer::OnPrevLetter()
 {
-  int offset = CorrectOffset(GetOffset(), GetCursor());
-  if (!m_letterOffsets.size())
+  const int offset = CorrectOffset(GetOffset(), GetCursor());
+  if (m_letterOffsets.empty())
     return;
-  for (int i = (int)m_letterOffsets.size() - 1; i >= 0; i--)
-  {
-    if (m_letterOffsets[i].first < offset)
-    {
-      SelectItem(m_letterOffsets[i].first);
-      return;
-    }
-  }
+  // Binary search for last letter offset less than current position
+  auto it = std::lower_bound(m_letterOffsets.begin(), m_letterOffsets.end(), offset,
+                             [](const std::pair<int, std::string>& elem, int value) {
+                               return elem.first < value;
+                             });
+  if (it != m_letterOffsets.begin())
+    SelectItem((--it)->first);
 }
 
 void CGUIBaseContainer::OnJumpLetter(const std::string& letter, bool skip /*=false*/)
@@ -700,19 +699,23 @@ void CGUIBaseContainer::OnJumpSMS(int letter)
   static const char letterMap[8][6] = { "ABC2", "DEF3", "GHI4", "JKL5", "MNO6", "PQRS7", "TUV8", "WXYZ9" };
 
   // only 2..9 supported
-  if (letter < 2 || letter > 9 || !m_letterOffsets.size())
+  if (letter < 2 || letter > 9 || m_letterOffsets.empty())
     return;
 
   const std::string letters = letterMap[letter - 2];
-  // find where we currently are
-  int offset = CorrectOffset(GetOffset(), GetCursor());
-  unsigned int currentLetter = 0;
-  while (currentLetter + 1 < m_letterOffsets.size() && m_letterOffsets[currentLetter + 1].first <= offset)
-    currentLetter++;
+  // find where we currently are using binary search
+  const int offset = CorrectOffset(GetOffset(), GetCursor());
+  auto it = std::upper_bound(m_letterOffsets.begin(), m_letterOffsets.end(), offset,
+                             [](int value, const std::pair<int, std::string>& elem) {
+                               return value < elem.first;
+                             });
+  // upper_bound gives us the first element > offset, we want the last element <= offset
+  if (it != m_letterOffsets.begin())
+    --it;
 
   // now switch to the next letter
-  std::string current = m_letterOffsets[currentLetter].second;
-  size_t startPos = (letters.find(current) + 1) % letters.size();
+  const std::string current = it->second;
+  const size_t startPos = (letters.find(current) + 1) % letters.size();
   // now jump to letters[startPos], or another one in the same range if possible
   size_t pos = startPos;
   while (true)
