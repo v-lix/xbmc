@@ -74,9 +74,9 @@ void CGUIControlGroupList::Process(unsigned int currentTime, CDirtyRegionList &d
 
   if (m_pageControl)
   {
-    int currentSize = static_cast<int>(Size());
-    int currentTotalSize = static_cast<int>(m_totalSize);
-    int currentScrollerValue = static_cast<int>(m_scroller.GetValue());
+    const int currentSize = static_cast<int>(Size());
+    const int currentTotalSize = static_cast<int>(m_totalSize);
+    const int currentScrollerValue = static_cast<int>(m_scroller.GetValue());
 
     if (m_lastPageControlSize != currentSize || m_lastPageControlTotalSize != currentTotalSize)
     {
