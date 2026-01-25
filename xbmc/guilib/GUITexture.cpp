@@ -168,7 +168,7 @@ bool CGUITexture::Process(unsigned int currentTime)
   if (m_isAllocated)
   {
     // Only report change on ready state transition, not every frame while loading
-    bool ready = ReadyToRender();
+    const bool ready = ReadyToRender();
     if (ready != m_lastReadyState)
     {
       m_lastReadyState = ready;
