@@ -31,6 +31,7 @@ class CGUIControlGroupList : public CGUIControlGroup
 {
 public:
   CGUIControlGroupList(int parentID, int controlID, float posX, float posY, float width, float height, float itemGap, int pageControl, ORIENTATION orientation, bool useControlPositions, uint32_t alignment, const CScroller& scroller);
+  CGUIControlGroupList(const CGUIControlGroupList& other);
   ~CGUIControlGroupList(void) override;
   CGUIControlGroupList* Clone() const override { return new CGUIControlGroupList(*this); }
 
