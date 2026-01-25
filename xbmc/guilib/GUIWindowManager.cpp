@@ -1648,10 +1648,11 @@ void CGUIWindowManager::DispatchThreadMessages()
     m_vecThreadMessages.pop_front();
 
     // Check for duplicate messages that would be superseded by later messages
+    // Only deduplicate label/text messages where the final value wins
+    // GUI_MSG_ITEM_SELECT is excluded because param1 specifies which item,
+    // and skipping intermediate selections could lose important state changes
     int msgType = pMsg->GetMessage();
-    if (msgType == GUI_MSG_ITEM_SELECT ||
-        msgType == GUI_MSG_LABEL_SET ||
-        msgType == GUI_MSG_LABEL2_SET ||
+    if (msgType == GUI_MSG_LABEL_SET || msgType == GUI_MSG_LABEL2_SET ||
         msgType == GUI_MSG_SET_TEXT)
     {
       int controlId = pMsg->GetControlId();
@@ -1659,8 +1660,7 @@ void CGUIWindowManager::DispatchThreadMessages()
       for (auto it = m_vecThreadMessages.begin(); it != m_vecThreadMessages.end(); ++it)
       {
         CGUIMessage* laterMsg = it->first;
-        if (laterMsg->GetMessage() == msgType &&
-            laterMsg->GetControlId() == controlId &&
+        if (laterMsg->GetMessage() == msgType && laterMsg->GetControlId() == controlId &&
             it->second == window)
         {
           // Skip this message, a later one will supersede it
