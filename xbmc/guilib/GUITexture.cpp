@@ -111,7 +111,6 @@ CGUITexture::CGUITexture(const CGUITexture& right)
     m_width(right.m_width),
     m_height(right.m_height),
     m_use_cache(right.m_use_cache),
-    m_lastReadyState(right.m_lastReadyState),
     m_alpha(right.m_alpha),
     m_allocateDynamically(right.m_allocateDynamically),
     m_info(right.m_info),
@@ -535,7 +534,7 @@ void CGUITexture::FreeResources(bool immediately /* = false */)
   Free();
 
   m_isAllocated = NO;
-  m_lastReadyState = true; // reset for next allocation cycle
+  m_lastReadyState.reset(); // reset for next allocation cycle
 }
 
 void CGUITexture::DynamicResourceAlloc(bool allocateDynamically)
