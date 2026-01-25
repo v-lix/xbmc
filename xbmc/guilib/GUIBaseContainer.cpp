@@ -71,7 +71,6 @@ CGUIBaseContainer::CGUIBaseContainer(const CGUIBaseContainer& other)
     m_orientation(other.m_orientation),
     m_itemsPerPage(other.m_itemsPerPage),
     m_pageControl(other.m_pageControl),
-    m_lastPageControlOffset(other.m_lastPageControlOffset),
     m_layoutCondition(other.m_layoutCondition),
     m_focusedLayoutCondition(other.m_focusedLayoutCondition),
     m_scroller(other.m_scroller),
@@ -1029,7 +1028,7 @@ void CGUIBaseContainer::SetPageControlRange()
   {
     CGUIMessage msg(GUI_MSG_LABEL_RESET, GetID(), m_pageControl, m_itemsPerPage, GetRows());
     SendWindowMessage(msg);
-    m_lastPageControlOffset = -1; // invalidate cache when range changes
+    m_lastPageControlOffset.reset(); // invalidate cache when range changes
   }
 }
 
@@ -1320,7 +1319,7 @@ void CGUIBaseContainer::Reset()
   m_items.clear();
   m_lastItem.reset();
   ResetAutoScrolling();
-  m_lastPageControlOffset = -1;
+  m_lastPageControlOffset.reset();
 }
 
 void CGUIBaseContainer::LoadLayout(TiXmlElement *layout)

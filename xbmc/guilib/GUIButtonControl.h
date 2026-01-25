@@ -18,6 +18,8 @@
 #include "GUILabel.h"
 #include "GUITexture.h"
 #include "guilib/guiinfo/GUIInfoLabel.h"
+
+#include <optional>
 #include "utils/ColorUtils.h"
 
 /*!
@@ -93,7 +95,7 @@ protected:
   std::unique_ptr<CGUITexture> m_imgNoFocus;
   unsigned int  m_focusCounter;
   unsigned char m_alpha;
-  unsigned char m_lastFocusAlpha{0};
+  std::optional<unsigned char> m_lastFocusAlpha;
 
   float m_minWidth;
   float m_maxWidth;

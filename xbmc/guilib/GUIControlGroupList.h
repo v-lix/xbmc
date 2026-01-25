@@ -15,6 +15,8 @@
 
 #include "GUIControlGroup.h"
 
+#include <optional>
+
 struct SGUIControlAndOffset
 {
   CGUIControl* control{nullptr};
@@ -116,9 +118,9 @@ protected:
   float m_totalSize;
 
   CScroller m_scroller;
-  int m_lastScrollerValue;
-  int m_lastPageControlSize{-1};
-  int m_lastPageControlTotalSize{-1};
+  std::optional<int> m_lastScrollerValue;
+  std::optional<int> m_lastPageControlSize;
+  std::optional<int> m_lastPageControlTotalSize;
 
   bool m_useControlPositions;
   ORIENTATION m_orientation;

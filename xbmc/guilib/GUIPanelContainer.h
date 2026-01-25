@@ -15,6 +15,8 @@
 
 #include "GUIBaseContainer.h"
 
+#include <optional>
+
 /*!
  \ingroup controls
  \brief
@@ -61,6 +63,6 @@ protected:
   int m_itemsPerRow;
 
   // Cached offset calculated in Process() and reused in Render()
-  int m_cachedScrollOffset{0};
+  std::optional<int> m_cachedScrollOffset;
 };
 

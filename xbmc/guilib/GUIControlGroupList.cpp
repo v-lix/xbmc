@@ -30,7 +30,6 @@ CGUIControlGroupList::CGUIControlGroupList(int parentID, int controlID, float po
   m_totalSize = 0;
   m_orientation = orientation;
   m_alignment = alignment;
-  m_lastScrollerValue = -1;
   m_useControlPositions = useControlPositions;
   ControlType = GUICONTROL_GROUPLIST;
   m_minSize = 0;
@@ -65,7 +64,8 @@ void CGUIControlGroupList::Process(unsigned int currentTime, CDirtyRegionList &d
 
     if (m_lastPageControlSize != currentSize || m_lastPageControlTotalSize != currentTotalSize)
     {
-      CGUIMessage message(GUI_MSG_LABEL_RESET, GetParentID(), m_pageControl, currentSize, currentTotalSize);
+      CGUIMessage message(GUI_MSG_LABEL_RESET, GetParentID(), m_pageControl, currentSize,
+                          currentTotalSize);
       SendWindowMessage(message);
       m_lastPageControlSize = currentSize;
       m_lastPageControlTotalSize = currentTotalSize;
@@ -73,7 +73,8 @@ void CGUIControlGroupList::Process(unsigned int currentTime, CDirtyRegionList &d
 
     if (m_lastScrollerValue != currentScrollerValue)
     {
-      CGUIMessage message(GUI_MSG_ITEM_SELECT, GetParentID(), m_pageControl, currentScrollerValue);
+      CGUIMessage message(GUI_MSG_ITEM_SELECT, GetParentID(), m_pageControl,
+                          currentScrollerValue);
       SendWindowMessage(message);
       m_lastScrollerValue = currentScrollerValue;
     }
@@ -354,8 +355,8 @@ void CGUIControlGroupList::ClearAll()
   m_totalSize = 0;
   CGUIControlGroup::ClearAll();
   m_scroller.SetValue(0);
-  m_lastPageControlSize = -1;
-  m_lastPageControlTotalSize = -1;
+  m_lastPageControlSize.reset();
+  m_lastPageControlTotalSize.reset();
 }
 
 #define CLAMP(x, low, high)  (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
@@ -396,9 +397,9 @@ void CGUIControlGroupList::SetInvalid()
 {
   CGUIControl::SetInvalid();
   // Force a message to the scrollbar
-  m_lastScrollerValue = -1;
-  m_lastPageControlSize = -1;
-  m_lastPageControlTotalSize = -1;
+  m_lastScrollerValue.reset();
+  m_lastPageControlSize.reset();
+  m_lastPageControlTotalSize.reset();
 }
 
 void CGUIControlGroupList::ScrollTo(float offset)
