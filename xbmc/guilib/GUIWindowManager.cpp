@@ -67,6 +67,7 @@
 #include "windows/GUIWindowStartup.h"
 #include "windows/GUIWindowSystemInfo.h"
 
+#include <algorithm>
 #include <mutex>
 
 // Dialog includes
@@ -1651,23 +1652,23 @@ void CGUIWindowManager::DispatchThreadMessages()
     // Only deduplicate label/text messages where the final value wins
     // GUI_MSG_ITEM_SELECT is excluded because param1 specifies which item,
     // and skipping intermediate selections could lose important state changes
-    int msgType = pMsg->GetMessage();
+    const int msgType = pMsg->GetMessage();
     if (msgType == GUI_MSG_LABEL_SET || msgType == GUI_MSG_LABEL2_SET ||
         msgType == GUI_MSG_SET_TEXT)
     {
-      int controlId = pMsg->GetControlId();
+      const int controlId = pMsg->GetControlId();
       // Check if there's a later message of same type to same control
-      for (auto it = m_vecThreadMessages.begin(); it != m_vecThreadMessages.end(); ++it)
+      const bool hasDuplicate = std::any_of(
+          m_vecThreadMessages.begin(), m_vecThreadMessages.end(),
+          [msgType, controlId, window](const auto& queued) {
+            return queued.first->GetMessage() == msgType &&
+                   queued.first->GetControlId() == controlId && queued.second == window;
+          });
+      if (hasDuplicate)
       {
-        CGUIMessage* laterMsg = it->first;
-        if (laterMsg->GetMessage() == msgType && laterMsg->GetControlId() == controlId &&
-            it->second == window)
-        {
-          // Skip this message, a later one will supersede it
-          delete pMsg;
-          pMsg = nullptr;
-          break;
-        }
+        // Skip this message, a later one will supersede it
+        delete pMsg;
+        pMsg = nullptr;
       }
     }
 
@@ -1678,9 +1679,9 @@ void CGUIWindowManager::DispatchThreadMessages()
       // XXX: during SendMessage(), there could be a deeper 'xbmc main loop' inited by e.g. doModal
       //      which may loop there and callback to DispatchThreadMessages() multiple times.
       if (window)
-        SendMessage( *pMsg, window );
+        SendMessage(*pMsg, window);
       else
-        SendMessage( *pMsg );
+        SendMessage(*pMsg);
       delete pMsg;
 
       lock.lock();
