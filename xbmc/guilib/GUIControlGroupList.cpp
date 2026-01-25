@@ -36,16 +36,16 @@ CGUIControlGroupList::CGUIControlGroupList(int parentID, int controlID, float po
 }
 
 CGUIControlGroupList::CGUIControlGroupList(const CGUIControlGroupList& other)
-    : CGUIControlGroup(other),
-      m_itemGap(other.m_itemGap),
-      m_pageControl(other.m_pageControl),
-      m_focusedPosition(other.m_focusedPosition),
-      m_totalSize(other.m_totalSize),
-      m_scroller(other.m_scroller),
-      m_useControlPositions(other.m_useControlPositions),
-      m_orientation(other.m_orientation),
-      m_alignment(other.m_alignment),
-      m_minSize(other.m_minSize)
+  : CGUIControlGroup(other),
+    m_itemGap(other.m_itemGap),
+    m_pageControl(other.m_pageControl),
+    m_focusedPosition(other.m_focusedPosition),
+    m_totalSize(other.m_totalSize),
+    m_scroller(other.m_scroller),
+    m_useControlPositions(other.m_useControlPositions),
+    m_orientation(other.m_orientation),
+    m_alignment(other.m_alignment),
+    m_minSize(other.m_minSize)
 {
   // Note: m_lastScrollerValue, m_lastPageControlSize, m_lastPageControlTotalSize
   // are intentionally not copied - they are cache values that should be recalculated
@@ -89,8 +89,7 @@ void CGUIControlGroupList::Process(unsigned int currentTime, CDirtyRegionList &d
 
     if (m_lastScrollerValue != currentScrollerValue)
     {
-      CGUIMessage message(GUI_MSG_ITEM_SELECT, GetParentID(), m_pageControl,
-                          currentScrollerValue);
+      CGUIMessage message(GUI_MSG_ITEM_SELECT, GetParentID(), m_pageControl, currentScrollerValue);
       SendWindowMessage(message);
       m_lastScrollerValue = currentScrollerValue;
     }

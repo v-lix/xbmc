@@ -18,9 +18,9 @@
 #include "GUILabel.h"
 #include "GUITexture.h"
 #include "guilib/guiinfo/GUIInfoLabel.h"
+#include "utils/ColorUtils.h"
 
 #include <optional>
-#include "utils/ColorUtils.h"
 
 /*!
  \ingroup controls

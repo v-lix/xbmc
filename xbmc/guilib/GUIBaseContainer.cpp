@@ -632,9 +632,8 @@ void CGUIBaseContainer::OnNextLetter()
   const int offset = CorrectOffset(GetOffset(), GetCursor());
   // Binary search for first letter offset greater than current position
   auto it = std::upper_bound(m_letterOffsets.begin(), m_letterOffsets.end(), offset,
-                             [](int value, const std::pair<int, std::string>& elem) {
-                               return value < elem.first;
-                             });
+                             [](int value, const std::pair<int, std::string>& elem)
+                             { return value < elem.first; });
   if (it != m_letterOffsets.end())
     SelectItem(it->first);
 }
@@ -646,9 +645,8 @@ void CGUIBaseContainer::OnPrevLetter()
     return;
   // Binary search for last letter offset less than current position
   auto it = std::lower_bound(m_letterOffsets.begin(), m_letterOffsets.end(), offset,
-                             [](const std::pair<int, std::string>& elem, int value) {
-                               return elem.first < value;
-                             });
+                             [](const std::pair<int, std::string>& elem, int value)
+                             { return elem.first < value; });
   if (it != m_letterOffsets.begin())
     SelectItem((--it)->first);
 }
@@ -705,9 +703,8 @@ void CGUIBaseContainer::OnJumpSMS(int letter)
   // find where we currently are using binary search
   const int offset = CorrectOffset(GetOffset(), GetCursor());
   auto it = std::upper_bound(m_letterOffsets.begin(), m_letterOffsets.end(), offset,
-                             [](int value, const std::pair<int, std::string>& elem) {
-                               return value < elem.first;
-                             });
+                             [](int value, const std::pair<int, std::string>& elem)
+                             { return value < elem.first; });
   // upper_bound gives us the first element > offset, we want the last element <= offset
   if (it != m_letterOffsets.begin())
     --it;

@@ -151,7 +151,8 @@ protected:
   std::shared_ptr<CGUIListItem> m_lastItem;
 
   int m_pageControl;
-  std::optional<int> m_lastPageControlOffset; // cached offset to avoid redundant page control messages
+  std::optional<int>
+      m_lastPageControlOffset; // cached offset to avoid redundant page control messages
 
   std::list<CGUIListItemLayout> m_layouts;
   std::list<CGUIListItemLayout> m_focusedLayouts;
