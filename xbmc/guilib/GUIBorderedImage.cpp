@@ -31,8 +31,7 @@ CGUIBorderedImage::CGUIBorderedImage(int parentID,
 }
 
 CGUIBorderedImage::CGUIBorderedImage(const CGUIBorderedImage& right)
-  : CGUIImage(right), m_borderImage(right.m_borderImage->Clone()), m_borderSize(right.m_borderSize),
-    m_lastBorderRect(right.m_lastBorderRect)
+  : CGUIImage(right), m_borderImage(right.m_borderImage->Clone()), m_borderSize(right.m_borderSize)
 {
   ControlType = GUICONTROL_BORDEREDIMAGE;
 }
@@ -86,13 +85,14 @@ void CGUIBorderedImage::AllocResources()
 {
   m_borderImage->AllocResources();
   CGUIImage::AllocResources();
+  m_lastBorderRect.reset();
 }
 
 void CGUIBorderedImage::FreeResources(bool immediately)
 {
   m_borderImage->FreeResources(immediately);
   CGUIImage::FreeResources(immediately);
-  m_lastBorderRect = CRect(-1, -1, -1, -1);
+  m_lastBorderRect.reset();
 }
 
 void CGUIBorderedImage::DynamicResourceAlloc(bool bOnOff)
