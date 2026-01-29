@@ -2395,8 +2395,12 @@ bool CVideoPlayer::CheckContinuity(CCurrentStream& current, DemuxPacket* pPacket
     correction = pPacket->dts - maxdts;
   }
 
-  /* if it's large scale jump, correct for it after having confirmed the jump */
-  if (pPacket->dts + DVD_MSEC_TO_TIME(1000) < current.dts_end())
+  /* if it's large scale jump, correct for it after having confirmed the jump
+   * Files with DTS classic audio need a wider threshold to avoid false corrections */
+  const bool hasDTSClassic = m_CurrentAudio.hint.codec == AV_CODEC_ID_DTS &&
+                             m_CurrentAudio.hint.profile == AV_PROFILE_DTS;
+  const double backwardThreshold = DVD_MSEC_TO_TIME(hasDTSClassic ? 1000 : 500);
+  if (pPacket->dts + backwardThreshold < current.dts_end())
   {
     CLog::Log(
         LOGDEBUG,
@@ -4185,7 +4189,9 @@ void CVideoPlayer::FlushBuffers(double pts, bool accurate, bool sync)
 
     // Reset offset_pts to prevent accumulation of timestamp corrections across seeks
     // This fixes desync issues with external subtitles after multiple seeks (issue #26647)
-    m_offset_pts = 0.0;
+    if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+            CSettings::SETTING_COREELEC_RESET_PTS_ON_SEEK))
+      m_offset_pts = 0.0;
   }
 
   m_CurrentAudio.dts         = DVD_NOPTS_VALUE;
