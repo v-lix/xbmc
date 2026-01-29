@@ -4284,6 +4284,8 @@
           </constraints>
           <control type="spinner" format="string" />
         </setting>
+      </group>
+      <group id="3" label="50002">
         <setting id="coreelec.amlogic.dolbyvision.audio.seamlessbranch" type="integer" label="60594" help="60595" parent="coreelec.amlogic.dolbyvision.type">
           <requirement>HAVE_AMCODEC</requirement>
           <visible>false</visible>

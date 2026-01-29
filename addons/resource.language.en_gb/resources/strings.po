@@ -24640,6 +24640,12 @@ msgctxt "#50001"
 msgid "Dolby Vision"
 msgstr ""
 
+#. "Audio/Misc"
+#: system/settings/settings.xml
+msgctxt "#50002"
+msgid "Audio/Misc"
+msgstr ""
+
 #. "Dolby Vision"
 #: system/settings/settings.xml
 msgctxt "#50011"
@@ -26274,7 +26280,7 @@ msgstr ""
 #. "Audio Issues Fix"
 #: system/settings/settings.xml
 msgctxt "#60594"
-msgid "Set Type of Correction to Fix Audio Issues"
+msgid "LAV Filters mode"
 msgstr ""
 
 #. "Audio Issues Fix"
@@ -26310,13 +26316,13 @@ msgstr ""
 #. "Audio Issues Fix"
 #: system/settings/settings.xml
 msgctxt "#60600"
-msgid "LAV SB"
+msgid "Seamless Branching"
 msgstr ""
 
 #. "Audio Issues Fix"
 #: system/settings/settings.xml
 msgctxt "#60601"
-msgid "LAV Full"
+msgid "Full"
 msgstr ""
 
 #. Title of Dolby Vision RPU conversion setting
