@@ -4306,6 +4306,11 @@
           </constraints>
           <control type="spinner" format="string" />
         </setting>
+        <setting id="coreelec.resetptsonseek" type="boolean" label="60602" help="60603">
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
       </group>
     </category>
     <category id="cache" label="439" help="36399">

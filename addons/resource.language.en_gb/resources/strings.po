@@ -26325,6 +26325,18 @@ msgctxt "#60601"
 msgid "Full"
 msgstr ""
 
+#. Reset PTS offset on seek setting
+#: system/settings/settings.xml
+msgctxt "#60602"
+msgid "Reset PTS offset on seek"
+msgstr ""
+
+#. Help text for Reset PTS offset on seek setting
+#: system/settings/settings.xml
+msgctxt "#60603"
+msgid "Reset the PTS timestamp correction offset when seeking. Fixes subtitle desync after multiple seeks, but introduces a slightly \"jumpy\" A/V sync behaviour after seeking, which is not a big issue and usually desirable over subtitle desync."
+msgstr ""
+
 #. Title of Dolby Vision RPU conversion setting
 #: system/settings/settings.xml
 msgctxt "#69196"
