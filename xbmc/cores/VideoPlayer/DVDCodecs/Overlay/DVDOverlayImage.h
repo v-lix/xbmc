@@ -58,7 +58,6 @@ public:
       t += linesize;
     }
 
-    m_isHdrPq = src.m_isHdrPq;
     m_textureid = 0;
   }
 
@@ -78,11 +77,6 @@ public:
   std::vector<uint8_t> pixels;
   std::vector<uint32_t> palette;
 
-  // If true, pixel values are already intended for HDR PQ output (e.g. UHD-BD PGS
-  // palettes authored as BT.2020 + ST2084 code values) and must NOT be converted
-  // again by GUI shaders.
-  bool m_isHdrPq{false};
-
   int linesize{0};
   int x{0};
   int y{0};
@@ -90,5 +84,9 @@ public:
   int height{0};
   int source_width{0};
   int source_height{0};
+
+  // If true, pixel values are already intended for HDR PQ output (e.g. UHD-BD PGS
+  // palettes authored as BT.2020 + ST2084 code values) and must NOT be converted
+  // again by GUI shaders.
   bool m_isHdrPq{false};
 };

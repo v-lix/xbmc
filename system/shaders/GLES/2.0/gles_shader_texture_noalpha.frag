@@ -72,7 +72,7 @@ void main ()
   vec3 rgb = texture2D(m_samp0, m_cord0.xy).rgb;
 
 #if defined(KODI_TRANSFER_PQ)
-  rgb.rgb = transferPQ(rgb.rgb);
+  rgb.rgb = transferPQ(rgb);
 #endif
 
 #if defined(KODI_LIMITED_RANGE)
