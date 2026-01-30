@@ -26297,24 +26297,6 @@ msgstr ""
 
 #. "Audio Issues Fix"
 #: system/settings/settings.xml
-msgctxt "#60597"
-msgid "Seek/Sync"
-msgstr ""
-
-#. "Audio Issues Fix"
-#: system/settings/settings.xml
-msgctxt "#60598"
-msgid "2"
-msgstr ""
-
-#. "Audio Issues Fix"
-#: system/settings/settings.xml
-msgctxt "#60599"
-msgid "Debug"
-msgstr ""
-
-#. "Audio Issues Fix"
-#: system/settings/settings.xml
 msgctxt "#60600"
 msgid "Seamless Branching"
 msgstr ""
