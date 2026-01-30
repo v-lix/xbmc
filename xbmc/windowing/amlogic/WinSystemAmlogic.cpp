@@ -317,6 +317,16 @@ float CWinSystemAmlogic::GetGuiSdrPeakLuminance() const
   return ((0.7f * guiSdrPeak + 30.0f) / 100.0f);
 }
 
+float CWinSystemAmlogic::GetGuiSdrSaturation() const
+{
+  const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  const int guiSdrSaturation =
+      settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRSATURATION);
+
+  // Map 0-100 setting to 0.0-2.0 range
+  return (guiSdrSaturation / 50.0f);
+}
+
 bool CWinSystemAmlogic::Hide()
 {
   return false;
