@@ -8,6 +8,8 @@
 
 #include "WinSystemAmlogic.h"
 
+#include <algorithm>
+#include <cmath>
 #include <string.h>
 #include <float.h>
 
@@ -314,17 +316,27 @@ float CWinSystemAmlogic::GetGuiSdrPeakLuminance() const
   const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
   const int guiSdrPeak = settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRPEAKLUMINANCE);
 
-  return ((0.7f * guiSdrPeak + 30.0f) / 100.0f);
+  // Map the 0-100 setting to a usable SDR white level in HDR mode.
+  // The shader expects this value as "nits / 100".
+  // Use an exponential curve but anchor the endpoints to a sensible range:
+  //   0   -> 30 nits
+  //   100 -> 1000 nits
+  constexpr float kMinNits = 30.0f;
+  constexpr float kMaxNits = 1000.0f;
+  const float exponent = std::log(kMaxNits / kMinNits) * (static_cast<float>(guiSdrPeak) / 100.0f);
+  float sdrWhiteNits = std::clamp(kMinNits * std::exp(exponent), kMinNits, kMaxNits);
+
+  return sdrWhiteNits / 100.0f;
 }
 
 float CWinSystemAmlogic::GetGuiSdrSaturation() const
 {
   const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-  const int guiSdrSaturation =
-      settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRSATURATION);
 
-  // Map 0-100 setting to 0.0-2.0 range
-  return (guiSdrSaturation / 50.0f);
+  // UI is 0..100, where 50 is neutral. Map to shader saturation factor 0..2.
+  const int satClamped = std::clamp(settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRSATURATION), 0, 100);
+
+  return std::clamp(static_cast<float>(satClamped) / 50.0f, 0.0f, 2.0f);
 }
 
 bool CWinSystemAmlogic::Hide()
