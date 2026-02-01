@@ -2973,6 +2973,16 @@ void CVideoPlayer::HandleMessages()
         {
           CloseStream(m_CurrentSubtitle, false);
           OpenStream(m_CurrentSubtitle, st.demuxerId, st.id, st.source);
+          if (st.source == STREAM_SOURCE_DEMUX)
+          {
+            CDVDMsgPlayerSeek::CMode mode;
+            mode.time = static_cast<double>(GetUpdatedTime());
+            mode.backward = true;
+            mode.accurate = true;
+            mode.trickplay = true;
+            mode.sync = true;
+            m_messenger.Put(std::make_shared<CDVDMsgPlayerSeek>(mode));
+          }
         }
       }
     }
