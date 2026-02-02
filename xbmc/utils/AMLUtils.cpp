@@ -32,6 +32,7 @@
 #include "utils/RegExp.h"
 #include "filesystem/SpecialProtocol.h"
 #include "rendering/RenderSystem.h"
+#include "settings/DisplaySettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "guilib/GUIComponent.h"
@@ -490,50 +491,122 @@ std::string aml_dv_type_to_string(enum DV_TYPE type)
   return type_string;
 }
 
+void set_vsvdb_payload_ver(enum DV_TYPE dv_type, int max_lum_nits_value, int source_max_pq)
+{
+  if ((dv_type == DV_TYPE_DISPLAY_LED) ||
+      (max_lum_nits_value < 400) ||
+      ((max_lum_nits_value > 6450) && (source_max_pq == 4095)))
+    CalculateVSVDBPayload_2();
+  else
+    CalculateVSVDBPayload();
+}
+
 unsigned int aml_dv_on(unsigned int mode)
 {
+  bool dv_source_level_5(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5));
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5", dv_source_level_5);
 
-  // set the DV-LL Dolby VSVDB limit to latest value from user.
-  int dv_ll_dolby_vsvdb_limit(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LL_VSVDB_LIMIT));
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_dolby_vsvdb_source_lum_limit", dv_ll_dolby_vsvdb_limit);
+  bool dv_source_level_5_osdst(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST));
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5_osdst", dv_source_level_5_osdst);
 
-  // set the Dolby VSVDB parameter to latest value from user.
-  bool dv_dolby_vsvdb_inject(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT));
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_dolby_vsvdb_inject", dv_dolby_vsvdb_inject ? 1 : 0);
+  unsigned int xbmc_dv_vsvdb_source_lum_limit_num = 0;
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_source_lum_limit_num", xbmc_dv_vsvdb_source_lum_limit_num);
 
-  if (dv_dolby_vsvdb_inject) {
-    std::string dv_dolby_vsvdb_payload(settings()->GetString(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD));
-    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_dolby_vsvdb_payload", dv_dolby_vsvdb_payload);
-  }
-
-  // set the HDR Infoframe parameter to latest value from user.
-  bool dv_hdr_inject(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR_INJECT));
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_hdr_inject", dv_hdr_inject ? 1 : 0);
-
-  if (dv_hdr_inject) {
-    std::string dv_hdr_payload(settings()->GetString(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR_PAYLOAD));
-    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_hdr_payload", dv_hdr_payload);
-  }
-
-  // set the Colorimetery to latest value from user.
-  int colorimetry(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_COLORIMETRY_FOR_STD));
+  xbmc_dv_cap::dv_ver_i = 0;
+  aml_get_dv_cap();
+  enum DV_COLORIMETRY colorimetry = DV_COLORIMETRY_AMLOGIC;
+  if (xbmc_dv_cap::dv_ver_i == 2) colorimetry = DV_COLORIMETRY_REMOVE;
   CSysfsPath("/sys/module/hdmitx20/parameters/dovi_tv_led_bt2020", (colorimetry == DV_COLORIMETRY_BT2020NC) ? 'Y' : 'N');
   CSysfsPath("/sys/module/hdmitx20/parameters/dovi_tv_led_no_colorimetry", (colorimetry == DV_COLORIMETRY_REMOVE) ? 'Y' : 'N');
 
-  // set source metadata handling
-  bool dv_source_levels_metadata(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVELS_METADATA)); 
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_use_source_meta_levels", dv_source_levels_metadata);
-
-  int dv_source_level_5(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5));
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_keep_source_meta_level_5", dv_source_level_5);
-
-  int dv_source_level_6(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_6));
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_keep_source_meta_level_6", dv_source_level_6);
-
+  DOVIStreamMetadata dovi_stream_metadata;
+  dovi_stream_metadata = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
+  int source_max_pq = static_cast<int>(dovi_stream_metadata.source_max_pq);
   enum DV_TYPE dv_type(aml_dv_type());
-  
-  // set the HDR for LLDV if DV_TYPE_PLAYER_LED_HDR.
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_hdr_for_lldv", (dv_type == DV_TYPE_PLAYER_LED_HDR) ? 'Y' : 'N'); 
+  int max_lum_nits_value(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM));
+
+  // VP auto-detect: automatically use VP when display can't handle source luminance
+  bool dv_type_vp_auto(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO));
+  unsigned int dv_vp(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR));
+
+  if ((dv_vp != 0) || (dv_type == DV_TYPE_DISPLAY_LED))
+    dv_type_vp_auto = false;
+
+  if (dv_type_vp_auto)
+  {
+    switch (dv_type)
+    {
+      case DV_TYPE_PLAYER_LED_HDR:
+        dv_vp = 1;
+        break;
+      case DV_TYPE_PLAYER_LED_HDR2:
+        dv_vp = 2;
+        break;
+      case DV_TYPE_PLAYER_LED_LLDV:
+        dv_vp = 3;
+        break;
+      default:
+        break;
+    }
+  }
+
+  // FPS-based VP adjustment: high FPS content uses different VP modes
+  if ((CServiceBroker::GetDataCacheCore().GetVideoFps() > 41.0f) && ((dv_vp == 4) || (dv_vp == 5)))
+  {
+    if (dv_vp == 4) dv_vp = 6;
+    else if (dv_vp == 5) dv_vp = 7;
+  }
+
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp", dv_vp);
+
+  // VP tone mapping level controls core bypass stages:
+  //   > 1: CVM bypass in core1/core2
+  //   > 2: CSC bypass in core1
+  //   > 3: core3 forced to IPT 12-bit bypass (0x00)
+  // P5: cap at 3 (IPT base layer, diag block handles HDR10 conversion)
+  // P8: keep at 4 (YUV HDR10 base layer, needs core3 IPT bypass)
+  // VP=5/7 (LLDV 444, FPS-adjusted only): cap at 2.
+  unsigned int dv_vp_tm(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR_TM));
+  dv_vp_tm = 4;
+  CSysfsPath dvprofile{"/sys/module/amdolby_vision/parameters/xbmc_dv_profile"};
+  if (dvprofile.Exists())
+  {
+    unsigned int dv_profile = dvprofile.Get<unsigned int>().value();
+    if ((dv_vp != 0) && (dv_vp_tm > 3) && (dv_profile == 5)) dv_vp_tm = 3;
+    if ((dv_vp != 0) && (dv_vp_tm > 2) && ((dv_vp == 5) || (dv_vp == 7))) dv_vp_tm = 2;
+  }
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp_tm", dv_vp_tm);
+
+  // Override DV type based on VP mode
+  if (dv_vp > 2) dv_type = DV_TYPE_PLAYER_LED_LLDV;
+  else if (dv_vp == 1) dv_type = DV_TYPE_PLAYER_LED_HDR;
+  else if (dv_vp == 2) dv_type = DV_TYPE_PLAYER_LED_HDR2;
+
+  // Tell kernel the DV type
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_type", static_cast<unsigned int>(dv_type));
+
+  // Force CD/CS for all DV modes
+  aml_kodi_set_cd_cs(1);
+
+  // Enable HDR10 metadata injection for DV LL output (VP/HDR modes)
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_for_dv_ll",
+             (dv_type == DV_TYPE_PLAYER_LED_HDR || dv_type == DV_TYPE_PLAYER_LED_HDR2) ? 'Y' : 'N');
+  unsigned int xbmc_dv_hdr10_for_dv_ll_inject_num = 0;
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_for_dv_ll_inject_num", xbmc_dv_hdr10_for_dv_ll_inject_num);
+
+  bool dv_dolby_vsvdb_inject(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT));
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_inject", dv_dolby_vsvdb_inject);
+  unsigned int xbmc_dv_vsvdb_inject_num = 0;
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_inject_num", xbmc_dv_vsvdb_inject_num);
+
+  set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
+
+  std::string dv_dolby_vsvdb_payload(settings()->GetString(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD));
+  if ((dv_vp != 0) && (dv_vp_tm > 1))
+    dv_dolby_vsvdb_payload = "27FE012E5699AA";
+  else if ((dv_vp != 0) && (dv_vp_tm == 1))
+    dv_dolby_vsvdb_payload = "27FE012D5699AA";
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_payload", dv_dolby_vsvdb_payload);
 
   // setup display led or player led
   CSysfsPath dolby_vision_flags{"/sys/module/amdolby_vision/parameters/dolby_vision_flags"};
@@ -543,27 +616,38 @@ unsigned int aml_dv_on(unsigned int mode)
   {
     if (dv_type == DV_TYPE_DISPLAY_LED) // Display Led (DV-Std)
     {
+      dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~(FLAG_FORCE_RGB_OUTPUT));
       dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~(FLAG_FORCE_DOVI_LL));
       dolby_vision_ll_policy.Set(DOLBY_VISION_LL_DISABLE);
     }
     else // Player Led (DV-LL and HDR) or VS10 Only.
     {
-      dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() | FLAG_FORCE_DOVI_LL);
-      dolby_vision_ll_policy.Set(DOLBY_VISION_LL_YUV422);
+      if ((dv_vp == 5) || (dv_vp == 7))
+      {
+        dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() | FLAG_FORCE_DOVI_LL);
+        dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() | FLAG_FORCE_RGB_OUTPUT);
+        dolby_vision_ll_policy.Set(DOLBY_VISION_LL_RGB444);
+      }
+      else
+      {
+        dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~(FLAG_FORCE_RGB_OUTPUT));
+        dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() | FLAG_FORCE_DOVI_LL);
+        dolby_vision_ll_policy.Set(DOLBY_VISION_LL_YUV422);
+      }
     }
   }
 
   // switch mode to IPT Tunnel if IPT and type is DV_TYPE_DISPLAY_LED.
-  if ((mode == DOLBY_VISION_OUTPUT_MODE_IPT) && (dv_type == DV_TYPE_DISPLAY_LED)) 
+  if ((mode == DOLBY_VISION_OUTPUT_MODE_IPT) && (dv_type == DV_TYPE_DISPLAY_LED))
     mode = DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL;
 
   // change mode and enable.
   CSysfsPath dolby_vision_mode{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
   unsigned int existing_mode = dolby_vision_mode.Get<unsigned int>().value();
   bool modeChange(existing_mode != mode);
-  CLog::Log(LOGINFO, "AMLUtils::{} - mode change [{}], existing mode [{}], this mode [{}]", __FUNCTION__, modeChange, aml_dv_output_mode_to_string(existing_mode), aml_dv_output_mode_to_string(mode));
+  CLog::Log(LOGDEBUG, "AMLUtils::{} - mode change [{}], existing mode [{}], this mode [{}]", __FUNCTION__, modeChange, aml_dv_output_mode_to_string(existing_mode), aml_dv_output_mode_to_string(mode));
   if (modeChange) CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_mode", mode);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);  
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", "Y");
 
   if (modeChange) {
@@ -585,6 +669,103 @@ unsigned int aml_dv_on(unsigned int mode)
   return mode;
 }
 
+void aml_get_dv_cap()
+{
+  if (aml_display_support_dv())
+  {
+    CSysfsPath dv_cap{"/sys/devices/virtual/amhdmitx/amhdmitx0/dv_cap"};
+    if (dv_cap.Exists())
+    {
+      try
+      {
+        std::string valstr = dv_cap.Get<std::string>().value();
+
+        int pos = valstr.find(": V");
+        xbmc_dv_cap::dv_ver_i = std::stoi(valstr.substr(pos+3, 1));
+
+        pos = valstr.find("h: ");
+        xbmc_dv_cap::dv_len_i = std::stoi(valstr.substr(pos+3, 2)) + 1;
+
+        pos = valstr.find("B: ");
+        xbmc_dv_cap::dv_vsvdb_s = valstr.substr(pos+3, xbmc_dv_cap::dv_len_i);
+
+        pos = valstr.find("M: ");
+        int pos2 = valstr.find("nti");
+        xbmc_dv_cap::dv_max_v1_i = std::stoi(valstr.substr(pos+3, pos2-pos-1));
+
+        pos = valstr.find("Q: ");
+        pos2 = valstr.find("pqi");
+        xbmc_dv_cap::dv_max_v2_i = std::stoi(valstr.substr(pos+3, pos2-pos-1));
+
+        pos = valstr.find("Rx: ");
+        pos2 = valstr.find("rxi");
+        xbmc_dv_cap::dv_rx_i = std::stoi(valstr.substr(pos+3, pos2-pos-1));
+
+        pos = valstr.find("Ry: ");
+        pos2 = valstr.find("ryi");
+        xbmc_dv_cap::dv_ry_i = std::stoi(valstr.substr(pos+3, pos2-pos-1));
+
+        pos = valstr.find("Gx: ");
+        pos2 = valstr.find("gxi");
+        xbmc_dv_cap::dv_gx_i = std::stoi(valstr.substr(pos+3, pos2-pos-1));
+
+        pos = valstr.find("Gy: ");
+        pos2 = valstr.find("gyi");
+        xbmc_dv_cap::dv_gy_i = std::stoi(valstr.substr(pos+3, pos2-pos-1));
+
+        pos = valstr.find("Bx: ");
+        pos2 = valstr.find("bxi");
+        xbmc_dv_cap::dv_bx_i = std::stoi(valstr.substr(pos+3, pos2-pos-1));
+
+        pos = valstr.find("By: ");
+        pos2 = valstr.find("byi");
+        xbmc_dv_cap::dv_by_i = std::stoi(valstr.substr(pos+3, pos2-pos-1));
+      }
+      catch (const std::exception& e)
+      {
+        CLog::Log(LOGERROR, "AMLUtils::{} - failed to parse dv_cap: {}", __FUNCTION__, e.what());
+      }
+    }
+  }
+}
+
+void aml_dv_send_md_levels()
+{
+  DOVIStreamMetadata dovi_stream_metadata;
+  dovi_stream_metadata = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_md_source_max_pq", dovi_stream_metadata.source_max_pq);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_md_source_min_pq", dovi_stream_metadata.source_min_pq);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_md_level_6_max_lum", dovi_stream_metadata.level6_max_lum);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_md_level_6_min_lum", dovi_stream_metadata.level6_min_lum);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_md_level_6_max_cll", dovi_stream_metadata.level6_max_cll);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_md_level_6_max_fall", dovi_stream_metadata.level6_max_fall);
+}
+
+void aml_dv_send_hdr10_data()
+{
+  HDRStaticMetadataInfo hdrStaticMetadataInfo;
+  hdrStaticMetadataInfo = CServiceBroker::GetDataCacheCore().GetVideoHDRStaticMetadataInfo();
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_max_lum", hdrStaticMetadataInfo.max_lum);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_min_lum", hdrStaticMetadataInfo.min_lum);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_max_cll", hdrStaticMetadataInfo.max_cll);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_max_fall", hdrStaticMetadataInfo.max_fall);
+}
+
+void aml_dv_send_el_type()
+{
+  DOVIStreamInfo dovi_stream_info;
+  dovi_stream_info = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamInfo();
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_el_type", dovi_stream_info.dovi_el_type);
+}
+
+void aml_dv_send_profile(int dvprofile)
+{
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_profile", static_cast<unsigned int>(dvprofile));
+}
+
+// Static flag for kernel-side 422 forcing during DV/HDR10+ playback
+static bool aml_linux_force_422 = false;
+
 void aml_dv_off()
 {
   // change mode and disable.
@@ -592,10 +773,22 @@ void aml_dv_off()
   unsigned int existing_mode = dolby_vision_mode.Get<unsigned int>().value();
   bool modeChange(existing_mode != DOLBY_VISION_OUTPUT_MODE_BYPASS);
 
-  CLog::Log(LOGINFO, "AMLUtils::{} - mode change [{}], existing mode [{}], this mode [{}]", 
+  CLog::Log(LOGDEBUG, "AMLUtils::{} - mode change [{}], existing mode [{}], this mode [{}]",
     __FUNCTION__, modeChange,
-    aml_dv_output_mode_to_string(existing_mode), 
+    aml_dv_output_mode_to_string(existing_mode),
     aml_dv_output_mode_to_string(DOLBY_VISION_OUTPUT_MODE_BYPASS));
+
+  CSysfsPath dolby_vision_flags{"/sys/module/amdolby_vision/parameters/dolby_vision_flags"};
+  CSysfsPath dolby_vision_ll_policy{"/sys/module/amdolby_vision/parameters/dolby_vision_ll_policy"};
+  if (dolby_vision_flags.Exists() && dolby_vision_ll_policy.Exists())
+  {
+    dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~(FLAG_FORCE_RGB_OUTPUT));
+    dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~(FLAG_FORCE_DOVI_LL));
+    dolby_vision_ll_policy.Set(DOLBY_VISION_LL_DISABLE);
+  }
+
+  CSysfsPath amdolby_vision_debug{"/sys/class/amdolby_vision/debug"};
+  if (amdolby_vision_debug.Exists()) CSysfsPath("/sys/class/amdolby_vision/debug", "enable_fel 0");
 
   // First allow system to reset to follow source, then turn off DV.
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FOLLOW_SOURCE);
@@ -606,8 +799,16 @@ void aml_dv_off()
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);
   if (modeChange) CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_mode", DOLBY_VISION_OUTPUT_MODE_BYPASS);
 
+  aml_linux_force_422 = false;
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
+
   // Do set_disp_mode_auto on kernel.
-  if (modeChange) aml_dv_display_auto_now();
+  if (modeChange)
+  {
+    aml_dv_display_auto_now();
+    const RESOLUTION_INFO res_info = CDisplaySettings::GetInstance().GetResolutionInfo(CDisplaySettings::GetInstance().GetCurrentResolution());
+    write_resolution_ini(res_info);
+  }
 }
 
 unsigned int aml_dv_dolby_vision_mode()
@@ -693,9 +894,7 @@ void aml_dv_set_xbmc_osd()
 
 bool aml_dv_use_active_area()
 {
-  return (aml_is_dv_enable() &&
-          (aml_dv_dolby_vision_mode() == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL) &&
-         settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_RESTRICT_OVERLAYS));
+  return false;
 }
 
 enum DV_MODE aml_dv_mode()
@@ -1553,9 +1752,6 @@ void aml_reset_audio_from_play_from_resume()
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetAlgoForReset(1);
 }
 
-// Static flag for kernel-side 422 forcing during DV/HDR10+ playback
-static bool aml_linux_force_422 = false;
-
 // CD/CS (Color Depth/Color Space) management for DV/HDR10+ playback (avdvplus R6)
 // Type 1: DV processing setup - force YUV422 and adjust CS/CD limits
 // Type 2: HDR10+ processing - limit color depth/space
@@ -1568,10 +1764,12 @@ void aml_kodi_set_cd_cs(int cd_cs_type)
     case 1: // DV video processor setup
     {
       enum DV_TYPE dv_type = static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE));
+      unsigned int dv_vp(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR));
 
-      // For player-led modes (LLDV, HDR, HDR2), force YUV422 and set CS/CD limits
-      if (dv_type == DV_TYPE_PLAYER_LED_LLDV || dv_type == DV_TYPE_PLAYER_LED_HDR ||
-          dv_type == DV_TYPE_PLAYER_LED_HDR2)
+      // For player-led modes or VP override, force YUV422 and set CS/CD limits
+      if ((dv_vp == 2) || ((dv_vp == 0) && (dv_type == DV_TYPE_PLAYER_LED_HDR2))
+                       || ((dv_vp == 0) && (dv_type == DV_TYPE_PLAYER_LED_LLDV))
+                       || dv_type == DV_TYPE_PLAYER_LED_HDR)
       {
         if (!advSettings->GetForceCS())
         {

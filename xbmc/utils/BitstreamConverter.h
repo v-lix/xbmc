@@ -210,4 +210,9 @@ protected:
   HDRStaticMetadataInfo m_hdrStaticMetadataInfo;
 };
 
+void aml_dv_send_md_levels();
+void aml_dv_send_hdr10_data();
+void aml_dv_send_el_type();
+void aml_dv_send_profile(int dvprofile);
 void aml_dv_hdr10plus_conversion(bool hdr10plus_conversion);
+void aml_kodi_set_cd_cs(int cd_cs_type);

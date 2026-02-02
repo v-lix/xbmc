@@ -26319,6 +26319,14 @@ msgctxt "#60603"
 msgid "Reset the PTS timestamp correction offset when seeking. Fixes subtitle desync after multiple seeks, but introduces a slightly \"jumpy\" A/V sync behaviour after seeking, which is not a big issue and usually desirable over subtitle desync."
 msgstr ""
 
+msgctxt "#60604"
+msgid "VP Auto"
+msgstr ""
+
+msgctxt "#60605"
+msgid "Set for Auto selection between Player Led and Video Processor settings."
+msgstr ""
+
 #. Title of Dolby Vision RPU conversion setting
 #: system/settings/settings.xml
 msgctxt "#69196"

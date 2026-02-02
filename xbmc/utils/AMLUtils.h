@@ -74,10 +74,12 @@ enum DV_COLORIMETRY : int
 #define AML_SC2     0x32
 
 #define FLAG_FORCE_DOVI_LL      (unsigned int)(0x4000)
+#define FLAG_FORCE_RGB_OUTPUT   (unsigned int)(0x8000)
 #define FLAG_TOGGLE_FRAME       (unsigned int)(0x80000000)
 
 #define DOLBY_VISION_LL_DISABLE (unsigned int)(0)
 #define DOLBY_VISION_LL_YUV422  (unsigned int)(1)
+#define DOLBY_VISION_LL_RGB444  (unsigned int)(2)
 
 #define DOLBY_VISION_FOLLOW_SOURCE     (unsigned int)(1)
 #define DOLBY_VISION_FORCE_OUTPUT_MODE (unsigned int)(2)
@@ -112,6 +114,21 @@ void aml_dv_wait_video_off(int timeout);
 int aml_blackout_policy(int new_blackout);
 unsigned int aml_dv_on(unsigned int mode);
 void aml_dv_off();
+void aml_get_dv_cap();
+struct xbmc_dv_cap
+{
+  static inline int dv_ver_i = 0;
+  static inline int dv_len_i = 0;
+  static inline int dv_max_v1_i = 0;
+  static inline int dv_max_v2_i = 0;
+  static inline int dv_rx_i = 0;
+  static inline int dv_ry_i = 0;
+  static inline int dv_gx_i = 0;
+  static inline int dv_gy_i = 0;
+  static inline int dv_bx_i = 0;
+  static inline int dv_by_i = 0;
+  static inline std::string dv_vsvdb_s = "";
+};
 unsigned int aml_dv_dolby_vision_mode();
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth);
 void aml_dv_close();
@@ -126,6 +143,13 @@ bool aml_dv_use_active_area();
 enum DV_MODE aml_dv_mode();
 enum DV_TYPE aml_dv_type();
 unsigned int aml_vs10_by_setting(const std::string setting);
+void aml_dv_send_md_levels();
+void aml_dv_send_hdr10_data();
+void aml_dv_send_el_type();
+void aml_dv_send_profile(int dvprofile);
+void set_vsvdb_payload_ver(enum DV_TYPE dv_type, int max_lum_nits_value, int source_max_pq);
+void CalculateVSVDBPayload();
+void CalculateVSVDBPayload_2();
 void aml_dv_enable_fel();
 void aml_hevc_nal_skip_policy(const int value);
 void aml_set_transfer_pq(StreamHdrType hdrType, unsigned int bitDepth);
