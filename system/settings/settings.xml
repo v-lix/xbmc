@@ -3870,19 +3870,6 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
-        <setting id="coreelec.amlogic.sdr2hdr" type="boolean" label="14282" help="14283">
-          <requirement>HAVE_AMCODEC</requirement>
-          <default>false</default>
-          <control type="toggle" />
-        </setting>
-        <setting id="coreelec.amlogic.hdr2sdr" type="boolean" label="14284" help="14285">
-          <requirement>HAVE_AMCODEC</requirement>
-          <default>false</default>
-          <control type="toggle" />
-          <dependencies>
-            <dependency type="enable" setting="coreelec.amlogic.sdr2hdr" operator="is">false</dependency>
-          </dependencies>
-        </setting>
       </group>
       <group id="2" label="50001">
         <setting id="coreelec.amlogic.dolbyvision.mode" type="integer" label="50011" help="50012">

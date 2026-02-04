@@ -78,22 +78,6 @@ bool CWinSystemAmlogic::InitWindowSystem()
      CSysfsPath("/sys/module/di/parameters/nr2_en", 0);
   }
 
-  int sdr2hdr = settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_SDR2HDR);
-  if (sdr2hdr)
-  {
-    CLog::Log(LOGDEBUG, "CWinSystemAmlogic::InitWindowSystem -- setting sdr2hdr mode to {:d}", sdr2hdr);
-    CSysfsPath("/sys/module/am_vecm/parameters/sdr_mode", 1);
-    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", 0);
-    CSysfsPath("/sys/module/am_vecm/parameters/hdr_policy", 0);
-  }
-
-  int hdr2sdr = settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_HDR2SDR);
-  if (hdr2sdr)
-  {
-    CLog::Log(LOGDEBUG, "CWinSystemAmlogic::InitWindowSystem -- setting hdr2sdr mode to {:d}", hdr2sdr);
-    CSysfsPath("/sys/module/am_vecm/parameters/hdr_mode", 1);
-  }
-
   if (((LINUX_VERSION_CODE >> 16) & 0xFF) < 5)
   {
     auto setting = settings->GetSetting(CSettings::SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING);
