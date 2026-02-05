@@ -26325,24 +26325,28 @@ msgctxt "#60601"
 msgid "LAV Full"
 msgstr ""
 
-#. Reset PTS offset on seek setting
+#. VP Auto setting label
 #: system/settings/settings.xml
 msgctxt "#60602"
+msgid "Set for Auto selection between Player Led and Video Processor settings"
+msgstr ""
+
+#. Help text for VP Auto setting
+#: system/settings/settings.xml
+msgctxt "#60603"
+msgid "Set this option to let the software automatically select between using normal Player Led versus Video Processor (VP) settings depending on your Display Max Lum capability (shown below) and the DV Video mastered MDL. When VP is in use the OSD will be a different colour. This feature only works with DV Mode On Demand."
+msgstr ""
+
+#. Reset PTS offset on seek setting
+#: system/settings/settings.xml
+msgctxt "#60604"
 msgid "Reset PTS offset on seek"
 msgstr ""
 
 #. Help text for Reset PTS offset on seek setting
 #: system/settings/settings.xml
-msgctxt "#60603"
-msgid "Reset the PTS timestamp correction offset when seeking. Fixes subtitle desync after multiple seeks, but introduces a slightly \"jumpy\" A/V sync behaviour after seeking, which is not a big issue and usually desirable over subtitle desync."
-msgstr ""
-
-msgctxt "#60604"
-msgid "VP Auto"
-msgstr ""
-
 msgctxt "#60605"
-msgid "Set for Auto selection between Player Led and Video Processor settings."
+msgid "Reset the PTS timestamp correction offset when seeking. Fixes subtitle desync after multiple seeks, but introduces a slightly \"jumpy\" A/V sync behaviour after seeking, which is not a big issue and usually desirable over subtitle desync."
 msgstr ""
 
 #. Title of Dolby Vision RPU conversion setting
