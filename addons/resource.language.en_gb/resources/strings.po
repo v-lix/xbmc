@@ -26280,7 +26280,7 @@ msgstr ""
 #. "Audio Issues Fix"
 #: system/settings/settings.xml
 msgctxt "#60594"
-msgid "LAV Filters mode"
+msgid "Audio Fixes mode"
 msgstr ""
 
 #. "Audio Issues Fix"
@@ -26316,13 +26316,13 @@ msgstr ""
 #. "Audio Issues Fix"
 #: system/settings/settings.xml
 msgctxt "#60600"
-msgid "Seamless Branching"
+msgid "LAV SB"
 msgstr ""
 
 #. "Audio Issues Fix"
 #: system/settings/settings.xml
 msgctxt "#60601"
-msgid "Full"
+msgid "LAV Full"
 msgstr ""
 
 #. Reset PTS offset on seek setting
