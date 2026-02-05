@@ -367,8 +367,7 @@ void CalculateVSVDBPayload_2()
 }
 
 static bool support_dv() {
-  enum DV_TYPE dv_type(static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
-  return ((aml_display_support_dv_std() || aml_display_support_dv_ll() || aml_display_support_hdr_pq()) && (dv_type != DV_TYPE_VS10_ONLY));
+  return (aml_display_support_dv_std() || aml_display_support_dv_ll() || aml_display_support_hdr_pq());
 }
 
 void dv_type_filler(const SettingConstPtr& setting, std::vector<IntegerSettingOption>& list, int& current, void* data) {
@@ -461,11 +460,11 @@ void vsvdb_max_filler(const SettingConstPtr& setting, std::vector<IntegerSetting
   list.emplace_back("PQ 4070 (10000 cd/m^2)", 31);
 }
 
-void add_vs10_bypass(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(50063), DOLBY_VISION_OUTPUT_MODE_BYPASS);}
-void add_vs10_dv_bypass(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(50063), DOLBY_VISION_OUTPUT_MODE_IPT);}
-void add_vs10_sdr(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(50064), DOLBY_VISION_OUTPUT_MODE_SDR10);}
-void add_vs10_hdr10(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(50065), DOLBY_VISION_OUTPUT_MODE_HDR10);}
-void add_vs10_dv(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(50066), DOLBY_VISION_OUTPUT_MODE_IPT);}
+void add_vs10_bypass(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(60063), DOLBY_VISION_OUTPUT_MODE_BYPASS);}
+void add_vs10_dv_bypass(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(60063), DOLBY_VISION_OUTPUT_MODE_IPT);}
+void add_vs10_sdr(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(60064), DOLBY_VISION_OUTPUT_MODE_SDR10);}
+void add_vs10_hdr10(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(60065), DOLBY_VISION_OUTPUT_MODE_HDR10);}
+void add_vs10_dv(std::vector<IntegerSettingOption>& list) {list.emplace_back(g_localizeStrings.Get(60066), DOLBY_VISION_OUTPUT_MODE_IPT);}
 
 void vs10_sdr_filler(const SettingConstPtr& setting, std::vector<IntegerSettingOption>& list, int& current, void* data)
 {
@@ -496,8 +495,8 @@ void vs10_hdr_hlg_filler(const SettingConstPtr& setting, std::vector<IntegerSett
 void vs10_dv_filler(const SettingConstPtr& setting, std::vector<IntegerSettingOption>& list, int& current, void* data)
 {
   list.clear();
-  if (support_dv()) add_vs10_dv_bypass(list);
   add_vs10_sdr(list);
+  if (support_dv()) add_vs10_dv_bypass(list);
 }
 
 CDolbyVisionAML::CDolbyVisionAML()
