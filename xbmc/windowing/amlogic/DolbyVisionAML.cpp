@@ -373,11 +373,11 @@ static bool support_dv() {
 
 void dv_type_filler(const SettingConstPtr& setting, std::vector<IntegerSettingOption>& list, int& current, void* data) {
   list.clear();
-  if (aml_display_support_dv_std()) list.emplace_back(g_localizeStrings.Get(50023), DV_TYPE_DISPLAY_LED);
-  if (aml_display_support_dv_ll()) list.emplace_back(g_localizeStrings.Get(50024), DV_TYPE_PLAYER_LED_LLDV);
-  if (aml_display_support_hdr_pq()) list.emplace_back(g_localizeStrings.Get(50025), DV_TYPE_PLAYER_LED_HDR);
-  if (aml_display_support_hdr_pq()) list.emplace_back(g_localizeStrings.Get(50027), DV_TYPE_PLAYER_LED_HDR2);
-  list.emplace_back(g_localizeStrings.Get(50026), DV_TYPE_VS10_ONLY);
+  if (aml_display_support_dv_std()) list.emplace_back(g_localizeStrings.Get(60023), DV_TYPE_DISPLAY_LED);
+  if (aml_display_support_dv_ll()) list.emplace_back(g_localizeStrings.Get(60024), DV_TYPE_PLAYER_LED_LLDV);
+  if (aml_display_support_hdr_pq()) list.emplace_back(g_localizeStrings.Get(60025), DV_TYPE_PLAYER_LED_HDR);
+  if (aml_display_support_hdr_pq()) list.emplace_back(g_localizeStrings.Get(60579), DV_TYPE_PLAYER_LED_HDR2);
+  list.emplace_back(g_localizeStrings.Get(60026), DV_TYPE_VS10_ONLY);
 }
 
 void dv_processor_filler(const SettingConstPtr& setting, std::vector<IntegerSettingOption>& list, int& current, void* data) {
