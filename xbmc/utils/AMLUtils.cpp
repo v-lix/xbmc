@@ -1768,8 +1768,7 @@ void aml_kodi_set_cd_cs(int cd_cs_type)
 
       // For player-led modes or VP override, force YUV422 and set CS/CD limits
       if ((dv_vp == 2) || ((dv_vp == 0) && (dv_type == DV_TYPE_PLAYER_LED_HDR2))
-                       || ((dv_vp == 0) && (dv_type == DV_TYPE_PLAYER_LED_LLDV))
-                       || dv_type == DV_TYPE_PLAYER_LED_HDR)
+                       || ((dv_vp == 0) && (dv_type == DV_TYPE_PLAYER_LED_LLDV)))
       {
         if (!advSettings->GetForceCS())
         {
@@ -1778,9 +1777,10 @@ void aml_kodi_set_cd_cs(int cd_cs_type)
           advSettings->SetForceCSPrevVal(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS));
           advSettings->SetLimitCDPrevVal(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD));
         }
-        // Force YUV444 color space and no bit depth limit for DV processing
-        settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS, 3); // 444
+        settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS, 3); // 422
         settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD, 3); // 16bit (no limit)
+        const RESOLUTION_INFO res_info = CDisplaySettings::GetInstance().GetResolutionInfo(CDisplaySettings::GetInstance().GetCurrentResolution());
+        write_resolution_ini(res_info);
 
         // Enable kernel-side 422 forcing for lower frame rates
         if (CServiceBroker::GetDataCacheCore().GetVideoFps() < 41.0f)
@@ -1809,7 +1809,9 @@ void aml_kodi_set_cd_cs(int cd_cs_type)
 
         // Limit color depth and force color space for HDR10+ compatibility
         settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD, 3); // 16bit
-        settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS, 3); // 444
+        settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS, 3); // 422
+        const RESOLUTION_INFO res_info = CDisplaySettings::GetInstance().GetResolutionInfo(CDisplaySettings::GetInstance().GetCurrentResolution());
+        write_resolution_ini(res_info);
       }
       break;
     }
