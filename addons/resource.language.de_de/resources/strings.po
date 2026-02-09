@@ -19408,6 +19408,22 @@ msgctxt "#60605"
 msgid "Reset the PTS timestamp correction offset when seeking. Fixes subtitle desync after multiple seeks, but introduces a slightly \"jumpy\" A/V sync behaviour after seeking, which is not a big issue and usually desirable over subtitle desync."
 msgstr "Setzt den PTS-Zeitstempel-Korrektur-Offset beim Seeken zurück. Behebt die Desynchronisation von Untertiteln nach mehreren Suchvorgängen, führt aber ein leicht \"sprunghaftes\" A/V-Synchronisationsverhalten nach dem Seekvorgang ein, was kein großes Problem darstellt und in der Regel gegenüber der Desynchronisation von Untertiteln wünschenswert ist."
 
+msgctxt "#60606"
+msgid "Force all display modes"
+msgstr "Alle Anzeigemodi erzwingen"
+
+msgctxt "#60607"
+msgid "Show all DV/VS10 output mode options regardless of the connected display's capabilities. Use with caution."
+msgstr "Alle DV/VS10-Ausgabemodus-Optionen anzeigen, unabhängig von den Fähigkeiten des angeschlossenen Displays. Mit Vorsicht verwenden."
+
+msgctxt "#60608"
+msgid "Override EDID detection"
+msgstr "EDID-Erkennung überschreiben"
+
+msgctxt "#60609"
+msgid "Skip automatic colour space and luminance detection from the display's EDID. Allows full manual control over VSVDB colour space and max luminance settings."
+msgstr "Automatische Farbraum- und Luminanz-Erkennung aus der EDID des Displays überspringen. Ermöglicht die vollständige manuelle Kontrolle über VSVDB-Farbraum und Max-Luminanz-Einstellungen."
+
 msgctxt "#69196"
 msgid "Convert DV Profile 7 FEL to MEL or to Profile 8.1"
 msgstr "DV Profil 7 umwandeln"

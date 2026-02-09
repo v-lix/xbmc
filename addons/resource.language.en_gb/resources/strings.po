@@ -26349,6 +26349,22 @@ msgctxt "#60605"
 msgid "Reset the PTS timestamp correction offset when seeking. Fixes subtitle desync after multiple seeks, but introduces a slightly \"jumpy\" A/V sync behaviour after seeking, which is not a big issue and usually desirable over subtitle desync."
 msgstr ""
 
+msgctxt "#60606"
+msgid "Force all display modes"
+msgstr ""
+
+msgctxt "#60607"
+msgid "Show all DV/VS10 output mode options regardless of the connected display's capabilities. Use with caution."
+msgstr ""
+
+msgctxt "#60608"
+msgid "Override EDID detection"
+msgstr ""
+
+msgctxt "#60609"
+msgid "Skip automatic colour space and luminance detection from the display's EDID. Allows full manual control over VSVDB colour space and max luminance settings."
+msgstr ""
+
 #. Title of Dolby Vision RPU conversion setting
 #: system/settings/settings.xml
 msgctxt "#69196"
