@@ -1767,8 +1767,9 @@ void aml_kodi_set_cd_cs(int cd_cs_type)
       unsigned int dv_vp(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR));
 
       // For player-led modes or VP override, force YUV422 and set CS/CD limits
-      if ((dv_vp == 2) || ((dv_vp == 0) && (dv_type == DV_TYPE_PLAYER_LED_HDR2))
-                       || ((dv_vp == 0) && (dv_type == DV_TYPE_PLAYER_LED_LLDV)))
+      if ((dv_vp == 2) || (dv_vp == 3) ||
+          ((dv_vp == 0) && (dv_type == DV_TYPE_PLAYER_LED_HDR2)) ||
+          ((dv_vp == 0) && (dv_type == DV_TYPE_PLAYER_LED_LLDV)))
       {
         if (!advSettings->GetForceCS())
         {
