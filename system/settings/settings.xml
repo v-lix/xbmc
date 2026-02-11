@@ -3354,14 +3354,7 @@
         <setting id="audiooutput.mixsublevel" type="integer" label="34131" help="34132">
           <level>2</level>
           <default>0</default>
-          <constraints>
-            <options>
-              <option label="34133">0</option>
-              <option label="34134">50</option>
-              <option label="34135">100</option>
-            </options>
-          </constraints>
-          <control type="list" format="string" />
+          <control type="slider" format="percentage" range="0,1,100" />
         </setting>
       </group>
       <group id="2" label="15108">
