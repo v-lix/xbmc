@@ -37,6 +37,8 @@ struct VdrDmData {
   uint16_t max_frame_average_light_level;
 };
 
+int max_pq_to_nits(int pq);
+
 std::vector<uint8_t> create_rpu_nalu_for_hdr10plus(
   const Hdr10PlusMetadata& meta,
   const PeakBrightnessSource& peak_source,

@@ -4809,22 +4809,25 @@ bool CVideoPlayer::OnAction(const CAction &action)
       break;
 
     case ACTION_VS10_ORIGINAL:
-      if (CServiceBroker::GetDataCacheCore().GetVideoHdrType() == StreamHdrType::HDR_TYPE_DOLBYVISION)
-        aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_IPT);
+    {
+      StreamHdrType hdrType = CServiceBroker::GetDataCacheCore().GetVideoHdrType();
+      if (hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
+        aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_IPT, hdrType);
       else
-        aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_BYPASS);
+        aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_BYPASS, hdrType);
       return true;
-    
+    }
+
     case ACTION_VS10_SDR:
-      aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_SDR10);
+      aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_SDR10, CServiceBroker::GetDataCacheCore().GetVideoHdrType());
       return true;
-    
+
     case ACTION_VS10_HDR10:
-      aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_HDR10);
+      aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_HDR10, CServiceBroker::GetDataCacheCore().GetVideoHdrType());
       return true;
 
     case ACTION_VS10_DV:
-      aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_IPT);
+      aml_dv_set_vs10_mode(DOLBY_VISION_OUTPUT_MODE_IPT, CServiceBroker::GetDataCacheCore().GetVideoHdrType());
       return true;
 
     case ACTION_TOGGLE_VIDEO_FREERUN_MODE:

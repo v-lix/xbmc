@@ -40,12 +40,16 @@
 #include "ServiceBroker.h"
 
 #include "settings/AdvancedSettings.h"
+#include "HDR10PlusConvert.h"
 
 #include "platform/linux/SysfsPath.h"
 
 #include "linux/fb.h"
 #include <sys/ioctl.h>
 #include <amcodec/codec.h>
+
+static bool vs10_conversion = false;
+static bool vs10_conversion_reset_hdr10 = true;
 
 static std::shared_ptr<CSettings> settings()
 {
@@ -111,10 +115,31 @@ void aml_reset_audio_from_vs10_change()
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetLastResetTime(0.0);
 }
 
-void aml_dv_set_vs10_mode(unsigned int mode)
+void aml_dv_set_vs10_mode(unsigned int mode, StreamHdrType hdrType)
 {
-  if (mode != DOLBY_VISION_OUTPUT_MODE_BYPASS) 
+  enum DV_TYPE dv_type(static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
+  if (dv_type == DV_TYPE_VS10_ONLY) return;
+
+  CSysfsPath dolby_vision_mode{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
+  unsigned int existing_mode = dolby_vision_mode.Get<unsigned int>().value();
+  if ((existing_mode != mode) && (mode == DOLBY_VISION_OUTPUT_MODE_BYPASS) && (hdrType == StreamHdrType::HDR_TYPE_HDR10))
+    vs10_conversion_reset_hdr10 = true;
+  else
+    vs10_conversion_reset_hdr10 = false;
+
+  if (mode != DOLBY_VISION_OUTPUT_MODE_BYPASS)
+  {
+    if ((existing_mode == mode) || ((mode == DOLBY_VISION_OUTPUT_MODE_IPT) && (hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)))
+      vs10_conversion = false;
+    else
+      vs10_conversion = true;
+
+    if ((existing_mode != DOLBY_VISION_OUTPUT_MODE_HDR10) &&
+        (mode == DOLBY_VISION_OUTPUT_MODE_SDR10) && (hdrType == StreamHdrType::HDR_TYPE_HDR10))
+      aml_dv_on(DOLBY_VISION_OUTPUT_MODE_HDR10);
+
     aml_dv_on(mode);
+  }
   else if (aml_is_dv_enable()) // DV BYPASS, and it is on - then switch it off.
     aml_dv_off();
 
@@ -178,6 +203,15 @@ static unsigned int aml_vs10_by_hdrtype(StreamHdrType hdrType, unsigned int bitD
       vs10_mode = aml_vs10_by_setting(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV);
       break;
   }
+
+  if ((vs10_mode != DOLBY_VISION_OUTPUT_MODE_BYPASS) &&
+       ((hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION) ||
+        ((hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION) && (vs10_mode == DOLBY_VISION_OUTPUT_MODE_SDR10)) ||
+        ((hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION) && (vs10_mode == DOLBY_VISION_OUTPUT_MODE_HDR10))))
+    vs10_conversion = true;
+  else
+    vs10_conversion = false;
+
   return vs10_mode;
 }
 
@@ -243,7 +277,7 @@ bool aml_display_support_dv_ll()
 {
   int support_ll = 0;
   CRegExp regexp;
-  regexp.RegComp("YCbCr_422_12BIT");
+  regexp.RegComp("LL_YCbCr_422_12BIT");
   std::string valstr;
   CSysfsPath dv_cap{"/sys/devices/virtual/amhdmitx/amhdmitx0/dv_cap"};
   if (dv_cap.Exists())
@@ -430,7 +464,7 @@ bool aml_dolby_vision_enabled()
 
 std::string aml_dv_output_mode_to_string(unsigned int mode)
 {
-  std::string mode_string = "Unkown";
+  std::string mode_string = "Unknown";
   switch (mode) {
     case DOLBY_VISION_OUTPUT_MODE_IPT:
       mode_string = "0-IPT";
@@ -453,7 +487,7 @@ std::string aml_dv_output_mode_to_string(unsigned int mode)
 
 std::string aml_dv_mode_to_string(enum DV_MODE mode)
 {
-  std::string mode_string = "Unkown";
+  std::string mode_string = "Unknown";
   switch (mode) {
     case DV_MODE::DV_MODE_ON:
       mode_string = "0-On";
@@ -522,14 +556,13 @@ unsigned int aml_dv_on(unsigned int mode)
   DOVIStreamMetadata dovi_stream_metadata;
   dovi_stream_metadata = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
   int source_max_pq = static_cast<int>(dovi_stream_metadata.source_max_pq);
-  enum DV_TYPE dv_type(aml_dv_type());
+  enum DV_TYPE dv_type(static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
   int max_lum_nits_value(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM));
 
-  // VP auto-detect: automatically use VP when display can't handle source luminance
   bool dv_type_vp_auto(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO));
   unsigned int dv_vp(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR));
 
-  if ((dv_vp != 0) || (dv_type == DV_TYPE_DISPLAY_LED))
+  if (vs10_conversion || (dv_vp != 0) || (dv_type == DV_TYPE_DISPLAY_LED) || (max_lum_nits_value < max_pq_to_nits(source_max_pq)))
     dv_type_vp_auto = false;
 
   if (dv_type_vp_auto)
@@ -557,6 +590,28 @@ unsigned int aml_dv_on(unsigned int mode)
     else if (dv_vp == 5) dv_vp = 7;
   }
 
+  // During VS10 conversion, map VP mode to corresponding DV type and clear VP
+  if (vs10_conversion && (dv_vp != 0))
+  {
+    switch (dv_vp)
+    {
+      case 1:
+        dv_type = DV_TYPE_PLAYER_LED_HDR;
+        break;
+      case 2:
+        dv_type = DV_TYPE_PLAYER_LED_HDR2;
+        break;
+      case 3:
+      case 4:
+      case 6:
+        dv_type = DV_TYPE_PLAYER_LED_LLDV;
+        break;
+      default:
+        break;
+    }
+    dv_vp = 0;
+    vs10_conversion = false;
+  }
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp", dv_vp);
 
   // VP tone mapping level controls core bypass stages:
@@ -1700,7 +1755,7 @@ void aml_toogle_video_freerun_mode()
 }
 
 void aml_dv_hdr10plus_conversion (bool hdr10plus_conversion) {
-  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10plus_conv", hdr10plus_conversion);
+  // Kernel-side xbmc_dv_hdr10plus_conv param disabled; VS10 handles HDR10+ conversion natively
 }
 
 void aml_reset_audio_from_player_open()
@@ -1841,4 +1896,11 @@ void aml_kodi_reset_cd_cs()
   // Reset kernel-side 422 forcing
   aml_linux_force_422 = false;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
+
+  if (CServiceBroker::GetDataCacheCore().GetVideoHdrType() == StreamHdrType::HDR_TYPE_HDR10 &&
+           vs10_conversion_reset_hdr10)
+  {
+    aml_dv_on(DOLBY_VISION_OUTPUT_MODE_IPT);
+    vs10_conversion_reset_hdr10 = false;
+  }
 }

@@ -12,6 +12,7 @@
 #include <vector>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 #include "cores/VideoPlayer/DVDStreamInfo.h"
 
@@ -32,6 +33,25 @@ constexpr double ST2084_C3 = (2392.0 / 4096.0) * 32.0;
 constexpr std::uint16_t L1_MAX_PQ_MIN_VALUE = 2081;
 constexpr std::uint16_t L1_MAX_PQ_MAX_VALUE = 4095;
 constexpr std::uint16_t L1_AVG_PQ_MIN_VALUE = 819;
+
+int max_pq_to_nits(int pq) {
+  if (pq < 2055) return 96;
+  if (pq > 4095) return 10000;
+  switch (pq) {
+    case 3079: { return  1000; }
+    case 3388: { return  2000; }
+    case 3696: { return  4000; }
+    case 4095: { return 10000; }
+  }
+  double pq_normalized = pq / 4095.0;
+  double pq_pow = std::pow(pq_normalized, 1.0 / ST2084_M2);
+  double num = std::max(pq_pow - ST2084_C1, 0.0);
+  double den = ST2084_C2 - ST2084_C3 * pq_pow;
+  if (std::abs(den) < std::numeric_limits<double>::epsilon()) {
+    return 0;
+  }
+  return static_cast<int>(std::round(ST2084_Y_MAX * std::pow(num / den, 1.0 / ST2084_M1)));
+}
 
 static double nits_to_pq(double nits) {
   double y = nits / ST2084_Y_MAX;
