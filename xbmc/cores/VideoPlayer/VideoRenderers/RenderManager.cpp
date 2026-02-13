@@ -228,7 +228,7 @@ bool CRenderManager::Configure()
 
     m_renderState = STATE_CONFIGURED;
 
-    UpdateResolution(true);
+    UpdateResolution();
 
     CLog::Log(LOGDEBUG, "CRenderManager::Configure - {}", m_QueueSize);
   }
