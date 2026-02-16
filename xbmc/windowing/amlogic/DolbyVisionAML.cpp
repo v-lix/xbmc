@@ -181,7 +181,8 @@ void CalculateVSVDBPayload()
     }
   }
 
-  if ((cs == 3) && ((xbmc_dv_cap::dv_rx_i == 0) || (xbmc_dv_cap::dv_ry_i == 0) || (xbmc_dv_cap::dv_gx_i == 0) ||
+  // Only validate/correct DISPLAY mode when NOT manually overriding EDID
+  if (!override_edid && (cs == 3) && ((xbmc_dv_cap::dv_rx_i == 0) || (xbmc_dv_cap::dv_ry_i == 0) || (xbmc_dv_cap::dv_gx_i == 0) ||
       (xbmc_dv_cap::dv_gy_i == 0) || (xbmc_dv_cap::dv_bx_i == 0) || (xbmc_dv_cap::dv_by_i == 0)))
   {
     cs = 1;
@@ -322,7 +323,8 @@ void CalculateVSVDBPayload_2()
     }
   }
 
-  if ((cs == 3) && ((xbmc_dv_cap::dv_rx_i == 0) || (xbmc_dv_cap::dv_ry_i == 0) || (xbmc_dv_cap::dv_gx_i == 0) ||
+  // Only validate/correct DISPLAY mode when NOT manually overriding EDID
+  if (!override_edid && (cs == 3) && ((xbmc_dv_cap::dv_rx_i == 0) || (xbmc_dv_cap::dv_ry_i == 0) || (xbmc_dv_cap::dv_gx_i == 0) ||
       (xbmc_dv_cap::dv_gy_i == 0) || (xbmc_dv_cap::dv_bx_i == 0) || (xbmc_dv_cap::dv_by_i == 0)))
   {
     cs = 1;
@@ -536,7 +538,10 @@ bool CDolbyVisionAML::Setup()
 {
   CLog::Log(LOGDEBUG, "CDolbyVisionAML::Setup - Begin");
 
-  if (!aml_support_dolby_vision())
+  // Allow setup to continue if override_edid is enabled (to fake DV support via manual VSVDB injection)
+  bool override_edid = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
+
+  if (!aml_support_dolby_vision() && !override_edid)
   {
     set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE, false);
     settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE, DV_MODE_OFF);
@@ -563,10 +568,15 @@ bool CDolbyVisionAML::Setup()
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR_TM, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, true);
+
+  // VSVDB child settings visibility controlled by vsvdb_inject toggle
+  // (XML dependency is commented out, so we handle it in C++)
+  bool vsvdb_inject = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_inject);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_inject);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_inject);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_inject);
+
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR8, true);
@@ -669,6 +679,11 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT)
   {
+    bool vsvdb_inject = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT);
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_inject);
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_inject);
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_inject);
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_inject);
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS)
