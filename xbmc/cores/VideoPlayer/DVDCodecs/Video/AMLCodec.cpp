@@ -1929,13 +1929,17 @@ bool CAMLCodec::OpenDecoder(bool restart)
   m_decoder_bypass_buffer_ready = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoDecoderBypassBufferReady;
   m_decoder_buffer = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoDecoderBuffer;
   m_decoder_stream_buffer = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoDecoderStreamBuffer;
+  m_decoder_minimum_buffer = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoDecoderMinimumBuffer;
+  m_decoder_minimum_stream_buffer = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoDecoderMinimumStreamBuffer;
   m_buffer_level_ready = false;
 
-  CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - Decoder settings: timeout: [{:d}s], bypass buffer ready: [{:d}], buffer: [{:.1f}%], stream buffer: [{:.1f}%]",
+  CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - Decoder settings: timeout: [{:d}s], bypass buffer ready: [{:d}], buffer: [{:.1f}%], stream buffer: [{:.1f}%], minimum buffer: [{:.1f}%], minimum stream buffer: [{:.1f}%]",
     m_decoder_timeout,
     m_decoder_bypass_buffer_ready,
     m_decoder_buffer,
-    m_decoder_stream_buffer);
+    m_decoder_stream_buffer,
+    m_decoder_minimum_buffer,
+    m_decoder_minimum_stream_buffer);
 
   if (!OpenAmlVideo(hints))
   {
@@ -2396,10 +2400,13 @@ bool CAMLCodec::AddData(uint8_t *pData, size_t iSize, double dts, double pts)
  
   if (!m_buffer_level_ready) {
     m_buffer_level_ready = m_decoder_bypass_buffer_ready ||
-                           (streambuffer 
+                           (streambuffer
                               ? new_buffer_level > m_decoder_stream_buffer
                               : new_buffer_level > m_decoder_buffer);
 
+    m_minimum_buffer_level = streambuffer
+                               ? m_decoder_minimum_stream_buffer
+                               : m_decoder_minimum_buffer;
   }
 
   if (!m_opened || !pData || free_len == 0 || new_buffer_level >= 100.0f)
@@ -2638,9 +2645,18 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   if (!m_opened)
     return CDVDVideoCodec::VC_ERROR;
 
-  if (m_buffer_level_ready && ((ret = DequeueBuffer()) == 0))
+  bool streambuffer(am_private->gcodec.dec_mode == STREAM_TYPE_STREAM);
+
+  // Dequeue when buffer is above minimum level, or always during drain to flush
+  // remaining frames at EOF. The minimum gate pauses output when the buffer is low,
+  // triggering Kodi's visual buffering indicator for slow/remote sources.
+  if (m_buffer_level_ready && (m_drain || buffer_level > m_minimum_buffer_level) && ((ret = DequeueBuffer()) == 0))
   {
     videoPicture.iFlags = 0;
+
+    // Frame mode: disable the minimum gate after the first frame (only needed for initial fill).
+    // Stream mode: keep the gate active throughout playback.
+    m_minimum_buffer_level = (streambuffer ? m_minimum_buffer_level : 0.0f);
 
     m_tp_last_frame = std::chrono::system_clock::now();
 
@@ -2698,6 +2714,7 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   }
   else if (m_drain)
     return CDVDVideoCodec::VC_EOF;
+  // Decoder error or no frame produced within the timeout period.
   else if (ret != EAGAIN || elapsed_since_last_frame > std::chrono::seconds(m_decoder_timeout))
   {
     CLog::Log(LOGERROR, "CAMLCodec::GetPicture: time elapsed since last frame: {:d}ms ({:d}:{})",
@@ -2705,10 +2722,15 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     m_tp_last_frame = std::chrono::system_clock::now();
     return CDVDVideoCodec::VC_FLUSHED;
   }
-  else if ((buffer_level > 10.0f &&
-            elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
-           (m_buffer_level_ready &&
-            elapsed_since_last_frame < std::chrono::milliseconds(am_private->video_rate * 1000 / UNIT_FREQ)))
+  // Frame mode only: poll without requesting data when the HW buffer has data
+  // (smooth EOF drain, 500ms cap for stall recovery) or within one frame period
+  // after output (cadence smoothing). Stream mode skips this — the HW decoder
+  // manages its own output cadence and needs continuous data flow via VC_BUFFER.
+  else if (!streambuffer &&
+           ((buffer_level > 10.0f &&
+             elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
+            (m_buffer_level_ready &&
+             elapsed_since_last_frame < std::chrono::milliseconds(am_private->video_rate * 1000 / UNIT_FREQ))))
     return CDVDVideoCodec::VC_NONE;
 
   return CDVDVideoCodec::VC_BUFFER;
