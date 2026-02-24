@@ -1926,7 +1926,6 @@ bool CAMLCodec::OpenDecoder(bool restart)
   m_state = 0;
   m_hints.pClock = hints.pClock;
   m_tp_last_frame = std::chrono::system_clock::now();
-  m_tp_last_adddata = std::chrono::system_clock::now();
   m_decoder_timeout = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoDecoderTimeout;
   m_decoder_drain_timeout = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoDecoderDrainTimeout;
   m_decoder_bypass_buffer_ready = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoDecoderBypassBufferReady;
@@ -2526,8 +2525,6 @@ bool CAMLCodec::AddData(uint8_t *pData, size_t iSize, double dts, double pts)
   if (iSize > 50000)
     usleep(2000); // wait 2ms to process larger packets
 
-  m_tp_last_adddata = std::chrono::system_clock::now();
-
   if (iSize > 0)
     CLog::Log(LOGDEBUG, LOGVIDEO,
       "CAMLCodec::{}: dl:{:d} fl:{:d} sz:{:d}({:d}) lv:{:.1f}% dts:{:.3f} pts:{:.3f}", __FUNCTION__,
@@ -2654,18 +2651,12 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
 
   bool streambuffer(am_private->gcodec.dec_mode == STREAM_TYPE_STREAM);
 
-  // Bypass the minimum buffer gate when no data has been added recently — the
-  // demuxer is dry (EOF approach) so the buffer will only deplete further.
-  // Without this, the gate cycles open/closed as buffer_level oscillates around
-  // the threshold, causing burst-gap frame output near EOF.
-  auto since_last_data = std::chrono::duration_cast<std::chrono::milliseconds>(
-    std::chrono::system_clock::now() - m_tp_last_adddata);
-  bool data_stalled = since_last_data > std::chrono::milliseconds(500);
-
-  // Dequeue when buffer is above minimum level, or always during drain/data stall.
-  // The minimum gate pauses output when the buffer is low, triggering Kodi's visual
-  // buffering indicator for slow/remote sources.
-  if (m_buffer_level_ready && (m_drain || m_stream_eof || data_stalled || buffer_level > m_minimum_buffer_level) && ((ret = DequeueBuffer()) == 0))
+  // Always try to dequeue a decoded frame when the decoder is ready.
+  // The minimum buffer gate is checked separately only when no output frame is
+  // available (EAGAIN), decoupling frame output from the input buffer level.
+  // This prevents burst-gap stutter near EOF where the input buffer oscillates
+  // around the minimum threshold while the decoder still has output frames ready.
+  if (m_buffer_level_ready && ((ret = DequeueBuffer()) == 0))
   {
     videoPicture.iFlags = 0;
 
@@ -2747,6 +2738,14 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     m_tp_last_frame = std::chrono::system_clock::now();
     return CDVDVideoCodec::VC_FLUSHED;
   }
+  // No output frame available (EAGAIN): if buffer is below the minimum level,
+  // return VC_BUFFER to trigger the buffering indicator for slow/remote sources.
+  // This preserves the visual buffering UI without blocking frame output when
+  // the decoder has frames ready (e.g. near EOF as the input buffer depletes).
+  // For frame mode, m_minimum_buffer_level is 0 after the first frame, so this
+  // only activates for stream mode during mid-playback buffer underruns.
+  else if (buffer_level < m_minimum_buffer_level)
+    return CDVDVideoCodec::VC_BUFFER;
   // Frame mode only: poll without requesting data when the HW buffer has data
   // (smooth EOF drain, 500ms cap for stall recovery) or within one frame period
   // after output (cadence smoothing). Stream mode skips this — the HW decoder

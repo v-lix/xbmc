@@ -147,7 +147,6 @@ private:
 
   std::chrono::time_point<std::chrono::system_clock> m_tp_last_frame;
   std::chrono::time_point<std::chrono::system_clock> m_tp_drain_start;
-  std::chrono::time_point<std::chrono::system_clock> m_tp_last_adddata;
 
   bool            m_buffer_level_ready;
   float           m_minimum_buffer_level;
