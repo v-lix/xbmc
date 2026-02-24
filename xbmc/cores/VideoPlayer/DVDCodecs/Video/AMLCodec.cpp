@@ -1919,6 +1919,7 @@ bool CAMLCodec::OpenDecoder(bool restart)
 {
   m_speed = DVD_PLAYSPEED_NORMAL;
   m_drain = false;
+  m_stream_eof = false;
   m_cur_pts = DVD_NOPTS_VALUE;
   m_dst_rect.SetRect(0, 0, 0, 0);
   CDVDStreamInfo &hints = m_hints;  // Fudge to avoid large chnage delta renaming hints to m_hints.
@@ -2384,6 +2385,7 @@ void CAMLCodec::Reset()
   m_cur_pts = DVD_NOPTS_VALUE;
   m_last_pts = DVD_NOPTS_VALUE;
   m_state = 0;
+  m_stream_eof = false;
   m_buffer_level_ready = false;
 
   SetSpeed(m_speed);
@@ -2712,8 +2714,14 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
 
     return CDVDVideoCodec::VC_PICTURE;
   }
+  // During drain, poll while the decoder still has data to process rather than
+  // returning VC_EOF immediately — this lets remaining frames drain smoothly.
   else if (m_drain)
+  {
+    if (buffer_level > 0.0f)
+      return CDVDVideoCodec::VC_NONE;
     return CDVDVideoCodec::VC_EOF;
+  }
   // Decoder error or no frame produced within the timeout period.
   else if (ret != EAGAIN || elapsed_since_last_frame > std::chrono::seconds(m_decoder_timeout))
   {
@@ -2722,11 +2730,13 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     m_tp_last_frame = std::chrono::system_clock::now();
     return CDVDVideoCodec::VC_FLUSHED;
   }
-  // Frame mode only: poll without requesting data when the HW buffer has data
-  // (smooth EOF drain, 500ms cap for stall recovery) or within one frame period
-  // after output (cadence smoothing). Stream mode skips this — the HW decoder
-  // manages its own output cadence and needs continuous data flow via VC_BUFFER.
-  else if (!streambuffer &&
+  // Poll without requesting data:
+  // - Frame mode: when buffer has data (smooth EOF drain, 500ms stall cap) or
+  //   within one frame period after output (cadence smoothing).
+  // - Stream mode: only after EL starvation signals EOF approach — stream mode
+  //   normally needs continuous data flow via VC_BUFFER, but near EOF the poll
+  //   keeps the EL-absent transition smooth.
+  else if ((streambuffer ? m_stream_eof : true) &&
            ((buffer_level > 10.0f &&
              elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
             (m_buffer_level_ready &&

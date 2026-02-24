@@ -72,6 +72,7 @@ public:
 
   void          SetSpeed(int speed);
   void          SetDrain(bool drain){m_drain = drain;};
+  void          SetStreamEOF(bool eof){m_stream_eof = eof;};
   void          SetVideoRect(const CRect &SrcRect, const CRect &DestRect);
   void          SetVideoRate(int videoRate);
   int           GetOMXPts() const { return static_cast<int>(m_cur_pts); }
@@ -104,6 +105,7 @@ private:
   DllLibAmCodec   *m_dll;
   bool             m_opened;
   bool             m_drain = false;
+  bool             m_stream_eof = false;
   am_private_t    *am_private;
 
   int              m_speed;
