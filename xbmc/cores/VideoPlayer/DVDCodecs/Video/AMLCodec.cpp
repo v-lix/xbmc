@@ -29,6 +29,7 @@
 
 #include "platform/linux/SysfsPath.h"
 
+#include <algorithm>
 #include <unistd.h>
 #include <queue>
 #include <vector>
@@ -2651,6 +2652,27 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
 
   bool streambuffer(am_private->gcodec.dec_mode == STREAM_TYPE_STREAM);
 
+  // Detect approaching EOF using playback position from DataCacheCore.
+  // Use 5% of total duration (floor 30s, ceiling 180s) to handle both short
+  // clips and long movies with early credit rolls.
+  if (streambuffer && !m_stream_eof)
+  {
+    time_t start;
+    int64_t current, min, max;
+    m_dataCacheCore.GetPlayTimes(start, current, min, max);
+    if (max > 0)
+    {
+      int64_t remaining = max - current;
+      int64_t threshold = std::clamp(max / 20, static_cast<int64_t>(30000), static_cast<int64_t>(180000));
+      if (remaining < threshold && remaining >= 0)
+      {
+        CLog::Log(LOGDEBUG, LOGVIDEO, "CAMLCodec::GetPicture: approaching EOF — remaining:{:d}ms threshold:{:d}ms, enabling stream EOF mode",
+          remaining, threshold);
+        m_stream_eof = true;
+      }
+    }
+  }
+
   // Always try to dequeue a decoded frame when the decoder is ready.
   // The minimum buffer gate is checked separately only when no output frame is
   // available (EAGAIN), decoupling frame output from the input buffer level.
@@ -2738,12 +2760,21 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     m_tp_last_frame = std::chrono::system_clock::now();
     return CDVDVideoCodec::VC_FLUSHED;
   }
-  // Poll without requesting data when the HW buffer has data (smooth EOF drain,
-  // 500ms cap for stall recovery — frame mode only to avoid starving stream mode
-  // decoders) or within one frame period after output (cadence smoothing — all
-  // modes, to catch back-to-back frames and prevent burst accumulation).
+  // No output frame available (EAGAIN): if buffer is below the minimum level
+  // and we're not approaching EOF, return VC_BUFFER to trigger the buffering
+  // indicator for slow/remote sources. Near EOF (m_stream_eof), bypass the gate
+  // so frames drain smoothly instead of stuttering around the threshold.
+  else if (!m_stream_eof && buffer_level < m_minimum_buffer_level)
+    return CDVDVideoCodec::VC_BUFFER;
+  // Poll without requesting data:
+  // 1) Frame mode stall recovery: buffer has data, poll up to 500ms.
+  // 2) Stream mode approaching EOF: poll up to 500ms to catch frames from the
+  //    slowed DV compositor without burst accumulation.
+  // 3) Cadence smoothing (all modes): poll for one frame period after output.
   else if ((!streambuffer &&
             buffer_level > 10.0f &&
+            elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
+           (streambuffer && m_stream_eof &&
             elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
            (m_buffer_level_ready &&
             elapsed_since_last_frame < std::chrono::milliseconds(am_private->video_rate * 1000 / UNIT_FREQ)))
