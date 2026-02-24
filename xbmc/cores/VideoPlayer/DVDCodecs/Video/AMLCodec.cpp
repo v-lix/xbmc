@@ -2738,12 +2738,17 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     m_tp_last_frame = std::chrono::system_clock::now();
     return CDVDVideoCodec::VC_FLUSHED;
   }
-  // Poll without requesting data when the HW buffer has data (smooth EOF drain,
-  // 500ms cap for stall recovery — frame mode only to avoid starving stream mode
-  // decoders) or within one frame period after output (cadence smoothing — all
-  // modes, to catch back-to-back frames and prevent burst accumulation).
+  // Poll without requesting data:
+  // 1) Frame mode stall recovery: buffer has data, poll up to 500ms for next frame.
+  // 2) Stream mode EOF drain: buffer is depleting (<10%), poll up to 500ms to catch
+  //    frames from the slowed DV compositor without burst accumulation. Above 10%,
+  //    stream mode falls through to VC_BUFFER to keep the stream buffer fed.
+  // 3) Cadence smoothing (all modes): poll for one frame period after output.
   else if ((!streambuffer &&
             buffer_level > 10.0f &&
+            elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
+           (streambuffer &&
+            buffer_level < 10.0f &&
             elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
            (m_buffer_level_ready &&
             elapsed_since_last_frame < std::chrono::milliseconds(am_private->video_rate * 1000 / UNIT_FREQ)))
