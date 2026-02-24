@@ -2746,15 +2746,15 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   // only activates for stream mode during mid-playback buffer underruns.
   else if (buffer_level < m_minimum_buffer_level)
     return CDVDVideoCodec::VC_BUFFER;
-  // Frame mode only: poll without requesting data when the HW buffer has data
-  // (smooth EOF drain, 500ms cap for stall recovery) or within one frame period
-  // after output (cadence smoothing). Stream mode skips this — the HW decoder
-  // manages its own output cadence and needs continuous data flow via VC_BUFFER.
-  else if (!streambuffer &&
-           ((buffer_level > 10.0f &&
-             elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
-            (m_buffer_level_ready &&
-             elapsed_since_last_frame < std::chrono::milliseconds(am_private->video_rate * 1000 / UNIT_FREQ))))
+  // Poll without requesting data when the HW buffer has data (smooth EOF drain,
+  // 500ms cap for stall recovery — frame mode only to avoid starving stream mode
+  // decoders) or within one frame period after output (cadence smoothing — all
+  // modes, to catch back-to-back frames and prevent burst accumulation).
+  else if ((!streambuffer &&
+            buffer_level > 10.0f &&
+            elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
+           (m_buffer_level_ready &&
+            elapsed_since_last_frame < std::chrono::milliseconds(am_private->video_rate * 1000 / UNIT_FREQ)))
     return CDVDVideoCodec::VC_NONE;
 
   return CDVDVideoCodec::VC_BUFFER;
