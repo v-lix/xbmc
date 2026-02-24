@@ -2738,14 +2738,6 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     m_tp_last_frame = std::chrono::system_clock::now();
     return CDVDVideoCodec::VC_FLUSHED;
   }
-  // No output frame available (EAGAIN): if buffer is below the minimum level,
-  // return VC_BUFFER to trigger the buffering indicator for slow/remote sources.
-  // This preserves the visual buffering UI without blocking frame output when
-  // the decoder has frames ready (e.g. near EOF as the input buffer depletes).
-  // For frame mode, m_minimum_buffer_level is 0 after the first frame, so this
-  // only activates for stream mode during mid-playback buffer underruns.
-  else if (buffer_level < m_minimum_buffer_level)
-    return CDVDVideoCodec::VC_BUFFER;
   // Poll without requesting data when the HW buffer has data (smooth EOF drain,
   // 500ms cap for stall recovery — frame mode only to avoid starving stream mode
   // decoders) or within one frame period after output (cadence smoothing — all
