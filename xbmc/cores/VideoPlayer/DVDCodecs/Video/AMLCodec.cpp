@@ -2766,21 +2766,18 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   // so frames drain smoothly instead of stuttering around the threshold.
   else if (!m_stream_eof && buffer_level < m_minimum_buffer_level)
     return CDVDVideoCodec::VC_BUFFER;
-  // Poll without requesting data:
-  // 1) Frame mode stall recovery: buffer has data, poll up to 500ms.
-  // 2) Cadence smoothing (all modes): poll for one frame period after output.
-  //    When approaching EOF (m_stream_eof), extend to 2x frame period to catch
-  //    frames from the slowed DV compositor (~60ms at 67% rate vs ~39ms nominal).
+  // Frame mode: tight poll while HW buffer is healthy. Self-regulating —
+  // buffer drains during VC_NONE (no data feeding), drops below 10%, then
+  // VC_BUFFER feeds data and refills. Catches frames at vsync rate.
+  if (!streambuffer && buffer_level > 10.0f)
+    return CDVDVideoCodec::VC_NONE;
+  // Stream mode near EOF: extended cadence poll for the slowed DV compositor
+  // (~60ms at 67% rate vs ~39ms nominal). Keeps the video thread polling
+  // instead of falling to GetMessage(frametime*10) sleep.
+  if (streambuffer && m_stream_eof && m_buffer_level_ready)
   {
-    int cadence_ms = am_private->video_rate * 1000 / UNIT_FREQ;
-    if (m_stream_eof)
-      cadence_ms *= 2;
-
-    if ((!streambuffer &&
-              buffer_level > 10.0f &&
-              elapsed_since_last_frame < std::chrono::milliseconds(500)) ||
-             (m_buffer_level_ready &&
-              elapsed_since_last_frame < std::chrono::milliseconds(cadence_ms)))
+    int cadence_ms = (am_private->video_rate * 1000 + UNIT_FREQ - 1) / UNIT_FREQ * 2;
+    if (elapsed_since_last_frame < std::chrono::milliseconds(cadence_ms))
       return CDVDVideoCodec::VC_NONE;
   }
 
