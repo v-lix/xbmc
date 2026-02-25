@@ -17,6 +17,7 @@
 #include "PTSTracker.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderManager.h"
 #include "threads/Thread.h"
+#include "threads/SystemClock.h"
 #include "utils/BitstreamStats.h"
 
 #include <atomic>
@@ -147,4 +148,6 @@ protected:
   VideoPicture m_picture;
 
   EOutputState m_outputSate;
+
+  XbmcThreads::EndTime<> m_playerInfoTimer;
 };
