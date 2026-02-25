@@ -2742,13 +2742,19 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   }
   // During drain, poll while the decoder still has data to process rather than
   // returning VC_EOF immediately — this lets remaining frames drain smoothly.
-  // Time-cap the poll so a stalled decoder (e.g. DV compositor holding the last
-  // frame) doesn't block EOF indefinitely.
+  // Keep polling if:
+  //   1. Buffer has data AND we're within the initial drain timeout, OR
+  //   2. Frames are still being produced (decoder is making progress).
+  // Safety: VC_EOF once buffer is empty AND no frame within frametime*10,
+  // or if decoder stalls for >frametime*10 after the initial timeout.
   else if (m_drain)
   {
     auto drain_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::system_clock::now() - m_tp_drain_start);
-    if (buffer_level > 0.0f && drain_elapsed < std::chrono::seconds(m_decoder_drain_timeout))
+    int poll_ms = (am_private->video_rate * 10000 + UNIT_FREQ - 1) / UNIT_FREQ;
+    bool frames_flowing = elapsed_since_last_frame < std::chrono::milliseconds(poll_ms);
+    if (buffer_level > 0.0f &&
+        (drain_elapsed < std::chrono::seconds(m_decoder_drain_timeout) || frames_flowing))
       return CDVDVideoCodec::VC_NONE;
     return CDVDVideoCodec::VC_EOF;
   }
