@@ -2782,13 +2782,12 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   // VC_BUFFER so AddData keeps the FEL stream fed — starving data feeding
   // causes the DV compositor to slow down on high-bitrate content.
   // Once buffer drops below 10%, the demuxer/queue is likely drained and
-  // remaining frames are inside the HW pipeline. Poll for up to frametime*10
-  // (matching the VC_BUFFER timeout) to catch slow compositor output at 1ms
-  // latency instead of sleeping the full 417ms.
+  // remaining frames are inside the HW pipeline. Poll at 2x cadence to
+  // catch frames from a slightly slowed DV compositor at 1ms latency.
   if (streambuffer && m_stream_eof && m_buffer_level_ready && buffer_level < 10.0f)
   {
-    int poll_ms = (am_private->video_rate * 10000 + UNIT_FREQ - 1) / UNIT_FREQ;
-    if (elapsed_since_last_frame < std::chrono::milliseconds(poll_ms))
+    int cadence_ms = (am_private->video_rate * 1000 + UNIT_FREQ - 1) / UNIT_FREQ * 2;
+    if (elapsed_since_last_frame < std::chrono::milliseconds(cadence_ms))
       return CDVDVideoCodec::VC_NONE;
   }
 
