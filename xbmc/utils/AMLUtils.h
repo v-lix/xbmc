@@ -73,6 +73,7 @@ enum DV_COLORIMETRY : int
 #define AML_SM1     0x2B
 #define AML_SC2     0x32
 
+#define FLAG_FORCE_CVM          (unsigned int)(0x0001)
 #define FLAG_FORCE_DOVI_LL      (unsigned int)(0x4000)
 #define FLAG_FORCE_RGB_OUTPUT   (unsigned int)(0x8000)
 #define FLAG_TOGGLE_FRAME       (unsigned int)(0x80000000)
@@ -88,6 +89,7 @@ enum DV_COLORIMETRY : int
 #define DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL (unsigned int)(1)
 #define DOLBY_VISION_OUTPUT_MODE_HDR10      (unsigned int)(2)
 #define DOLBY_VISION_OUTPUT_MODE_SDR10      (unsigned int)(3)
+#define DOLBY_VISION_OUTPUT_MODE_SDR8       (unsigned int)(4)
 #define DOLBY_VISION_OUTPUT_MODE_BYPASS     (unsigned int)(5)
 
 int  aml_get_cpufamily_id();

@@ -691,6 +691,14 @@ unsigned int aml_dv_on(unsigned int mode)
         dolby_vision_ll_policy.Set(DOLBY_VISION_LL_YUV422);
       }
     }
+
+    // For SDR output, clear FLAG_FORCE_CVM so the kernel's skip_cvm_tbl can
+    // bypass Color Volume Management for SDR→SDR (avoids DV compositor
+    // over-processing that users perceive as sharpening/contrast artifacts).
+    if (mode == DOLBY_VISION_OUTPUT_MODE_SDR10 || mode == DOLBY_VISION_OUTPUT_MODE_SDR8)
+      dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~(FLAG_FORCE_CVM));
+    else
+      dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() | FLAG_FORCE_CVM);
   }
 
   // switch mode to IPT Tunnel if IPT and type is DV_TYPE_DISPLAY_LED.
