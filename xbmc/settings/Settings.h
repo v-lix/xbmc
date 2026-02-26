@@ -459,6 +459,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING = "coreelec.amlogic.disableguiscaling";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_MODE = "coreelec.amlogic.dolbyvision.mode";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE = "coreelec.amlogic.dolbyvision.mode.on.luminance";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS = "coreelec.amlogic.dolbyvision.osd.brightness";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR = "coreelec.amlogic.dolbyvision.video.processor";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR_TM = "coreelec.amlogic.dolbyvision.video.processor.tm";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_TYPE = "coreelec.amlogic.dolbyvision.type";
@@ -473,6 +474,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_SDR8 = "coreelec.amlogic.dolbyvision.vs10.sdr8";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_SDR10 = "coreelec.amlogic.dolbyvision.vs10.sdr10";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10 = "coreelec.amlogic.dolbyvision.vs10.hdr10";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS = "coreelec.amlogic.dolbyvision.vs10.hdr10.osd.brightness";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10PLUS = "coreelec.amlogic.dolbyvision.vs10.hdr10plus";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDRHLG = "coreelec.amlogic.dolbyvision.vs10.hdrhlg";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_DV = "coreelec.amlogic.dolbyvision.vs10.dv";

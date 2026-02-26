@@ -25408,6 +25408,30 @@ msgctxt "#60066"
 msgid "DV"
 msgstr ""
 
+#. "Dolby Vision OSD Peak Brightness"
+#: system/settings/settings.xml
+msgctxt "#60067"
+msgid "DV OSD peak brightness (nits)"
+msgstr ""
+
+#. "Dolby Vision OSD Peak Brightness"
+#: system/settings/settings.xml
+msgctxt "#60068"
+msgid "Set the maximum luminance for OSD graphics (GUI, subtitles) in nits during DV playback. Controls how bright overlays appear when the DV compositor is active. Default 300 matches the compositor's built-in value."
+msgstr ""
+
+#. "Dolby Vision VS10 HDR10 OSD Peak Brightness"
+#: system/settings/settings.xml
+msgctxt "#60069"
+msgid "HDR10 OSD peak brightness (nits)"
+msgstr ""
+
+#. "Dolby Vision VS10 HDR10 OSD Peak Brightness"
+#: system/settings/settings.xml
+msgctxt "#60070"
+msgid "Set the maximum luminance for OSD graphics (GUI, subtitles) in nits when VS10 HDR10 output is active. Overrides the general DV OSD brightness for HDR10 output specifically. Default 316 matches the compositor's built-in value for HDR10."
+msgstr ""
+
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60071"

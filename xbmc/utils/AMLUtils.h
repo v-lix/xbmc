@@ -133,6 +133,8 @@ unsigned int aml_dv_dolby_vision_mode();
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth);
 void aml_dv_close();
 void aml_dv_set_osd_max(int max);
+void aml_dv_set_osd_brightness(int nits);
+void aml_dv_set_hdr10_osd_brightness(int nits);
 bool aml_is_dv_enable();
 void aml_dv_display_trigger();
 void aml_dv_display_auto_now();

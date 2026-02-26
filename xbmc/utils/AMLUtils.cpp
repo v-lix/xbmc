@@ -706,6 +706,11 @@ unsigned int aml_dv_on(unsigned int mode)
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", "Y");
 
+  // Apply OSD brightness settings
+  aml_dv_set_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS));
+  if (mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
+    aml_dv_set_hdr10_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS));
+
   if (modeChange) {
     aml_dv_toggle_frame(mode);
 
@@ -859,6 +864,8 @@ void aml_dv_off()
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp_tm", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
 
   // Do set_disp_mode_auto on kernel.
   if (modeChange)
@@ -903,6 +910,17 @@ void aml_dv_set_osd_max(int max)
 {
   // Set the OSD DV graphic max.
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", max);
+}
+
+void aml_dv_set_osd_brightness(int nits)
+{
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", nits);
+}
+
+void aml_dv_set_hdr10_osd_brightness(int nits)
+{
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 1);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dv_HDR10_graphics_max", nits);
 }
 
 bool aml_is_dv_enable()

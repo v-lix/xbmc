@@ -564,6 +564,7 @@ bool CDolbyVisionAML::Setup()
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionVS10DV", vs10_dv_filler);
 
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE, true);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR_TM, true);
@@ -583,6 +584,7 @@ bool CDolbyVisionAML::Setup()
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR8, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR10, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10, true);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10PLUS, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDRHLG, true);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV, true);
@@ -599,6 +601,8 @@ bool CDolbyVisionAML::Setup()
   std::set<std::string> settingSet;
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE);
+  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS);
+  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO);
@@ -672,6 +676,16 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
     int max(std::dynamic_pointer_cast<const CSettingInt>(setting)->GetValue());
     aml_dv_set_osd_max(max);
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
+  }
+  else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS)
+  {
+    if (aml_is_dv_enable())
+      aml_dv_set_osd_brightness(std::dynamic_pointer_cast<const CSettingInt>(setting)->GetValue());
+  }
+  else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS)
+  {
+    if (aml_is_dv_enable() && aml_dv_dolby_vision_mode() == DOLBY_VISION_OUTPUT_MODE_HDR10)
+      aml_dv_set_hdr10_osd_brightness(std::dynamic_pointer_cast<const CSettingInt>(setting)->GetValue());
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO)
   {
