@@ -68,7 +68,7 @@ bool CWinSystemAmlogic::InitWindowSystem()
 {
   // Setup DV UI Elements etc.
   m_dolbyVisionAML = std::make_unique<CDolbyVisionAML>();
-  if (!m_dolbyVisionAML->Setup()) m_dolbyVisionAML.reset();
+  m_dolbyVisionAML->Setup();
 
   const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
 

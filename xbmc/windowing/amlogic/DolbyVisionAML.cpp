@@ -535,23 +535,47 @@ CDolbyVisionAML::CDolbyVisionAML()
 {
 }
 
+static void set_dv_settings_visible(bool show)
+{
+  bool vsvdb_inject = show && (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT) ||
+                               settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID));
+
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR_TM, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_inject);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_inject);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_inject);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_inject);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR8, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR10, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10PLUS, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDRHLG, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_DUAL_PRIORITY, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PREFER_CONVERT, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PEAK_BRIGHTNESS_SOURCE, show);
+  set_visible(CSettings::SETTING_VIDEOPLAYER_CONVERTDOVI, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_AUDIO_SEAMLESSBRANCH, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES, show);
+}
+
 bool CDolbyVisionAML::Setup()
 {
   CLog::Log(LOGDEBUG, "CDolbyVisionAML::Setup - Begin");
 
-  // Allow setup to continue if override_edid is enabled (to fake DV support via manual VSVDB injection)
-  bool override_edid = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
-
-  if (!aml_support_dolby_vision() && !override_edid)
-  {
-    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE, false);
-    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE, DV_MODE_OFF);
-    CLog::Log(LOGDEBUG, "CDolbyVisionAML::Setup - Device does not support Dolby Vision - exiting setup");
-    return false;
-  }
-
   const auto settingsManager = settings()->GetSettingsManager();
 
+  // Always register fillers and callbacks so Override EDID can enable DV live
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionType", dv_type_filler);
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionProcessor", dv_processor_filler);
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionVSVDBMinLum", vsvdb_min_filler);
@@ -562,40 +586,6 @@ bool CDolbyVisionAML::Setup()
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionVS10HDR10Plus", vs10_hdr10_filler);
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionVS10HDRHLG", vs10_hdr_hlg_filler);
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionVS10DV", vs10_dv_filler);
-
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR_TM, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT, true);
-
-  // VSVDB child settings visibility controlled by vsvdb_inject toggle
-  // (XML dependency is commented out, so we handle it in C++)
-  bool vsvdb_inject = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_inject);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_inject);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_inject);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_inject);
-
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR8, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR10, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10PLUS, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDRHLG, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_DUAL_PRIORITY, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PREFER_CONVERT, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PEAK_BRIGHTNESS_SOURCE, true);
-  set_visible(CSettings::SETTING_VIDEOPLAYER_CONVERTDOVI, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_AUDIO_SEAMLESSBRANCH, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES, true);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID, true);
 
   // Register for ui dv mode change - to change on the fly.
   std::set<std::string> settingSet;
@@ -619,6 +609,28 @@ bool CDolbyVisionAML::Setup()
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
   settingsManager->RegisterCallback(this, settingSet);
+
+  // Override EDID is always visible (no DV mode dependency) so users can enable DV on non-DV displays
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID, true);
+
+  bool override_edid = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
+  bool dv_supported = aml_support_dolby_vision();
+
+  if (!dv_supported && !override_edid)
+  {
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE, false);
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE, DV_MODE_OFF);
+    set_dv_settings_visible(false);
+    CLog::Log(LOGDEBUG, "CDolbyVisionAML::Setup - Device does not support Dolby Vision");
+    return true;
+  }
+
+  set_dv_settings_visible(true);
+
+  // Smart default: Display-LED for DV-std displays, Player-LED HDR otherwise
+  if (settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE) == DV_TYPE_DISPLAY_LED &&
+      !aml_display_support_dv_std() && !force_modes())
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_PLAYER_LED_HDR);
 
   // register for announcements to capture OnWake and re-apply DV if needed.
   auto announcer = CServiceBroker::GetAnnouncementManager();
@@ -694,11 +706,12 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT)
   {
-    bool vsvdb_inject = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT);
-    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_inject);
-    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_inject);
-    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_inject);
-    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_inject);
+    bool vsvdb_children = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT) ||
+                          settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_children);
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_children);
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_children);
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_children);
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS)
@@ -744,6 +757,13 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID)
   {
+    bool override_on = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
+    bool dv_supported = aml_support_dolby_vision();
+    bool show = dv_supported || override_on;
+    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE, show);
+    set_dv_settings_visible(show);
+    if (!show)
+      settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE, DV_MODE_OFF);
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
   }
 }
