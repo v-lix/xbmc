@@ -751,20 +751,6 @@ unsigned int aml_dv_on(unsigned int mode)
     if ((mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL) || (mode == DOLBY_VISION_OUTPUT_MODE_IPT)) {
       aml_dv_trigger_update_resolution(StreamHdrType::HDR_TYPE_DOLBYVISION); // Required for 60Hz VS10 > DV.
       aml_dv_display_auto_now();
-
-      // display_auto_now triggers set_disp_mode_auto which clobbers VPP state.
-      // Force another full re-init via BYPASS cycle.
-      CLog::Log(LOGINFO, "AMLUtils::{} - DV re-init via BYPASS cycle (after display_auto_now)", __FUNCTION__);
-      CSysfsPath dv_mode_path{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
-      CSysfsPath dv_policy_path{"/sys/module/amdolby_vision/parameters/dolby_vision_policy"};
-
-      dv_policy_path.Set(DOLBY_VISION_FOLLOW_SOURCE);
-      dv_mode_path.Set(DOLBY_VISION_OUTPUT_MODE_BYPASS);
-      aml_dv_toggle_frame(DOLBY_VISION_OUTPUT_MODE_BYPASS);
-
-      dv_mode_path.Set(mode);
-      dv_policy_path.Set(DOLBY_VISION_FORCE_OUTPUT_MODE);
-      aml_dv_toggle_frame(mode);
     }
   }
 
