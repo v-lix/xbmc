@@ -50,7 +50,7 @@
 
 static bool vs10_conversion = false;
 static bool vs10_conversion_reset_hdr10 = true;
-static bool s_display_mode_changed = false;
+
 
 static std::shared_ptr<CSettings> settings()
 {
@@ -952,37 +952,7 @@ bool aml_is_dv_enable()
 
 void aml_dv_display_trigger()
 {
-  if (!aml_is_dv_enable())
-    return;
-
-  unsigned int mode = aml_dv_dolby_vision_mode();
-
-  if (s_display_mode_changed && mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
-  {
-    // Resolution changed while DV VS10 HDR10 was active. The set_disp_mode_auto
-    // triggered by the resolution change disturbs VPP state (core3 enable,
-    // data conversion params, dummy data, HDR module bypass) that the kernel's
-    // "DV already on" code path doesn't fully restore. Force a complete DV
-    // re-initialization by cycling through BYPASS then back to HDR10.
-    // The BYPASS toggle calls enable_dolby_vision(0) setting dolby_vision_on=false,
-    // then the HDR10 toggle enters the full !dolby_vision_on init path.
-    // Unlike aml_dv_off(), this does NOT call display_auto_now(), so no additional
-    // set_disp_mode_auto is triggered.
-    CLog::Log(LOGINFO, "AMLUtils::{} - DV HDR10 re-init after display mode change", __FUNCTION__);
-
-    CSysfsPath dv_mode{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
-    CSysfsPath dv_policy{"/sys/module/amdolby_vision/parameters/dolby_vision_policy"};
-
-    dv_policy.Set(DOLBY_VISION_FOLLOW_SOURCE);
-    dv_mode.Set(DOLBY_VISION_OUTPUT_MODE_BYPASS);
-    aml_dv_toggle_frame(DOLBY_VISION_OUTPUT_MODE_BYPASS);
-
-    dv_mode.Set(mode);
-    dv_policy.Set(DOLBY_VISION_FORCE_OUTPUT_MODE);
-    aml_dv_toggle_frame(mode);
-  }
-  else if (mode != DOLBY_VISION_OUTPUT_MODE_HDR10)
-  {
+  if (aml_is_dv_enable()) {
     CSysfsPath display_mode{"/sys/class/display/mode"};
     if (display_mode.Exists()) display_mode.Set(display_mode.Get<std::string>().value());
   }
@@ -1511,11 +1481,6 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
   {
     if (display_mode.Exists())
       display_mode.Set(mode);
-    s_display_mode_changed = true;
-  }
-  else
-  {
-    s_display_mode_changed = false;
   }
 
   aml_set_framebuffer_resolution(res, framebuffer_name);
