@@ -4168,22 +4168,6 @@
           </constraints>
           <control type="spinner" format="string" />
         </setting>
-        <setting id="coreelec.amlogic.dolbyvision.vs10.hdr10.osd.brightness" type="integer" label="60069" help="60070" parent="coreelec.amlogic.dolbyvision.vs10.hdr10">
-          <requirement>HAVE_AMCODEC</requirement>
-          <visible>false</visible>
-          <level>2</level>
-          <default>316</default>
-          <dependencies>
-            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
-            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.vs10.hdr10" operator="is">2</dependency>
-          </dependencies>
-          <constraints>
-            <minimum>100</minimum>
-            <step>1</step>
-            <maximum>2000</maximum>
-          </constraints>
-          <control type="slider" format="integer" />
-        </setting>
         <setting id="coreelec.amlogic.dolbyvision.vs10.hdr10plus" type="integer" label="60057" help="60058" parent="coreelec.amlogic.dolbyvision.type">
           <requirement>HAVE_AMCODEC</requirement>
           <visible>false</visible>

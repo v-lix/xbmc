@@ -716,10 +716,8 @@ unsigned int aml_dv_on(unsigned int mode)
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", "Y");
 
-  // Apply OSD brightness settings
+  // Apply OSD brightness setting
   aml_dv_set_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS));
-  if (mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
-    aml_dv_set_hdr10_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS));
 
   if (modeChange || firstEnable) {
     // When DV is already on and we switch modes, the kernel's "DV already on" path
@@ -957,12 +955,6 @@ void aml_dv_set_osd_max(int max)
 void aml_dv_set_osd_brightness(int nits)
 {
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", nits);
-}
-
-void aml_dv_set_hdr10_osd_brightness(int nits)
-{
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 1);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dv_HDR10_graphics_max", nits);
 }
 
 bool aml_is_dv_enable()

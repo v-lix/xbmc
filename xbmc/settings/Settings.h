@@ -474,7 +474,6 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_SDR8 = "coreelec.amlogic.dolbyvision.vs10.sdr8";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_SDR10 = "coreelec.amlogic.dolbyvision.vs10.sdr10";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10 = "coreelec.amlogic.dolbyvision.vs10.hdr10";
-  static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS = "coreelec.amlogic.dolbyvision.vs10.hdr10.osd.brightness";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10PLUS = "coreelec.amlogic.dolbyvision.vs10.hdr10plus";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDRHLG = "coreelec.amlogic.dolbyvision.vs10.hdrhlg";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_DV = "coreelec.amlogic.dolbyvision.vs10.dv";
