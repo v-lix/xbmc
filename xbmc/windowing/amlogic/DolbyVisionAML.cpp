@@ -691,7 +691,7 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS)
   {
-    if (aml_is_dv_enable())
+    if (aml_is_dv_enable() && aml_dv_dolby_vision_mode() != DOLBY_VISION_OUTPUT_MODE_HDR10)
       aml_dv_set_osd_brightness(std::dynamic_pointer_cast<const CSettingInt>(setting)->GetValue());
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS)
