@@ -716,8 +716,9 @@ unsigned int aml_dv_on(unsigned int mode)
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", "Y");
 
-  // Apply OSD brightness setting
-  aml_dv_set_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS));
+  // Apply OSD brightness setting (skip for SDR output — 300 nit default would overbrighten SDR content)
+  if (mode != DOLBY_VISION_OUTPUT_MODE_SDR10 && mode != DOLBY_VISION_OUTPUT_MODE_SDR8)
+    aml_dv_set_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS));
 
   if (modeChange || firstEnable) {
     // When DV is already on and we switch modes, the kernel's "DV already on" path
