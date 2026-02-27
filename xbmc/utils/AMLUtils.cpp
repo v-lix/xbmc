@@ -955,6 +955,13 @@ void aml_dv_display_trigger()
   if (aml_is_dv_enable()) {
     CSysfsPath display_mode{"/sys/class/display/mode"};
     if (display_mode.Exists()) display_mode.Set(display_mode.Get<std::string>().value());
+
+    // For HDR10 output, the display mode re-write triggers set_disp_mode_auto
+    // which clobbers VPP state (POST matrix, data conversion params, etc.).
+    // Force a DV frame reprocess to restore it via the "DV already on" path.
+    unsigned int mode = aml_dv_dolby_vision_mode();
+    if (mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
+      aml_dv_toggle_frame(mode);
   }
 }
 
