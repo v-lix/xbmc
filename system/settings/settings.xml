@@ -3904,7 +3904,7 @@
           </dependencies>
           <constraints>
             <minimum>100</minimum>
-            <step>1</step>
+            <step>10</step>
             <maximum>2000</maximum>
           </constraints>
           <control type="slider" format="integer" />
@@ -4179,7 +4179,7 @@
           </dependencies>
           <constraints>
             <minimum>100</minimum>
-            <step>1</step>
+            <step>10</step>
             <maximum>2000</maximum>
           </constraints>
           <control type="slider" format="integer" />
