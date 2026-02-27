@@ -603,6 +603,7 @@ bool CDolbyVisionAML::Setup()
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_DUAL_PRIORITY);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PREFER_CONVERT);
+  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST);
@@ -737,6 +738,15 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PREFER_CONVERT)
   {
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
+  }
+  else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10)
+  {
+    StreamHdrType hdrType = CServiceBroker::GetDataCacheCore().GetVideoHdrType();
+    if (hdrType == StreamHdrType::HDR_TYPE_HDR10)
+    {
+      unsigned int mode = std::dynamic_pointer_cast<const CSettingInt>(setting)->GetValue();
+      aml_dv_set_vs10_mode(mode, hdrType);
+    }
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV)
   {

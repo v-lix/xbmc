@@ -50,6 +50,7 @@
 
 static bool vs10_conversion = false;
 static bool vs10_conversion_reset_hdr10 = true;
+static bool s_display_mode_changed = false;
 
 static std::shared_ptr<CSettings> settings()
 {
@@ -709,7 +710,8 @@ unsigned int aml_dv_on(unsigned int mode)
   CSysfsPath dolby_vision_mode{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
   unsigned int existing_mode = dolby_vision_mode.Get<unsigned int>().value();
   bool modeChange(existing_mode != mode);
-  CLog::Log(LOGDEBUG, "AMLUtils::{} - mode change [{}], existing mode [{}], this mode [{}]", __FUNCTION__, modeChange, aml_dv_output_mode_to_string(existing_mode), aml_dv_output_mode_to_string(mode));
+  bool firstEnable = !aml_is_dv_enable();
+  CLog::Log(LOGDEBUG, "AMLUtils::{} - mode change [{}], first enable [{}], existing mode [{}], this mode [{}]", __FUNCTION__, modeChange, firstEnable, aml_dv_output_mode_to_string(existing_mode), aml_dv_output_mode_to_string(mode));
   if (modeChange) CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_mode", mode);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", "Y");
@@ -719,7 +721,25 @@ unsigned int aml_dv_on(unsigned int mode)
   if (mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
     aml_dv_set_hdr10_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS));
 
-  if (modeChange) {
+  if (modeChange || firstEnable) {
+    // When DV is already on and we switch modes, the kernel's "DV already on" path
+    // does minimal VPP restore, missing critical registers. Force full re-init
+    // by cycling through BYPASS (sets dolby_vision_on=false) so the subsequent
+    // toggle enters the full !dolby_vision_on init path.
+    if (modeChange && !firstEnable)
+    {
+      CLog::Log(LOGINFO, "AMLUtils::{} - DV re-init via BYPASS cycle (mode switch to {})", __FUNCTION__, aml_dv_output_mode_to_string(mode));
+      CSysfsPath dv_mode_path{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
+      CSysfsPath dv_policy_path{"/sys/module/amdolby_vision/parameters/dolby_vision_policy"};
+
+      dv_policy_path.Set(DOLBY_VISION_FOLLOW_SOURCE);
+      dv_mode_path.Set(DOLBY_VISION_OUTPUT_MODE_BYPASS);
+      aml_dv_toggle_frame(DOLBY_VISION_OUTPUT_MODE_BYPASS);
+
+      dv_mode_path.Set(mode);
+      dv_policy_path.Set(DOLBY_VISION_FORCE_OUTPUT_MODE);
+    }
+
     aml_dv_toggle_frame(mode);
 
     // Re-trigger update resolution when mode IPT Tunnel and in Display Led (DV-Std).
@@ -732,6 +752,20 @@ unsigned int aml_dv_on(unsigned int mode)
     if ((mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL) || (mode == DOLBY_VISION_OUTPUT_MODE_IPT)) {
       aml_dv_trigger_update_resolution(StreamHdrType::HDR_TYPE_DOLBYVISION); // Required for 60Hz VS10 > DV.
       aml_dv_display_auto_now();
+
+      // display_auto_now triggers set_disp_mode_auto which clobbers VPP state.
+      // Force another full re-init via BYPASS cycle.
+      CLog::Log(LOGINFO, "AMLUtils::{} - DV re-init via BYPASS cycle (after display_auto_now)", __FUNCTION__);
+      CSysfsPath dv_mode_path{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
+      CSysfsPath dv_policy_path{"/sys/module/amdolby_vision/parameters/dolby_vision_policy"};
+
+      dv_policy_path.Set(DOLBY_VISION_FOLLOW_SOURCE);
+      dv_mode_path.Set(DOLBY_VISION_OUTPUT_MODE_BYPASS);
+      aml_dv_toggle_frame(DOLBY_VISION_OUTPUT_MODE_BYPASS);
+
+      dv_mode_path.Set(mode);
+      dv_policy_path.Set(DOLBY_VISION_FORCE_OUTPUT_MODE);
+      aml_dv_toggle_frame(mode);
     }
   }
 
@@ -939,7 +973,37 @@ bool aml_is_dv_enable()
 
 void aml_dv_display_trigger()
 {
-  if (aml_is_dv_enable()) {
+  if (!aml_is_dv_enable())
+    return;
+
+  unsigned int mode = aml_dv_dolby_vision_mode();
+
+  if (s_display_mode_changed && mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
+  {
+    // Resolution changed while DV VS10 HDR10 was active. The set_disp_mode_auto
+    // triggered by the resolution change disturbs VPP state (core3 enable,
+    // data conversion params, dummy data, HDR module bypass) that the kernel's
+    // "DV already on" code path doesn't fully restore. Force a complete DV
+    // re-initialization by cycling through BYPASS then back to HDR10.
+    // The BYPASS toggle calls enable_dolby_vision(0) setting dolby_vision_on=false,
+    // then the HDR10 toggle enters the full !dolby_vision_on init path.
+    // Unlike aml_dv_off(), this does NOT call display_auto_now(), so no additional
+    // set_disp_mode_auto is triggered.
+    CLog::Log(LOGINFO, "AMLUtils::{} - DV HDR10 re-init after display mode change", __FUNCTION__);
+
+    CSysfsPath dv_mode{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
+    CSysfsPath dv_policy{"/sys/module/amdolby_vision/parameters/dolby_vision_policy"};
+
+    dv_policy.Set(DOLBY_VISION_FOLLOW_SOURCE);
+    dv_mode.Set(DOLBY_VISION_OUTPUT_MODE_BYPASS);
+    aml_dv_toggle_frame(DOLBY_VISION_OUTPUT_MODE_BYPASS);
+
+    dv_mode.Set(mode);
+    dv_policy.Set(DOLBY_VISION_FORCE_OUTPUT_MODE);
+    aml_dv_toggle_frame(mode);
+  }
+  else if (mode != DOLBY_VISION_OUTPUT_MODE_HDR10)
+  {
     CSysfsPath display_mode{"/sys/class/display/mode"};
     if (display_mode.Exists()) display_mode.Set(display_mode.Get<std::string>().value());
   }
@@ -1468,6 +1532,11 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
   {
     if (display_mode.Exists())
       display_mode.Set(mode);
+    s_display_mode_changed = true;
+  }
+  else
+  {
+    s_display_mode_changed = false;
   }
 
   aml_set_framebuffer_resolution(res, framebuffer_name);
