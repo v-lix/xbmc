@@ -35,6 +35,10 @@ static void set_visible(const std::string& id, bool visible) {
   if (auto setting = settings()->GetSetting(id)) setting->SetVisible(visible);
 }
 
+static void set_enabled(const std::string& id, bool enabled) {
+  if (auto setting = settings()->GetSetting(id)) setting->SetEnabled(enabled);
+}
+
 // Dolby VSVDB Color space data
 static double colour_space_data[3][6] = {
     // Rx--[5/8]-------  Ry--[1/4]------  Gx--[1]-  Gy--[1/2]-----  Bx--[1/8]-------  By--[1/32]--------
@@ -535,11 +539,30 @@ CDolbyVisionAML::CDolbyVisionAML()
 {
 }
 
+// Updates visibility of VSVDB child settings based on current state:
+// - VS10-only mode: hide all VSVDB sub-values
+// - Normal mode: show colour space and max luminance
+// - Override EDID enabled: show all four (colour space, max lum, min lum, payload)
+static void set_vsvdb_children_visible(bool show)
+{
+  bool override_edid = show && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
+  enum DV_TYPE dv_type(static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
+  bool vs10_only = (dv_type == DV_TYPE_VS10_ONLY);
+
+  bool vsvdb_active = show && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT);
+  bool vsvdb_basic = vsvdb_active && !vs10_only;
+  bool vsvdb_extended = vsvdb_basic && override_edid;
+
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_basic);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_basic);
+  set_enabled(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, override_edid);
+  set_enabled(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, override_edid);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_extended);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_extended);
+}
+
 static void set_dv_settings_visible(bool show)
 {
-  bool vsvdb_inject = show && (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT) ||
-                               settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID));
-
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, show);
@@ -547,10 +570,7 @@ static void set_dv_settings_visible(bool show)
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR_TM, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT, show);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_inject);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_inject);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_inject);
-  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_inject);
+  set_vsvdb_children_visible(show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR8, show);
@@ -674,6 +694,7 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
   {
+    set_vsvdb_children_visible(true);
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
     if (reset_dv_vs10_dv) settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV, DOLBY_VISION_OUTPUT_MODE_IPT);
     if (dv_type == DV_TYPE_VS10_ONLY) settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV, DOLBY_VISION_OUTPUT_MODE_SDR10);
@@ -706,12 +727,7 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT)
   {
-    bool vsvdb_children = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT) ||
-                          settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
-    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_children);
-    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_children);
-    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_children);
-    set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_children);
+    set_vsvdb_children_visible(true);
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS)
