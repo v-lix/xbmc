@@ -714,15 +714,28 @@ unsigned int aml_dv_on(unsigned int mode)
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", "Y");
 
-  // Reset all OSD brightness params so previous mode values don't leak across switches,
-  // then apply only the params needed for the current mode.
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
-
+  // Set OSD brightness for the current mode.
+  // IMPORTANT: dolby_vision_graphic_max must be written LAST because it's the only
+  // brightness param with kernel change detection (is_graphic_changed → force_set_lut).
+  // Writing it last ensures dv_graphic_blend_test and dv_HDR10_graphics_max are already
+  // correct when the kernel recalculates the LUT. Otherwise a vsync between the
+  // graphic_max reset and the blend_test write causes a premature LUT update with
+  // wrong values, and force_set_lut is consumed before the correct params are in place.
   if (mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
+  {
     aml_dv_set_hdr10_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS));
+    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
+  }
   else if (mode != DOLBY_VISION_OUTPUT_MODE_SDR10 && mode != DOLBY_VISION_OUTPUT_MODE_SDR8)
+  {
+    CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
     aml_dv_set_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS));
+  }
+  else
+  {
+    CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
+    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
+  }
 
   if (modeChange) {
     aml_dv_toggle_frame(mode);
