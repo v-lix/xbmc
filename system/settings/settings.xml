@@ -3381,6 +3381,17 @@
           <default>0</default>
           <control type="slider" format="percentage" range="0,1,100" />
         </setting>
+        <setting id="audiooutput.lfemixto" type="integer" label="38019" help="38020">
+          <level>2</level>
+          <default>0</default>
+          <constraints>
+            <options>
+              <option label="571">0</option>
+              <option label="38021">1</option>
+            </options>
+          </constraints>
+          <control type="list" format="string" />
+        </setting>
       </group>
       <group id="2" label="15108">
         <setting id="audiooutput.guisoundmode" type="integer" label="34120" help="36373">

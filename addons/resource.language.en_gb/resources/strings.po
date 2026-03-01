@@ -22691,7 +22691,20 @@ msgctxt "#38018"
 msgid "My rating"
 msgstr ""
 
-#empty strings from id 38019 to 38021
+#: system/settings/settings.xml
+msgctxt "#38019"
+msgid "LFE downmix target"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#38020"
+msgid "When including LFE in downmixing, this controls which speakers receive the LFE signal. Use 'Front L/R' to redirect LFE away from centre."
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#38021"
+msgid "Front L/R"
+msgstr ""
 
 #. Used for the rating selection
 #: xbmc/music/MusicUtils.cpp

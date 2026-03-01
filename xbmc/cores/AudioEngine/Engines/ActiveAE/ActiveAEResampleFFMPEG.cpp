@@ -131,6 +131,70 @@ bool CActiveAEResampleFFMPEG::Init(SampleConfig dstConfig,
     hasMatrix = true;
     av_channel_layout_uninit(&dstChLayout);
   }
+  // LFE downmix redirect to Front L/R
+  else if (sublevel > 0.0f &&
+           (m_src_chan_layout & AV_CH_LOW_FREQUENCY) &&
+           !(m_dst_chan_layout & AV_CH_LOW_FREQUENCY))
+  {
+    int lfeMixTo = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+        CSettings::SETTING_AUDIOOUTPUT_LFEMIXTO);
+    if (lfeMixTo == 1)
+    {
+      memset(m_rematrix, 0, sizeof(m_rematrix));
+      av_channel_layout_from_mask(&dstChLayout, m_dst_chan_layout);
+      av_channel_layout_from_mask(&srcChLayout, m_src_chan_layout);
+
+      for (int out = 0; out < m_dst_channels; out++)
+      {
+        AVChannel outChan = av_channel_layout_channel_from_index(&dstChLayout, out);
+        for (int in = 0; in < m_src_channels; in++)
+        {
+          AVChannel inChan = av_channel_layout_channel_from_index(&srcChLayout, in);
+
+          if (inChan == outChan)
+          {
+            m_rematrix[out][in] = 1.0;
+          }
+          else if (av_channel_layout_index_from_channel(&dstChLayout, inChan) >= 0)
+          {
+            // input channel exists in output, handled by its own output row
+          }
+          else if (inChan == AV_CHAN_LOW_FREQUENCY)
+          {
+            if (outChan == AV_CHAN_FRONT_LEFT || outChan == AV_CHAN_FRONT_RIGHT)
+              m_rematrix[out][in] = static_cast<double>(sublevel);
+          }
+          else
+          {
+            // standard downmix for other orphaned input channels
+            switch (inChan)
+            {
+              case AV_CHAN_FRONT_CENTER:
+                if (outChan == AV_CHAN_FRONT_LEFT || outChan == AV_CHAN_FRONT_RIGHT)
+                  m_rematrix[out][in] = centerMix;
+                break;
+              case AV_CHAN_BACK_LEFT:
+              case AV_CHAN_SIDE_LEFT:
+                if (outChan == AV_CHAN_FRONT_LEFT)
+                  m_rematrix[out][in] = M_SQRT1_2;
+                break;
+              case AV_CHAN_BACK_RIGHT:
+              case AV_CHAN_SIDE_RIGHT:
+                if (outChan == AV_CHAN_FRONT_RIGHT)
+                  m_rematrix[out][in] = M_SQRT1_2;
+                break;
+              default:
+                break;
+            }
+          }
+        }
+      }
+
+      hasMatrix = true;
+      av_channel_layout_uninit(&dstChLayout);
+      av_channel_layout_uninit(&srcChLayout);
+    }
+  }
 
   av_channel_layout_from_mask(&dstChLayout, m_dst_chan_layout);
   av_channel_layout_from_mask(&srcChLayout, m_src_chan_layout);
