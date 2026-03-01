@@ -539,24 +539,24 @@ CDolbyVisionAML::CDolbyVisionAML()
 {
 }
 
-// Updates visibility of VSVDB child settings based on current state:
-// - VS10-only mode: hide all VSVDB sub-values
-// - Normal mode: show colour space and max luminance
-// - Override EDID enabled: show all four (colour space, max lum, min lum, payload)
+// VSVDB child visibility/editability:
+// - VS10-only: all hidden
+// - Player-led modes: colour space and max luminance always visible (auto-filled, disabled)
+// - Override EDID on: all four visible and editable
 static void set_vsvdb_children_visible(bool show)
 {
   bool override_edid = show && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
   enum DV_TYPE dv_type(static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
   bool vs10_only = (dv_type == DV_TYPE_VS10_ONLY);
 
-  bool vsvdb_active = show && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT);
-  bool vsvdb_basic = vsvdb_active && !vs10_only;
+  bool vsvdb_basic = show && !vs10_only;
   bool vsvdb_extended = vsvdb_basic && override_edid;
 
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_basic);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_basic);
-  set_enabled(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, override_edid);
-  set_enabled(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, override_edid);
+  bool vsvdb_editable = override_edid || (vsvdb_basic && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT));
+  set_enabled(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_editable);
+  set_enabled(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_editable);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_extended);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_extended);
 }
