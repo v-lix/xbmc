@@ -4020,7 +4020,7 @@
           <dependencies>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
-            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">0</dependency>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">3</dependency>
             <!-- <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">1</dependency> -->
           </dependencies>
           <control type="toggle" />
@@ -4033,7 +4033,7 @@
           <dependencies>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
-            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">0</dependency>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">3</dependency>
             <!-- <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">1</dependency> -->
             <!-- <dependency type="visible" setting="coreelec.amlogic.dolbyvision.vsvdb.inject" operator="is">true</dependency> -->
           </dependencies>
@@ -4055,7 +4055,7 @@
           <dependencies>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
-            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">0</dependency>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">3</dependency>
             <!-- <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">1</dependency> -->
             <!-- <dependency type="visible" setting="coreelec.amlogic.dolbyvision.vsvdb.inject" operator="is">true</dependency> -->
           </dependencies>
