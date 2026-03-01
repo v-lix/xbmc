@@ -18633,8 +18633,8 @@ msgid "Set DV Mode"
 msgstr "DV Modus"
 
 msgctxt "#60012"
-msgid "Set Dolby Vision (DV) processing mode to On, On Demand, or Off. The Video Processor feature only works with DV Mode On Demand."
-msgstr "Es kann für Dolby Vision zwischen \"Immer\", \"On Demand\" oder \"Aus\" gewählt werden. Die Videoprozessor-Funktion funktioniert nur mit dem Modus \"On Demand\"."
+msgid "Set Dolby Vision (DV) processing mode to On, On Demand, or Off. The Video Processor (VP) modes are for use with an external Video Processor such as MadVR Envy and only work with DV Mode On Demand."
+msgstr "Es kann für Dolby Vision zwischen \"Immer\", \"On Demand\" oder \"Aus\" gewählt werden. Die Videoprozessor-Modi (VP) sind für die Verwendung mit einem externen Videoprozessor wie MadVR Envy vorgesehen und funktionieren nur mit dem Modus \"On Demand\"."
 
 msgctxt "#60013"
 msgid "On"

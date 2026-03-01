@@ -25189,7 +25189,7 @@ msgstr ""
 #. "Dolby Vision"
 #: system/settings/settings.xml
 msgctxt "#60012"
-msgid "Set Dolby Vision (DV) processing mode to On, On Demand, or Off. The Video Processor feature only works with DV Mode On Demand."
+msgid "Set Dolby Vision (DV) processing mode to On, On Demand, or Off. The Video Processor (VP) modes are for use with an external Video Processor such as MadVR Envy and only work with DV Mode On Demand."
 msgstr ""
 
 #. "Dolby Vision"
