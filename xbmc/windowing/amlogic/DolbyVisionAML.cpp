@@ -35,9 +35,6 @@ static void set_visible(const std::string& id, bool visible) {
   if (auto setting = settings()->GetSetting(id)) setting->SetVisible(visible);
 }
 
-static void set_enabled(const std::string& id, bool enabled) {
-  if (auto setting = settings()->GetSetting(id)) setting->SetEnabled(enabled);
-}
 
 // Dolby VSVDB Color space data
 static double colour_space_data[3][6] = {
@@ -539,10 +536,10 @@ CDolbyVisionAML::CDolbyVisionAML()
 {
 }
 
-// VSVDB child visibility/editability:
+// VSVDB child visibility:
 // - VS10-only: all hidden
-// - Player-led modes: colour space and max luminance always visible (auto-filled, disabled)
-// - Override EDID on: all four visible and editable
+// - Player-led modes: colour space and max luminance always visible
+// - Override EDID on: all four visible
 static void set_vsvdb_children_visible(bool show)
 {
   bool override_edid = show && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
@@ -554,9 +551,6 @@ static void set_vsvdb_children_visible(bool show)
 
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_basic);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_basic);
-  bool vsvdb_editable = override_edid || (vsvdb_basic && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT));
-  set_enabled(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS, vsvdb_editable);
-  set_enabled(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM, vsvdb_editable);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MIN_LUM, vsvdb_extended);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_PAYLOAD, vsvdb_extended);
 }
@@ -694,6 +688,12 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
   {
+    // Smart default: fall back from Display-LED on non-DV-std displays (e.g. after settings reset)
+    if (dv_type == DV_TYPE_DISPLAY_LED && !aml_display_support_dv_std() && !force_modes())
+    {
+      settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_PLAYER_LED_HDR);
+      return;
+    }
     set_vsvdb_children_visible(true);
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
     if (reset_dv_vs10_dv) settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV, DOLBY_VISION_OUTPUT_MODE_IPT);
