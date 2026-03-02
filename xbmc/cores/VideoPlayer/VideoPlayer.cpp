@@ -2976,7 +2976,19 @@ void CVideoPlayer::HandleMessages()
           if (st.source == STREAM_SOURCE_DEMUX)
           {
             CDVDMsgPlayerSeek::CMode mode;
-            mode.time = static_cast<double>(GetUpdatedTime());
+            // If A/V sync hasn't completed after a seek, the clock hasn't been
+            // updated via Discontinuity() yet, so GetUpdatedTime() returns a stale
+            // value (typically near 0). Use the seek target (m_State.dts) instead.
+            if ((m_CurrentVideo.syncState == IDVDStreamPlayer::SYNC_STARTING ||
+                 m_CurrentAudio.syncState == IDVDStreamPlayer::SYNC_STARTING) &&
+                m_State.dts != DVD_NOPTS_VALUE)
+            {
+              mode.time = static_cast<double>(DVD_TIME_TO_MSEC(m_State.dts + m_State.time_offset));
+            }
+            else
+            {
+              mode.time = static_cast<double>(GetUpdatedTime());
+            }
             mode.backward = true;
             mode.accurate = true;
             mode.trickplay = true;
