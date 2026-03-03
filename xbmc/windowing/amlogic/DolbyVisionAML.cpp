@@ -641,11 +641,6 @@ bool CDolbyVisionAML::Setup()
 
   set_dv_settings_visible(true);
 
-  // Smart default: Display-LED for DV-std displays, Player-LED HDR otherwise
-  if (settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE) == DV_TYPE_DISPLAY_LED &&
-      !aml_display_support_dv_std() && !force_modes())
-    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_PLAYER_LED_HDR);
-
   // register for announcements to capture OnWake and re-apply DV if needed.
   auto announcer = CServiceBroker::GetAnnouncementManager();
   announcer->AddAnnouncer(this);
