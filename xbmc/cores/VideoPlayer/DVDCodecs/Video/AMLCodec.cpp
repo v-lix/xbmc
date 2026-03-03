@@ -2083,7 +2083,11 @@ bool CAMLCodec::OpenDecoder()
   if (hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
     aml_dv_send_profile(hints.dovi.dv_profile);
 
-  aml_dv_open(hints.hdrType, hints.bitdepth);
+  // Skip DV compositor activation for windowed playback to avoid HDMI handshakes
+  // (e.g. trailer previews in skins toggling DV on/off for each clip).
+  m_fullscreen = m_processInfo.IsFullscreen();
+  if (m_fullscreen)
+    aml_dv_open(hints.hdrType, hints.bitdepth);
 
   // Now have the HDRType resolved, ok to set the transfer pq - so renderer can set the shaders as needed.
   aml_set_transfer_pq(hints.hdrType, hints.bitdepth);
@@ -2331,7 +2335,8 @@ void CAMLCodec::CloseDecoder()
 
   CloseAmlVideo();
 
-  aml_dv_close();
+  if (m_fullscreen)
+    aml_dv_close();
 }
 
 void CAMLCodec::CloseAmlVideo()

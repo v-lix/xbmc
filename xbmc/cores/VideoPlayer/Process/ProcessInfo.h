@@ -114,6 +114,9 @@ public:
   void SetPlayTimes(time_t start, int64_t current, int64_t min, int64_t max);
   int64_t GetMaxTime();
 
+  void SetFullscreen(bool fullscreen) { m_fullscreen = fullscreen; }
+  bool IsFullscreen() const { return m_fullscreen; }
+
   // settings
   CVideoSettings GetVideoSettings();
   void SetVideoSettings(CVideoSettings &settings);
@@ -171,6 +174,7 @@ protected:
   int64_t m_timeMax;
   int64_t m_timeMin;
   bool m_realTimeStream;
+  bool m_fullscreen = false;
 
   // settings
   CCriticalSection m_settingsSection;
