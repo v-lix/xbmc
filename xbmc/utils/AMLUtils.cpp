@@ -730,7 +730,16 @@ unsigned int aml_dv_on(unsigned int mode)
   // correct when the kernel recalculates the LUT. Otherwise a vsync between the
   // graphic_max reset and the blend_test write causes a premature LUT update with
   // wrong values, and force_set_lut is consumed before the correct params are in place.
-  if (mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
+  //
+  // VP modes always use the DV OSD Brightness slider (dolby_vision_graphic_max) — the
+  // kernel scales the g_2_l degamma table by this value. The HDR10-specific slider is
+  // only conditionally visible and not applicable to VP.
+  if (dv_vp != 0)
+  {
+    CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
+    aml_dv_set_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS));
+  }
+  else if (mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
   {
     aml_dv_set_hdr10_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS));
     CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
@@ -1072,12 +1081,13 @@ void aml_set_transfer_pq(StreamHdrType hdrType, unsigned int bitDepth) {
     // TODO: any need to test display supports each hdr content (inc fallback) specifically?
     hdr = (hdrType != StreamHdrType::HDR_TYPE_NONE);
 
-    // When VS10 is active (not BYPASS), the DV compositor handles OSD tone mapping
-    // via dolby_vision_graphic_max / dv_HDR10_graphics_max. Skip GLES PQ scaling
-    // to avoid double-dipping on OSD brightness.
+    // When VS10 or VP is active, the DV compositor handles OSD tone mapping
+    // via dolby_vision_graphic_max. Skip GLES PQ scaling to avoid double-dipping
+    // on OSD brightness.
     if (dv_on) {
+      unsigned int dv_vp = settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR);
       unsigned int vs10_mode = aml_vs10_by_hdrtype(hdrType, bitDepth);
-      hdr = ((vs10_mode == DOLBY_VISION_OUTPUT_MODE_BYPASS) && hdr);
+      hdr = ((vs10_mode == DOLBY_VISION_OUTPUT_MODE_BYPASS) && (dv_vp == 0) && hdr);
     }
   }
 
