@@ -535,6 +535,9 @@ void set_vsvdb_payload_ver(enum DV_TYPE dv_type, int max_lum_nits_value, int sou
     CalculateVSVDBPayload();
 }
 
+// Static flag for kernel-side 422 forcing during DV/HDR10+ playback
+static bool aml_linux_force_422 = false;
+
 unsigned int aml_dv_on(unsigned int mode)
 {
   bool dv_source_level_5(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5));
@@ -644,6 +647,12 @@ unsigned int aml_dv_on(unsigned int mode)
   // Force CD/CS for all DV modes
   aml_kodi_set_cd_cs(1);
 
+  // For VS10 non-IPT output (HDR10, SDR), the DV module is active but the
+  // kernel HDMI TX may still have a stale DV EOTF from a previous IPT mode.
+  // Tell the kernel to skip DV tunnel overrides so normal colour params apply.
+  bool dv_non_ipt = (mode >= DOLBY_VISION_OUTPUT_MODE_HDR10 && mode <= DOLBY_VISION_OUTPUT_MODE_SDR8);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_non_ipt", dv_non_ipt);
+
   // Enable HDR10 metadata injection for DV LL output (VP/HDR modes)
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_for_dv_ll",
              (dv_type == DV_TYPE_PLAYER_LED_HDR || dv_type == DV_TYPE_PLAYER_LED_HDR2) ? 'Y' : 'N');
@@ -751,6 +760,27 @@ unsigned int aml_dv_on(unsigned int mode)
       aml_dv_trigger_update_resolution(StreamHdrType::HDR_TYPE_DOLBYVISION); // Required for 60Hz VS10 > DV.
       aml_dv_display_auto_now();
     }
+    else if (dv_non_ipt &&
+             (existing_mode == DOLBY_VISION_OUTPUT_MODE_IPT ||
+              existing_mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)) {
+      // Coming from IPT: the HDMI TX attr is stale from the DV tunnel mode.
+      // Write user's colour settings and trigger mode re-evaluation in one
+      // atomic attr write (separate writes don't work: "now" overwrites fmt_attr).
+      int force_cs = settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS);
+      int limit_cd = settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD);
+      const std::string force_cs_str[] = { "rgb", "420", "422", "444" };
+      const std::string limit_cd_str[] = { "8bit", "10bit", "12bit", "16bit" };
+      std::string fmt_attr;
+      if (force_cs > 0)
+        fmt_attr += force_cs_str[force_cs - 1];
+      if (limit_cd > 0) {
+        if (!fmt_attr.empty()) fmt_attr += ",";
+        fmt_attr += limit_cd_str[limit_cd - 1];
+      }
+      if (!fmt_attr.empty()) fmt_attr += ",";
+      fmt_attr += "now";
+      CSysfsPath("/sys/class/amhdmitx/amhdmitx0/attr", fmt_attr);
+    }
   }
 
   return mode;
@@ -850,8 +880,7 @@ void aml_dv_send_profile(int dvprofile)
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_profile", static_cast<unsigned int>(dvprofile));
 }
 
-// Static flag for kernel-side 422 forcing during DV/HDR10+ playback
-static bool aml_linux_force_422 = false;
+// aml_linux_force_422 moved before aml_dv_on()
 
 void aml_dv_off()
 {
@@ -888,6 +917,7 @@ void aml_dv_off()
 
   aml_linux_force_422 = false;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_non_ipt", false);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp_tm", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
