@@ -4319,6 +4319,9 @@
           <visible>false</visible>
           <level>2</level>
           <default>false</default>
+          <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
+          </dependencies>
           <control type="toggle" />
         </setting>
       </group>
