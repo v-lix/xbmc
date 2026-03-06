@@ -16918,6 +16918,18 @@ msgctxt "#38018"
 msgid "My rating"
 msgstr "Persönliche Bewertung"
 
+msgctxt "#38019"
+msgid "LFE downmix target"
+msgstr "LFE-Downmix-Ziel"
+
+msgctxt "#38020"
+msgid "When including LFE in downmixing, this controls which speakers receive the LFE signal. Use 'Front L/R' to redirect LFE away from centre."
+msgstr "Beim Einbeziehen von LFE in den Downmix steuert dies, welche Lautsprecher das LFE-Signal erhalten. 'Front L/R' leitet das LFE-Signal vom Center weg."
+
+msgctxt "#38021"
+msgid "Front L/R"
+msgstr "Vorderes (Links/Rechts)"
+
 msgctxt "#38022"
 msgid "No rating"
 msgstr "Keine Bewertung"
@@ -17898,6 +17910,22 @@ msgctxt "#39210"
 msgid "If enabled, Dolby Vision files will have level 5 (active area) metadata overridden to zero offsets. Enable if your display has issues with incorrectly cropped image in Dolby Vision playback."
 msgstr "Bei Aktivierung werden Level-5-Metadaten (aktiver Bereich) von Dolby-Vision-Dateien auf 0 (Null)-Offsets gesetzt. Aktivieren, wenn das Display bei der Dolby-Vision-Wiedergabe Probleme mit falsch beschnittenen Bildern zeigt."
 
+msgctxt "#39210"
+msgid "Bluetooth Audio Codec"
+msgstr "Bluetooth-Audio-Codec"
+
+msgctxt "#39211"
+msgid "Select the Bluetooth audio codec to use when connected to Bluetooth headphones or speakers. Higher quality codecs require device support."
+msgstr "Bluetooth-Audio-Codec auswählen, der bei Verbindung mit Bluetooth-Kopfhörern oder -Lautsprechern verwendet wird. Höherwertige Codecs erfordern Unterstützung durch das jeweilige Gerät."
+
+msgctxt "#39212"
+msgid "Bluetooth Volume Boost"
+msgstr "Bluetooth-Lautstärkeverstärkung"
+
+msgctxt "#39213"
+msgid "Apply a 25% volume boost when using Bluetooth (A2DP) audio output. This can help improve volume levels with quieter Bluetooth devices."
+msgstr "25% Lautstärkeverstärkung bei Verwendung der Bluetooth-Audioausgabe (A2DP) anwenden. Dies kann helfen, die Lautstärke bei leiseren Bluetooth-Geräten zu verbessern."
+
 msgctxt "#39300"
 msgid "off"
 msgstr "Aus"
@@ -18281,7 +18309,7 @@ msgstr "Modus"
 
 msgctxt "#50012"
 msgid "Switch On Dolby Vision always, On demand or switch Off"
-msgstr "Es kann für Dolby Vision zwischen \"Immer\", \"On Demand\" oder \"Aus\" gewählt werden"
+msgstr "Es kann für Dolby Vision zwischen \"Immer\", \"Bei Bedarf\" oder \"Aus\" gewählt werden"
 
 msgctxt "#50013"
 msgid "On"
@@ -18289,7 +18317,7 @@ msgstr "Immer"
 
 msgctxt "#50014"
 msgid "On demand"
-msgstr "On Demand"
+msgstr "Bei Bedarf"
 
 msgctxt "#50015"
 msgid "Off"
@@ -18629,12 +18657,12 @@ msgid "Dolby Vision (DV)"
 msgstr "Dolby Vision"
 
 msgctxt "#60011"
-msgid "Set DV Mode"
+msgid "DV Mode"
 msgstr "DV Modus"
 
 msgctxt "#60012"
 msgid "Set Dolby Vision (DV) processing mode to On, On Demand, or Off. The Video Processor (VP) modes are for use with an external Video Processor such as MadVR Envy and only work with DV Mode On Demand."
-msgstr "Es kann für Dolby Vision zwischen \"Immer\", \"On Demand\" oder \"Aus\" gewählt werden. Die Videoprozessor-Modi (VP) sind für die Verwendung mit einem externen Videoprozessor wie MadVR Envy vorgesehen und funktionieren nur mit dem Modus \"On Demand\"."
+msgstr "Es kann für Dolby Vision zwischen \"Immer\", \"Bei Bedarf\" oder \"Aus\" gewählt werden. Die Videoprozessor-Modi (VP) sind für die Verwendung mit einem externen Videoprozessor wie MadVR Envy vorgesehen und funktionieren nur mit dem Modus \"Bei Bedarf\"."
 
 msgctxt "#60013"
 msgid "On"
@@ -18642,14 +18670,14 @@ msgstr "Immer"
 
 msgctxt "#60014"
 msgid "On Demand"
-msgstr "On Demand"
+msgstr "Bei Bedarf"
 
 msgctxt "#60015"
 msgid "Off"
 msgstr "Aus"
 
 msgctxt "#60016"
-msgid "Set GUI max luminance in menus"
+msgid "GUI max luminance in menus"
 msgstr "Maximale GUI-Helligkeit in Menüs"
 
 msgctxt "#60017"
@@ -18657,12 +18685,12 @@ msgid "Set the maximum luminance for the GUI menus in cd/m^2"
 msgstr "Maximale Helligkeit für die GUI-Menüs in cd/m² festlegen"
 
 msgctxt "#60021"
-msgid "Set DV Output Type"
+msgid "DV Type"
 msgstr "DV Typ"
 
 msgctxt "#60022"
-msgid "Set type of DV output to use with display capability. This setting will only show options that your display is capable of processing. For SDR display the only option available is VS10 Only."
-msgstr "Legt den Typ des DV-Ausgangs fest, der entsprechend den Fähigkeiten des Displays verwendet wird. Diese Einstellung zeigt nur Optionen an, die von deinem Display verarbeitet werden können. Bei einem SDR-Display ist die einzige verfügbare Option \"Nur VS10\"."
+msgid "Set type of DV output (auto-detected on first boot or when settings are reset)."
+msgstr "Typ der DV-Ausgabe festlegen (wird beim ersten Start oder beim Zurücksetzen der Einstellungen automatisch ermittelt)."
 
 msgctxt "#60023"
 msgid "Display Led (DV as DV-Std RGB 8 Bit Tunnel)"
@@ -18681,11 +18709,11 @@ msgid "DV as VS10 Only"
 msgstr "Nur VS10"
 
 msgctxt "#60031"
-msgid "Set DV VSVDB - If set to On it will replace Display DV VSVDB EDID"
+msgid "DV VSVDB"
 msgstr "DV VSVDB"
 
 msgctxt "#60032"
-msgid "Set DV VSVDB to replace Display DV VSVDB EDID with your specified values for Display "Colour Space" and "Maximum Luminance". If Display does not have a DV VSVDB EDID then these settings values will be used even if the "Set DV VSVDB" is set to Off. Toggle this setting from Off-On-Off to show your Display DV VSVDB EDID values."
+msgid "Set DV VSVDB to replace Display DV VSVDB EDID with your specified values for Display \"Colour Space\" and \"Maximum Luminance\". If Display does not have a DV VSVDB EDID then these settings values will be used even if the \"Set DV VSVDB\" is set to Off. Toggle this setting from Off-On-Off to show your Display DV VSVDB EDID values."
 msgstr "Setzt \"DV VSVDB\" so, dass die DV VSVDB EDID-Werte des Displays durch die hier angegebenen Werte für \"Farbraum\" und \"Maximale Helligkeit\" in Nits ersetzt werden. Wenn das Display keinen DV VSVDB EDID-Eintrag besitzt, werden diese Einstellungswerte auch dann verwendet, wenn \"DV VSVDB\" auf \"Aus\" gesetzt ist. Diese Einstellung von \"Aus-Ein-Aus\" umschalten, um die DV VSVDB EDID-Werte des Displays anzuzeigen."
 
 msgctxt "#60033"
@@ -18697,7 +18725,7 @@ msgid "DV VSVDB Payload. A v1 or v2, 14 character basic hex string for example: 
 msgstr "Dolby VSVDB Payload. Eine v1- oder v2-hexadezimale Zeichenfolge mit 14 Zeichen, z. B.: 2A3801515999AA"
 
 msgctxt "#60041"
-msgid "Set Colorimetry"
+msgid "Colorimetry"
 msgstr "Farbraum"
 
 msgctxt "#60042"
@@ -18754,7 +18782,7 @@ msgstr "HLG-HDR"
 
 msgctxt "#60060"
 msgid "Use DV VS10 output target mode for HLG video."
-msgstr "DV VS10 Zielmodus für HLG-HDR-Inhalte."
+msgstr "DV VS10 Zielmodus für HDR-HLG-Inhalte."
 
 msgctxt "#60061"
 msgid "DV VS10 for DV video"
@@ -18780,8 +18808,24 @@ msgctxt "#60066"
 msgid "DV"
 msgstr "Dolby Vision"
 
+msgctxt "#60067"
+msgid "DV OSD peak brightness (nits)"
+msgstr "DV-OSD-Spitzenhelligkeit (Nits)"
+
+msgctxt "#60068"
+msgid "Set the maximum luminance for OSD graphics (GUI, subtitles) in nits during DV playback. Controls how bright overlays appear when the DV compositor is active. Default 300 matches the compositor's built-in value."
+msgstr "Maximale Luminanz für OSD-Grafiken (GUI, Untertitel) in Nits während der DV-Wiedergabe festlegen. Steuert, wie hell Overlays erscheinen, wenn der DV-Compositor aktiv ist. Der Standardwert 300 entspricht dem im Compositor integrierten Wert."
+
+msgctxt "#60069"
+msgid "HDR10 OSD peak brightness (nits)"
+msgstr "HDR10-OSD-Spitzenhelligkeit (Nits)"
+
+msgctxt "#60070"
+msgid "Set the maximum luminance for OSD graphics (GUI, subtitles) in nits when VS10 HDR10 output is active. Overrides the general DV OSD brightness for HDR10 output specifically. Default 316 matches the compositor's built-in value for HDR10."
+msgstr "Maximale Luminanz für OSD-Grafiken (GUI, Untertitel) in Nits festlegen, wenn VS10-HDR10-Ausgabe aktiv ist. Überschreibt die allgemeine DV-OSD-Helligkeit speziell für HDR10-Ausgabe. Der Standardwert 316 entspricht dem im Compositor integrierten Wert für HDR10."
+
 msgctxt "#60071"
-msgid "Set Colour Space - Required if Display does not support DV"
+msgid "Colour Space"
 msgstr "Farbraum"
 
 msgctxt "#60072"
@@ -18789,7 +18833,7 @@ msgid "Set DV Colour Space based on your Display capability. If Display does not
 msgstr "Farbraum basierend auf den Fähigkeiten des Displays. Wenn das Display keinen DV VSVDB EDID-Eintrag besitzt, wird dieser Einstellungswert auch dann verwendet, wenn \"DV VSVDB\" auf \"Aus\" steht. Die Einstellung \"DV VSVDB\" von \"Aus-Ein-Aus\" umschalten, um den DV VSVDB EDID-Farbraum des Displays anzuzeigen – \"DISPLAY\" zeigt an, wenn ein nicht standardmäßiger Farbraum verwendet wird."
 
 msgctxt "#60073"
-msgid "Set DV VSVDB Minimum Luminance"
+msgid "DV VSVDB Minimum Luminance"
 msgstr "Minimale Helligkeit"
 
 msgctxt "#60074"
@@ -18797,11 +18841,11 @@ msgid "Set DV VSVDB Payload Minimum Luminance in PQ (cd/m^2)"
 msgstr "Minimale Dolby VSVDB-Payload-Helligkeit in PQ (cd/m²)"
 
 msgctxt "#60075"
-msgid "Set Max Lum in NITS - Required if Display does not support DV"
+msgid "Max Lum in NITS - Required if Display does not support DV"
 msgstr "Maximale Helligkeit in (cd/m²)"
 
 msgctxt "#60076"
-msgid "Set DV Maximum Luminance based on your Display capability. If Display does not have a DV VSVDB EDID then this setting value will be used even if the "Set DV VSVDB" is set to Off. Toggle the "Set DV VSVDB" setting from Off-On-Off to show your Display Maximum Luminance DV VSVDB EDID value."
+msgid "Set DV Maximum Luminance based on your Display capability. If Display does not have a DV VSVDB EDID then this setting value will be used even if the \"Set DV VSVDB\" is set to Off. Toggle the \"Set DV VSVDB\" setting from Off-On-Off to show your Display Maximum Luminance DV VSVDB EDID value."
 msgstr "Maximale Helligkeit basierend auf den Fähigkeiten des Displays festlegen. Wenn das Display keinen DV VSVDB EDID-Eintrag besitzt, wird dieser Einstellungswert auch dann verwendet, wenn \"DV VSVDB\" auf \"Aus\" gesetzt ist. Die Einstellung \"DV VSVDB\" von \"Aus-Ein-Aus\" umschalten, um den DV VSVDB EDID-Wert für die maximale Helligkeit in Nits des Displays anzuzeigen."
 
 msgctxt "#60081"
@@ -18817,7 +18861,7 @@ msgid "BT.709"
 msgstr "BT.709"
 
 msgctxt "#60091"
-msgid "Set HDR InfoFrame"
+msgid "HDR InfoFrame"
 msgstr "HDR-InfoFrame"
 
 msgctxt "#60092"
@@ -18909,7 +18953,7 @@ msgid "This setting allows you to see the OSD or Subtitles when using Level 5 as
 msgstr "OSD/Untertitel können gesehen werden, wenn Level 5-Metadaten als Quelle verwendet werden."
 
 msgctxt "#60160"
-msgid "Set Level 5"
+msgid "Level 5"
 msgstr "Level 5"
 
 msgctxt "#60161"
@@ -18994,7 +19038,7 @@ msgstr "Typ für Videoprozessor"
 
 msgctxt "#60502"
 msgid "Set when using a Video Processor (VP) since there will be no DV Dynamic Tone Mapping (DTM). All DV video output signal types are full capability DV (i.e., FEL). The VP feature only works with DV Mode On Demand. HDR10 modes include HDR10 InfoFrame Metadata and can be used without a VP with displays that perform well with HDR10."
-msgstr "Bei Verwendung eines Videoprozessors (VP) gibt es kein DV Dynamic Tone Mapping (DTM). Alle DV-Videoausgangssignaltypen sind voll funktionsfähige DV-Signale (z. B. FEL). Die VP-Funktion funktioniert nur mit dem DV-Modus \"On Demand\". HDR10-Modi enthalten HDR10 InfoFrame-Metadaten und können ohne VP mit Displays verwendet werden, die HDR10 gut unterstützen."
+msgstr "Bei Verwendung eines Videoprozessors (VP) gibt es kein DV Dynamic Tone Mapping (DTM). Alle DV-Videoausgangssignaltypen sind voll funktionsfähige DV-Signale (z. B. FEL). Die VP-Funktion funktioniert nur mit dem DV-Modus \"Bei Bedarf\". HDR10-Modi enthalten HDR10 InfoFrame-Metadaten und können ohne VP mit Displays verwendet werden, die HDR10 gut unterstützen."
 
 msgctxt "#60503"
 msgid "Off"
@@ -19398,7 +19442,7 @@ msgstr "Automatisch zwischen Player-Led und VP wählen"
 
 msgctxt "#60603"
 msgid "Set this option to let the software automatically select between using normal Player Led versus Video Processor (VP) settings depending on your Display Max Lum capability (shown below) and the DV Video mastered MDL. When VP is in use the OSD will be a different colour. This feature only works with DV Mode On Demand."
-msgstr "Aktiviere diese Option, damit die Software automatisch zwischen normalen Player-Led- und Video-Prozessor-(VP-)Einstellungen wählt, abhängig von der maximalen Display-Luminanz (unten angezeigt) und der beim DV-Video gemasterten MDL. Wenn VP verwendet wird, hat das OSD eine andere Farbe. Diese Funktion arbeitet nur mit DV \"On Demand\"."
+msgstr "Aktiviere diese Option, damit die Software automatisch zwischen normalen Player-Led- und Video-Prozessor-(VP-)Einstellungen wählt, abhängig von der maximalen Display-Luminanz (unten angezeigt) und der beim DV-Video gemasterten MDL. Wenn VP verwendet wird, hat das OSD eine andere Farbe. Diese Funktion arbeitet nur mit DV \"Bei Bedarf\"."
 
 msgctxt "#60604"
 msgid "Reset PTS offset on seek"

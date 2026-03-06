@@ -25220,7 +25220,7 @@ msgstr ""
 #. "Dolby Vision"
 #: system/settings/settings.xml
 msgctxt "#60011"
-msgid "Set DV Mode"
+msgid "DV Mode"
 msgstr ""
 
 #. "Dolby Vision"
@@ -25250,7 +25250,7 @@ msgstr ""
 #. "Dolby Vision"
 #: system/settings/settings.xml
 msgctxt "#60016"
-msgid "Set GUI max luminance in menus"
+msgid "GUI max luminance in menus"
 msgstr ""
 
 #. "Dolby Vision"
@@ -25262,7 +25262,7 @@ msgstr ""
 #. "Dolby Vision Type"
 #: system/settings/settings.xml
 msgctxt "#60021"
-msgid "Set DV Output Type"
+msgid "DV Type"
 msgstr ""
 
 #. "Dolby Vision Type"
@@ -25298,7 +25298,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60031"
-msgid "Set DV VSVDB - If set to On it will replace Display DV VSVDB EDID"
+msgid "DV VSVDB"
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25322,7 +25322,7 @@ msgstr ""
 #. "Dolby Vision Display Led Colorimetry"
 #: system/settings/settings.xml
 msgctxt "#60041"
-msgid "Set Colorimetry"
+msgid "Colorimetry"
 msgstr ""
 
 #. "Dolby Vision Display Led Colorimetry"
@@ -25472,7 +25472,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60071"
-msgid "Set Colour Space - Required if Display does not support DV"
+msgid "Colour Space"
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25484,7 +25484,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60073"
-msgid "Set DV VSVDB Minimum Luminance"
+msgid "DV VSVDB Minimum Luminance"
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25496,7 +25496,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60075"
-msgid "Set Max Lum in NITS - Required if Display does not support DV"
+msgid "Max Lum in NITS"
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25526,7 +25526,7 @@ msgstr ""
 #. "Dolby Vision HDR InfoFrame"
 #: system/settings/settings.xml
 msgctxt "#60091"
-msgid "Set HDR InfoFrame"
+msgid "HDR InfoFrame"
 msgstr ""
 
 #. "Dolby Vision HDR InfoFrame"
@@ -25664,7 +25664,7 @@ msgstr ""
 #. "Dolby Vision Display Led Level 5 Handling"
 #: system/settings/settings.xml
 msgctxt "#60160"
-msgid "Set Level 5"
+msgid "Level 5"
 msgstr ""
 
 #. "Dolby Vision Display Led Level 5 Handling"
