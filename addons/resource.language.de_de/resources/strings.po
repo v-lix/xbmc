@@ -16127,8 +16127,8 @@ msgid "Sets the visual depth of subtitles for stereoscopic 3D videos. The higher
 msgstr "Legt die visuelle Tiefe der Untertitel für stereoskopische 3D-Videos fest. Je höher der Wert, desto näher wirken die Untertitel."
 
 msgctxt "#36547"
-msgid "Sets the peak luminance level for GUI elements while the display is in HDR PQ mode. This affects all OSD, subtitles and graphics that are SDR in origin."
-msgstr "Einstellen der maximalen Leuchtdichte für GUI-Elemente, wenn der Bildschirm im HDR-PQ-Modus ist. Dies betrifft alle OSDs, Untertitel und Grafiken, die ursprünglich SDR sind."
+msgid "Sets the peak luminance level for GUI elements while the display is in HDR PQ mode. This affects all OSD, subtitles and graphics that are SDR in origin. Not used when Dolby Vision VS10 is active, as the DV compositor handles OSD brightness separately."
+msgstr "Einstellen der maximalen Leuchtdichte für GUI-Elemente, wenn der Bildschirm im HDR-PQ-Modus ist. Dies betrifft alle OSDs, Untertitel und Grafiken, die ursprünglich SDR sind. Wird nicht verwendet, wenn Dolby Vision VS10 aktiv ist, da der DV-Compositor die OSD-Helligkeit separat steuert."
 
 msgctxt "#36548"
 msgid "Limits resolution of GUI to save memory. Does not affect video playback. Requires restart."

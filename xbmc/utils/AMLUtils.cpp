@@ -1042,11 +1042,12 @@ void aml_set_transfer_pq(StreamHdrType hdrType, unsigned int bitDepth) {
     // TODO: any need to test display supports each hdr content (inc fallback) specifically?
     hdr = (hdrType != StreamHdrType::HDR_TYPE_NONE);
 
-    // Check for vs10 up or down mapping.
+    // When VS10 is active (not BYPASS), the DV compositor handles OSD tone mapping
+    // via dolby_vision_graphic_max / dv_HDR10_graphics_max. Skip GLES PQ scaling
+    // to avoid double-dipping on OSD brightness.
     if (dv_on) {
       unsigned int vs10_mode = aml_vs10_by_hdrtype(hdrType, bitDepth);
-      hdr = (((vs10_mode == DOLBY_VISION_OUTPUT_MODE_BYPASS) && hdr) ||
-              (vs10_mode <= DOLBY_VISION_OUTPUT_MODE_HDR10));
+      hdr = ((vs10_mode == DOLBY_VISION_OUTPUT_MODE_BYPASS) && hdr);
     }
   }
 

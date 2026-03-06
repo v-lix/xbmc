@@ -21588,7 +21588,7 @@ msgstr ""
 #. Description of setting with label #36097 "System / Display / GUI peak luminance in HDR PQ mode"
 #: system/settings/settings.xml
 msgctxt "#36547"
-msgid "Sets the peak luminance level for GUI elements while the display is in HDR PQ mode. This affects all OSD, subtitles and graphics that are SDR in origin."
+msgid "Sets the peak luminance level for GUI elements while the display is in HDR PQ mode. This affects all OSD, subtitles and graphics that are SDR in origin. Not used when Dolby Vision VS10 is active, as the DV compositor handles OSD brightness separately."
 msgstr ""
 
 #. Description of setting with label #37021 "Set GUI resolution limit"
