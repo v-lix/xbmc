@@ -678,7 +678,13 @@ unsigned int CAEStreamParser::SyncDTS(uint8_t* data, unsigned int size)
                ext_sub_sync == DTS_SYNC_EXT_LBR)
         dataType = CAEStreamInfo::STREAM_TYPE_DTSHD;
       else
-        dataType = m_info.m_type;
+      {
+        // Unknown extension sub sync - only use previous type if we had a valid one,
+        // otherwise keep the core DTS type (DTS_512/1024/2048) to avoid STREAM_TYPE_NULL
+        // which causes ALSA sink to fail with 0 channels on audio track switches
+        if (m_info.m_type != CAEStreamInfo::STREAM_TYPE_NULL)
+          dataType = m_info.m_type;
+      }
 
       m_coreSize = m_fsize;
       m_fsize += ext_size;
