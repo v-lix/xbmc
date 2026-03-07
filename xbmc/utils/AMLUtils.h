@@ -178,6 +178,7 @@ bool aml_set_reg_ignore_alpha();
 bool aml_unset_reg_ignore_alpha();
 std::string aml_video_fps_info();
 std::string aml_video_fps_drop();
+unsigned int aml_dv_video_processor_mode();
 void aml_toogle_video_freerun_mode();
 void aml_reset_audio_from_vs10_change();
 void aml_reset_audio_from_player_open();
