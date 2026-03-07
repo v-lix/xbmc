@@ -1835,6 +1835,14 @@ std::string aml_video_fps_drop() {
   return format_fps_info().drop_info;
 }
 
+unsigned int aml_dv_video_processor_mode()
+{
+  CSysfsPath dv_vp{"/sys/module/amdolby_vision/parameters/xbmc_dv_vp"};
+  if (dv_vp.Exists())
+    return dv_vp.Get<unsigned int>().value_or(0);
+  return 0;
+}
+
 void aml_toogle_video_freerun_mode() 
 {
   CSysfsPath freerun_mode{"/sys/class/video/freerun_mode"};

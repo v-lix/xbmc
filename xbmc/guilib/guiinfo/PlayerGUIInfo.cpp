@@ -758,6 +758,9 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
     case PLAYER_PROCESS_AML_VIDEO_FPS_DROP:
       value = aml_video_fps_drop();
       return true;
+    case PLAYER_PROCESS_AML_VP_MODE:
+      value = std::to_string(aml_dv_video_processor_mode() != 0 ? 1 : 0);
+      return true;
 
     case PLAYER_PROCESS_AV_CHANGE:
       value = std::to_string(CServiceBroker::GetDataCacheCore().GetAVChange());
