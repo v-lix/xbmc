@@ -18651,6 +18651,22 @@ msgctxt "#50211"
 msgid "Brightness adjustment (compensation) when using Min PQ 20."
 msgstr "Helligkeitsanpassung (Kompensation) bei Verwendung von Min. PQ 20."
 
+msgctxt "#55001"
+msgid "TrueHD Atmos dialogue normalisation defeat (0 dB)"
+msgstr "TrueHD Atmos-Dialognormalisierung deaktivieren (0 dB)"
+
+msgctxt "#55002"
+msgid "Force the dialogue normalisation value to (0 dB) in TrueHD Atmos bitstreams. This disables receiver-side dialogue normalisation for the Atmos presentation, preventing unwanted volume reduction during passthrough playback."
+msgstr "Dialognormalisierungswert in TrueHD Atmos-Bitstreams auf 0 dB erzwingen. Dadurch wird die receiverseitige Dialognormalisierung für die Atmos-Wiedergabe deaktiviert und eine unerwünschte Lautstärkereduzierung bei Passthrough-Wiedergabe verhindert."
+
+msgctxt "#55003"
+msgid "AC-3 / E-AC-3 dialogue normalisation defeat (0 dB)"
+msgstr "AC-3 / E-AC-3-Dialognormalisierung deaktivieren (0 dB)"
+
+msgctxt "#55004"
+msgid "Force the dialogue normalisation value to (0 dB) in AC-3 and E-AC-3 bitstreams. This disables receiver-side dialogue normalisation, preventing unwanted volume reduction during passthrough playback."
+msgstr "Dialognormalisierungswert in AC-3 und E-AC-3-Bitstreams auf 0 dB erzwingen. Dadurch wird die receiverseitige Dialognormalisierung deaktiviert und eine unerwünschte Lautstärkereduzierung bei Passthrough-Wiedergabe verhindert."
+
 #. 60001 to 69999 are reserved for avdvplus
 msgctxt "#60001"
 msgid "Dolby Vision (DV)"
