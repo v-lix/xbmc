@@ -624,6 +624,10 @@ void CDVDAudioCodecPassthrough::Reset()
     m_currentPts = DVD_NOPTS_VALUE;
     m_nextPts = DVD_NOPTS_VALUE;
     m_parser.Reset();
+
+    // Reset PackerMAT state for TrueHD to avoid stale state after seek
+    if (m_packerMAT)
+      m_packerMAT->Reset();
   }
 }
 

@@ -2128,14 +2128,30 @@ void CVideoPlayer::HandlePlaySpeed()
 
         if (m_CurrentVideo.starttime != DVD_NOPTS_VALUE && (m_CurrentVideo.packets > 0))
         {
-          if (m_CurrentVideo.starttime - m_CurrentVideo.cachetotal < clock)
+          const double videoClock = m_CurrentVideo.starttime - m_CurrentVideo.cachetotal;
+          if (videoClock < clock)
           {
-            clock = m_CurrentVideo.starttime - m_CurrentVideo.cachetotal;
+            // Video starts before audio. This typically happens after a chapter skip
+            // where the video decoder outputs key-frame references (earlier PTS) while
+            // audio starts at the chapter position. For passthrough audio, pulling the
+            // clock back creates a large timing gap that ActiveAE can only correct very
+            // slowly (~20ms per TrueHD MAT frame), causing audible dropouts lasting
+            // several seconds. Cap the pullback to 2 seconds to avoid this.
+            if ((clock - videoClock) > DVD_SEC_TO_TIME(2))
+            {
+              CLog::Log(LOGDEBUG, "VideoPlayer::Sync - video start {:.3f}s behind audio, "
+                        "limiting clock pullback (video:{:.3f} audio:{:.3f})",
+                        (clock - videoClock) / DVD_TIME_BASE,
+                        videoClock / DVD_TIME_BASE, clock / DVD_TIME_BASE);
+            }
+            else
+            {
+              clock = videoClock;
+            }
           }
           else
           {
             // Sync to the later start time to avoid desync
-            const double videoClock = m_CurrentVideo.starttime - m_CurrentVideo.cachetotal;
             clock = std::max(clock, videoClock);
           }
         }
