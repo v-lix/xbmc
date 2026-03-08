@@ -124,6 +124,7 @@ private:
 
   // Cached settings (updated via callback, read in hot path)
   std::atomic<bool> m_defeatAC3DialNorm{false};
+  std::atomic<bool> m_defeatEAC3AtmosDialNorm{false};
   std::atomic<bool> m_defeatTrueHDDialNorm{false};
 
   // E-AC-3 JOC/Atmos: dialnorm defeat must be skipped because modifying BSI

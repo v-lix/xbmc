@@ -25235,6 +25235,18 @@ msgctxt "#55004"
 msgid "Force the dialogue normalisation value to (0 dB) in AC-3 and E-AC-3 bitstreams. This disables receiver-side dialogue normalisation, preventing unwanted volume reduction during passthrough playback."
 msgstr ""
 
+#. Setting label for E-AC-3 Atmos dialogue normalisation defeat
+#: system/settings/settings.xml
+msgctxt "#55005"
+msgid "Include E-AC-3 Atmos (breaks Atmos)"
+msgstr ""
+
+#. Setting help for E-AC-3 Atmos dialogue normalisation defeat
+#: system/settings/settings.xml
+msgctxt "#55006"
+msgid "Also apply dialogue normalisation defeat to E-AC-3 Dolby Atmos (DD+ Atmos) streams. This will disable Dolby Atmos object audio rendering — your receiver will fall back to standard Dolby Digital Plus surround. Safe to enable if your setup does not support Atmos."
+msgstr ""
+
 #. "Dolby Vision"
 #: system/settings/settings.xml
 msgctxt "#60001"
