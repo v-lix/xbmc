@@ -3565,7 +3565,7 @@
         </setting>
         <setting id="coreelec.audio.ac3.dialnorm" type="boolean" label="55003" help="55004">
           <level>2</level>
-          <default>false</default>
+          <default>true</default>
           <dependencies>
             <dependency type="enable">
               <and>
@@ -3590,7 +3590,7 @@
         </setting>
         <setting id="coreelec.audio.truehd.atmos.dialnorm" type="boolean" label="55001" help="55002">
           <level>2</level>
-          <default>false</default>
+          <default>true</default>
           <dependencies>
             <dependency type="enable">
               <and>
