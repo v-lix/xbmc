@@ -125,7 +125,9 @@ bool CDVDAudioCodecPassthrough::Open(CDVDStreamInfo &hints, CDVDCodecOptions &op
       if (m_lavStyleSyncEnabled)
         m_jitterThreshold = JITTER_THRESHOLD_DEFAULT;
 
-      m_parser.SetDefeatAC3DialNorm(m_defeatAC3DialNorm.load());
+      m_isEAC3JOC = (hints.profile == AV_PROFILE_EAC3_DDP_ATMOS);
+      if (!m_isEAC3JOC)
+        m_parser.SetDefeatAC3DialNorm(m_defeatAC3DialNorm.load());
       break;
 
     case CAEStreamInfo::STREAM_TYPE_DTSHD_MA:
@@ -222,7 +224,8 @@ void CDVDAudioCodecPassthrough::Dispose()
 bool CDVDAudioCodecPassthrough::AddData(const DemuxPacket &packet)
 {
   // Apply cached values (updated by settings callbacks) without per-packet settings lookups.
-  m_parser.SetDefeatAC3DialNorm(m_defeatAC3DialNorm.load());
+  // Skip E-AC-3 dialnorm defeat for JOC/Atmos — modifying BSI dialnorm breaks JOC rendering.
+  m_parser.SetDefeatAC3DialNorm(!m_isEAC3JOC && m_defeatAC3DialNorm.load());
   m_parser.SetDefeatTrueHDDialNorm(m_defeatTrueHDDialNorm.load());
 
   if (m_backlogSize)
