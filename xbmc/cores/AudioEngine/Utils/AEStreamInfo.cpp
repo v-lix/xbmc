@@ -464,6 +464,13 @@ void CAEStreamParser::DefeatAC3DialNorm(uint8_t* data, unsigned int size)
         continue;
       }
 
+      // Need at least 10 bytes: sync(2) + BSI through byte 6(5) + data(1) + CRC(2)
+      if (frame_bytes < 10)
+      {
+        offset += frame_bytes;
+        continue;
+      }
+
       // dialnorm: byte 5 bits[2:0] (MSBs) + byte 6 bits[7:6] (LSBs)
       uint8_t dn = ((frame[5] & 0x07) << 2) | ((frame[6] >> 6) & 0x03);
       if (dn == 31)
@@ -473,20 +480,35 @@ void CAEStreamParser::DefeatAC3DialNorm(uint8_t* data, unsigned int size)
         continue;
       }
 
-      // Set dialnorm to 31 (= 0 dB, no normalization)
+      // Save original bytes, then set dialnorm to 31 (= 0 dB, no normalization)
+      uint8_t old5 = frame[5];
+      uint8_t old6 = frame[6];
       frame[5] |= 0x07;
       frame[6] |= 0xC0;
 
-      // Recompute CRC-2 (covers bytes 2..frame_bytes-3)
-      uint16_t crc2 = ac3_bswap16(
-        static_cast<uint16_t>(av_crc(crc_table, 0, frame + 2, frame_bytes - 4)));
-      if (crc2 == 0x0B77)
+      // Update CRC using delta method — XOR the existing CRC with the CRC change
+      // caused by the dialnorm modification. This preserves the original encoder's
+      // CRC algorithm (init value, etc.) which a from-scratch recomputation may not.
+      // CRC linearity: CRC_I(new) = CRC_I(old) XOR CRC_0(old XOR new)
+      uint8_t delta[2] = {static_cast<uint8_t>(old5 ^ frame[5]),
+                          static_cast<uint8_t>(old6 ^ frame[6])};
+      // Delta bytes are at offsets 3,4 in the CRC data region (frame[2..frame_bytes-3]).
+      // Leading zeros from init=0 produce CRC=0, so start directly with delta bytes.
+      uint32_t dcrc = av_crc(crc_table, 0, delta, 2);
+      // Advance CRC state through the remaining zero bytes after the delta
+      for (unsigned int i = 0; i < frame_bytes - 9; i++)
+        dcrc = crc_table[(uint8_t)dcrc] ^ (dcrc >> 8);
+
+      uint16_t old_crc = (static_cast<uint16_t>(frame[frame_bytes - 2]) << 8) |
+                          frame[frame_bytes - 1];
+      uint16_t new_crc = old_crc ^ ac3_bswap16(static_cast<uint16_t>(dcrc));
+      if (new_crc == 0x0B77)
       {
-        frame[frame_bytes - 3] ^= 0x1;
-        crc2 ^= 0x8005;
+        frame[frame_bytes - 3] ^= 0x01;
+        new_crc ^= 0x8005;
       }
-      frame[frame_bytes - 2] = (crc2 >> 8) & 0xFF;
-      frame[frame_bytes - 1] = crc2 & 0xFF;
+      frame[frame_bytes - 2] = (new_crc >> 8) & 0xFF;
+      frame[frame_bytes - 1] = new_crc & 0xFF;
     }
     else break;
 
