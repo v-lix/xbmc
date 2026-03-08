@@ -24,8 +24,6 @@
 
 #define __MODULE_NAME__ "DVDVideoCodecAmlogic"
 
-static constexpr int EL_STARVATION_THRESHOLD = 3;
-
 CAMLVideoBufferPool::~CAMLVideoBufferPool()
 {
   CLog::Log(LOGDEBUG, "CAMLVideoBufferPool::~CAMLVideoBufferPool: Deleting {:d} buffers", static_cast<unsigned int>(m_videoBuffers.size()) );
@@ -462,9 +460,6 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
   int data_added = false;
   bool dual_layer_converted = false;
   bool set_osd_max = false;
-  bool bl_only_flush = false;
-  double bl_only_pts = packet.pts;
-
   if (pData)
   {
     if (m_bitstream)
@@ -499,36 +494,9 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
             }
             m_el_starvation_count = 0;
           }
-          else if (!packet.isELPackage && !isELPackageBackup)
-          {
-            // Both BL packets — EL is absent (track ended early or gap in stream).
-            // Flush BL-only after starvation threshold; the kernel DV compositor
-            // handles EL absence gracefully via el_track_ended fast path.
-            m_el_starvation_count++;
-            if (m_el_starvation_count >= EL_STARVATION_THRESHOLD)
-            {
-              // Signal AMLCodec that EL has ended — switches stream mode from
-              // continuous data flow to poll mode for a smooth EL-absent transition.
-              if (m_el_starvation_count == EL_STARVATION_THRESHOLD)
-                m_Codec->SetStreamEOF(true);
-
-              CLog::Log(LOGDEBUG, LOGVIDEO, "CDVDVideoCodecAmlogic::{}: EL starvation (count {:d}), flushing queued BL pts:{:.3f} without EL",
-                __FUNCTION__, m_el_starvation_count, ptsBackup / DVD_TIME_BASE);
-              if (m_bitstream->Convert(pDataBackup, iSizeBackup, ptsBackup))
-              {
-                KODI::MEMORY::AlignedFree(pDataBackup);
-                m_packages.pop_front();
-                uint8_t *pCurrentBackup = static_cast<uint8_t*>(KODI::MEMORY::AlignedMalloc(packet.iSize + AV_INPUT_BUFFER_PADDING_SIZE, 16));
-                memcpy(pCurrentBackup, packet.pData, packet.iSize);
-                m_packages.push_back(std::make_tuple(pCurrentBackup, packet.iSize, false, packet.pts));
-                bl_only_flush = true;
-                bl_only_pts = ptsBackup;
-              }
-            }
-          }
         }
 
-        if (!dual_layer_converted && !bl_only_flush)
+        if (!dual_layer_converted)
         {
           // backup package and don't send to decoder yet
           uint8_t *pDataBackup = static_cast<uint8_t*>(KODI::MEMORY::AlignedMalloc(packet.iSize + AV_INPUT_BUFFER_PADDING_SIZE, 16));
@@ -605,7 +573,7 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
     }
   }
 
-  data_added = m_Codec->AddData(pData, iSize, packet.dts, m_hints.ptsinvalid ? DVD_NOPTS_VALUE : (bl_only_flush ? bl_only_pts : packet.pts));
+  data_added = m_Codec->AddData(pData, iSize, packet.dts, m_hints.ptsinvalid ? DVD_NOPTS_VALUE : packet.pts);
 
   // pop package only from list if hardware decoder did accept the data
   if (data_added && dual_layer_converted)
@@ -701,9 +669,11 @@ void CDVDVideoCodecAmlogic::SetCodecControl(int flags)
     m_codecControlFlags = flags;
 
     // On entering drain mode, flush any BL packets orphaned by the EL track ending early.
-    // This covers the common case where only a handful of BL packets are left unpaired at
-    // EOS — too few to reach EL_STARVATION_THRESHOLD in AddData — yet enough to starve
-    // the HW decoder and cause the end-of-file freeze reported with FEL MKV remuxes.
+    // During normal playback, BL packets are queued until their EL partner arrives — this
+    // is essential for m2ts FEL where separate PIDs cause bursty BL delivery (multiple BL
+    // packets can arrive before their corresponding EL packets at content transitions).
+    // At drain time we know no more EL packets are coming, so flush remaining BLs as
+    // single-layer to prevent end-of-file freezes with FEL MKV remuxes.
     if ((flags & DVD_CODEC_CTRL_DRAIN) && !m_packages.empty() && m_bitstream && m_Codec)
     {
       while (!m_packages.empty())
