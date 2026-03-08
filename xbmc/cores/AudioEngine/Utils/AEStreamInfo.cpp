@@ -451,9 +451,18 @@ void CAEStreamParser::DefeatAC3DialNorm(uint8_t* data, unsigned int size)
     else if (bsid <= 16)
     {
       // E-AC-3
+      uint8_t strmtyp = frame[2] >> 6;
       unsigned int framewords = (((frame[2] & 0x7) << 8) | frame[3]) + 1;
       frame_bytes = framewords * 2;
       if (offset + frame_bytes > size) break;
+
+      // Skip dependent substreams (strmtyp=1) — they carry JOC/Atmos extension
+      // data and their dialnorm is irrelevant for object audio rendering
+      if (strmtyp == 1)
+      {
+        offset += frame_bytes;
+        continue;
+      }
 
       // dialnorm: byte 5 bits[2:0] (MSBs) + byte 6 bits[7:6] (LSBs)
       uint8_t dn = ((frame[5] & 0x07) << 2) | ((frame[6] >> 6) & 0x03);
