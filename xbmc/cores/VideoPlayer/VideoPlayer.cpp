@@ -2149,10 +2149,11 @@ void CVideoPlayer::HandlePlaySpeed()
               clock = videoClock;
             }
           }
-          // When video starts after audio (e.g. DV decode latency),
-          // keep the audio-based clock. Video will catch up naturally
-          // once the decoder produces frames. Advancing the clock here
-          // would push it ahead of actual audio position, causing OOS.
+          else
+          {
+            // Sync to the later start time to avoid desync
+            clock = std::max(clock, videoClock);
+          }
         }
       }
       else if (m_CurrentVideo.starttime != DVD_NOPTS_VALUE && m_CurrentVideo.packets > 0)
