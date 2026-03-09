@@ -18667,6 +18667,14 @@ msgctxt "#55004"
 msgid "Force the dialogue normalisation value to (0 dB) in AC-3 and E-AC-3 bitstreams. This disables receiver-side dialogue normalisation, preventing unwanted volume reduction during passthrough playback."
 msgstr "Dialognormalisierungswert in AC-3 und E-AC-3-Bitstreams auf 0 dB erzwingen. Dadurch wird die receiverseitige Dialognormalisierung deaktiviert und eine unerwünschte Lautstärkereduzierung bei Passthrough-Wiedergabe verhindert."
 
+msgctxt "#55005"
+msgid "Include E-AC-3 Atmos (breaks Atmos)"
+msgstr "E-AC-3 Atmos einschließen (deaktiviert Atmos)"
+
+msgctxt "#55006"
+msgid "Also apply dialogue normalisation defeat to E-AC-3 Dolby Atmos (DD+ Atmos) streams. This will disable Dolby Atmos object audio rendering — your receiver will fall back to standard Dolby Digital Plus surround. Safe to enable if your setup does not support Atmos."
+msgstr "Deaktivierung der Dialognormalisierung auch auf E-AC-3 Dolby Atmos (DD+ Atmos)-Streams anwenden. Dadurch wird das Dolby Atmos-Objektaudio-Rendering deaktiviert — der Receiver fällt auf standardmäßiges Dolby Digital Plus Surround zurück. Kann bedenkenlos aktiviert werden, wenn die Anlage kein Atmos unterstützt."
+
 #. 60001 to 69999 are reserved for avdvplus
 msgctxt "#60001"
 msgid "Dolby Vision (DV)"
