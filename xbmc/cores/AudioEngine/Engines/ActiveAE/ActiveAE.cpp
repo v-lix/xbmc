@@ -697,11 +697,8 @@ void CActiveAE::StateMachine(int signal, Protocol *port, Message *msg)
           return;
         case CActiveAEControlProtocol::RESUMESTREAM:
           stream = *(CActiveAEStream**)msg->data;
-          // Don't force SYNC_START on resume. The ALSA sink buffer drains
-          // during pause, causing a transient delay reduction. Forcing a
-          // re-sync here would overcorrect for this transient (inserting
-          // silence), permanently shifting A/V sync. The transient self-
-          // corrects as the buffer refills (~200ms).
+          if (stream->m_paused)
+            stream->m_syncState = CAESyncInfo::AESyncState::SYNC_START;
           stream->m_paused = false;
           streaming = true;
           m_sink.m_controlPort.SendOutMessage(CSinkControlProtocol::STREAMING, &streaming, sizeof(bool));
@@ -958,7 +955,7 @@ void CActiveAE::StateMachine(int signal, Protocol *port, Message *msg)
           CActiveAEStream *stream;
           stream = *(CActiveAEStream**)msg->data;
           stream->m_paused = false;
-          // Don't force SYNC_START on resume (see PLAY handler comment)
+          stream->m_syncState = CAESyncInfo::AESyncState::SYNC_START;
           m_state = AE_TOP_CONFIGURED_PLAY;
           m_extTimeout = 0ms;
           return;
@@ -2047,9 +2044,9 @@ bool CActiveAE::RunStages()
     // calculate sync error
     for (it = m_streams.begin(); it != m_streams.end(); ++it)
     {
-      // Note: do NOT reset m_targetBufferLevel on pause. The low-latency
-      // ramp at playback start is useful, but resetting on every pause
-      // causes ~180ms audio delay transients that destabilize A/V sync.
+      // reset target buffer level at pause (but not initial start pause)
+      if ((*it)->m_paused && (*it)->m_started && m_settings.lowLatencyMode)
+        m_targetBufferLevel = m_initialTargetBufferLevel;
 
       if ((*it)->m_paused || !(*it)->m_started || !(*it)->m_processingBuffers || !(*it)->m_pClock)
         continue;
