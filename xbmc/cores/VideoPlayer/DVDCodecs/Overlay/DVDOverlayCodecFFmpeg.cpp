@@ -15,6 +15,7 @@
 #include "cores/VideoPlayer/Interface/TimingConstants.h"
 #include "utils/EndianSwap.h"
 #include "utils/log.h"
+#include "windowing/GraphicContext.h"
 
 extern "C" {
 #include <libavutil/dict.h>

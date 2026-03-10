@@ -300,8 +300,12 @@ float CWinSystemAmlogic::GetGuiSdrPeakLuminance() const
   if (GetGfxContext().IsTransferPQ())
   {
     // Shader PQ conversion expects nits / 100.
-    // Use the DV OSD brightness setting which also drives dolby_vision_graphic_max.
-    int osdNits = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS);
+    // Use the matching sysfs brightness setting for the current DV output mode.
+    int osdNits;
+    if (aml_dv_dolby_vision_mode() == DOLBY_VISION_OUTPUT_MODE_HDR10)
+      osdNits = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS);
+    else
+      osdNits = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS);
     if (osdNits <= 0)
       osdNits = 300;
     return osdNits / 100.0f;
