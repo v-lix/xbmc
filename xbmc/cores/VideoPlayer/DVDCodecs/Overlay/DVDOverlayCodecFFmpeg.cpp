@@ -112,13 +112,15 @@ bool CDVDOverlayCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &optio
   AVDictionary* codecOpts = nullptr;
   if (m_pCodecContext->codec_id == AV_CODEC_ID_HDMV_PGS_SUBTITLE)
   {
-    // UHD-BD HDR PGS palettes are BT.2020 PQ; SDR PGS is BT.709.
-    m_pgsIsPqAuthored = (hints.hdrType == StreamHdrType::HDR_TYPE_HDR10 ||
-                         hints.hdrType == StreamHdrType::HDR_TYPE_HDR10PLUS ||
-                         hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION);
+    // PGS subtitle streams often have unspecified size (height=0).
+    // UHD-BD PGS (h=0 or h>576) uses BT.2020 PQ palettes; SDR BD is BT.709.
+    // hdrType is not populated for subtitle streams, so detect via resolution.
+    int h = m_pCodecContext->height ? m_pCodecContext->height : hints.height;
+    m_pgsIsPqAuthored = (h == 0 || h > 576);
 
     const char* matrix = m_pgsIsPqAuthored ? "bt2020" : "auto";
     av_dict_set(&codecOpts, "pgs_matrix", matrix, 0);
+    CLog::Log(LOGDEBUG, "{}: PGS using {} matrix (height={})", __FUNCTION__, matrix, h);
   }
 
   if (avcodec_open2(m_pCodecContext, pCodec, &codecOpts) < 0)
