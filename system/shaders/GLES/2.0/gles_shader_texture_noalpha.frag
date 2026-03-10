@@ -30,16 +30,11 @@ vec3 transferPQ(vec3 x)
   const float ST2084_c1 = 3424.0 / 4096.0;
   const float ST2084_c2 = (2413.0 / 4096.0) * 32.0;
   const float ST2084_c3 = (2392.0 / 4096.0) * 32.0;
-  const mat3 matx = mat3(
-      0.627402, 0.069095, 0.016394,
-      0.329292, 0.919544, 0.088028,
-      0.043306, 0.011360, 0.895578);
-
   x = max(x, vec3(0.0));
   x = pow(x, vec3(1.0 / 0.45));
-  x = matx * x;
   x = max(x, vec3(0.0));
-  x = pow(x, vec3(ST2084_m1));
+  float peakNits = 100.0 * m_sdrPeak;
+  x = pow(x * (peakNits / 10000.0), vec3(ST2084_m1));
   x = (ST2084_c1 + ST2084_c2 * x) / (1.0 + ST2084_c3 * x);
   x = pow(x, vec3(ST2084_m2));
   float dither = (interleavedGradientNoise(gl_FragCoord.xy) - 0.5) / 1024.0;
