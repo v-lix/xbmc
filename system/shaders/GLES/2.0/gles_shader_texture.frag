@@ -52,8 +52,7 @@ vec3 transferPQ(vec3 x)
   x = pow(x, vec3(1.0 / 0.45));
   x = matx * x;
   x = max(x, vec3(0.0));
-  float peakNits = 100.0 * m_sdrPeak;
-  x = pow(x * (peakNits / 10000.0), vec3(ST2084_m1));
+  x = pow(x, vec3(ST2084_m1));
   x = (ST2084_c1 + ST2084_c2 * x) / (1.0 + ST2084_c3 * x);
   x = pow(x, vec3(ST2084_m2));
   float dither = (interleavedGradientNoise(gl_FragCoord.xy) - 0.5) / 1024.0;
