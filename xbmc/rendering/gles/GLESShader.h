@@ -71,5 +71,5 @@ protected:
   GLfloat m_clipYFactor;
   GLfloat m_clipYOffset;
 
-  GLfloat m_sdrPeak;
+  GLint m_sdrPeak = 0;
 };

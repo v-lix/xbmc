@@ -296,8 +296,18 @@ float CWinSystemAmlogic::GetDisplayLatency()
 float CWinSystemAmlogic::GetGuiSdrPeakLuminance() const
 {
   const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-  const int guiSdrPeak = settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRPEAKLUMINANCE);
 
+  if (GetGfxContext().IsTransferPQ())
+  {
+    // Shader PQ conversion expects nits / 100.
+    // Use the DV OSD brightness setting which also drives dolby_vision_graphic_max.
+    int osdNits = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS);
+    if (osdNits <= 0)
+      osdNits = 300;
+    return osdNits / 100.0f;
+  }
+
+  const int guiSdrPeak = settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRPEAKLUMINANCE);
   return ((0.7f * guiSdrPeak + 30.0f) / 100.0f);
 }
 

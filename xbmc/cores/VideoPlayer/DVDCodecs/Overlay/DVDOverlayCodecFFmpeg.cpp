@@ -15,7 +15,10 @@
 #include "cores/VideoPlayer/Interface/TimingConstants.h"
 #include "utils/EndianSwap.h"
 #include "utils/log.h"
-#include "windowing/GraphicContext.h"
+
+extern "C" {
+#include <libavutil/dict.h>
+}
 
 CDVDOverlayCodecFFmpeg::CDVDOverlayCodecFFmpeg() : CDVDOverlayCodec("FFmpeg Subtitle Decoder")
 {
@@ -105,12 +108,26 @@ bool CDVDOverlayCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &optio
     delete[] parse_extra;
   }
 
-  if (avcodec_open2(m_pCodecContext, pCodec, NULL) < 0)
+  AVDictionary* codecOpts = nullptr;
+  if (m_pCodecContext->codec_id == AV_CODEC_ID_HDMV_PGS_SUBTITLE)
+  {
+    // UHD-BD HDR PGS palettes are BT.2020 PQ; SDR PGS is BT.709.
+    m_pgsIsPqAuthored = (hints.hdrType == StreamHdrType::HDR_TYPE_HDR10 ||
+                         hints.hdrType == StreamHdrType::HDR_TYPE_HDR10PLUS ||
+                         hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION);
+
+    const char* matrix = m_pgsIsPqAuthored ? "bt2020" : "auto";
+    av_dict_set(&codecOpts, "pgs_matrix", matrix, 0);
+  }
+
+  if (avcodec_open2(m_pCodecContext, pCodec, &codecOpts) < 0)
   {
     CLog::Log(LOGDEBUG,"CDVDVideoCodecFFmpeg::Open() Unable to open codec");
+    av_dict_free(&codecOpts);
     avcodec_free_context(&m_pCodecContext);
     return false;
   }
+  av_dict_free(&codecOpts);
 
   return true;
 }
@@ -274,6 +291,7 @@ std::shared_ptr<CDVDOverlay> CDVDOverlayCodecFFmpeg::GetOverlay()
     overlay->bForced = (rect.flags & AV_SUBTITLE_FLAG_FORCED);
     overlay->source_width = m_width;
     overlay->source_height = m_height;
+    overlay->m_isHdrPq = m_pgsIsPqAuthored;
 
     uint8_t* s = rect.data[0];
     uint8_t* t = overlay->pixels.data();

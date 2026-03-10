@@ -1081,13 +1081,17 @@ void aml_set_transfer_pq(StreamHdrType hdrType, unsigned int bitDepth) {
     // TODO: any need to test display supports each hdr content (inc fallback) specifically?
     hdr = (hdrType != StreamHdrType::HDR_TYPE_NONE);
 
-    // When VS10 or VP is active, the DV compositor handles OSD tone mapping
-    // via dolby_vision_graphic_max. Skip GLES PQ scaling to avoid double-dipping
-    // on OSD brightness.
+    // When DV is active, enable PQ shaders for G_HDR_RGB OSD composition.
+    // In bypass mode, keep hdr based on content type (HDR10 passthrough).
+    // In VP mode, the kernel's sdr_degamma handles OSD conversion.
     if (dv_on) {
       unsigned int dv_vp = settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR);
       unsigned int vs10_mode = aml_vs10_by_hdrtype(hdrType, bitDepth);
-      hdr = ((vs10_mode == DOLBY_VISION_OUTPUT_MODE_BYPASS) && (dv_vp == 0) && hdr);
+      if (dv_vp != 0) {
+        hdr = false;
+      } else if (vs10_mode != DOLBY_VISION_OUTPUT_MODE_BYPASS) {
+        hdr = true;
+      }
     }
   }
 
