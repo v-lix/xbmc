@@ -456,10 +456,27 @@ void COverlayTextureGLES::Render(SRenderState& state)
 
   if (m_isHdrPqAuthored)
   {
+    auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
     float refNits = static_cast<float>(
-        CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
-            CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_REFNITS));
-    glUniform1f(renderSystem->GUIShaderGetSdrPeak(), refNits);
+        settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_REFNITS));
+    float saturation = static_cast<float>(
+        settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_SATURATION)) / 100.0f;
+
+    GLint sdrPeakLoc = renderSystem->GUIShaderGetSdrPeak();
+    glUniform1f(sdrPeakLoc, refNits);
+
+    GLint prog = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+    GLint satLoc = glGetUniformLocation(prog, "m_pqSaturation");
+    glUniform1f(satLoc, saturation);
+
+    static bool logged = false;
+    if (!logged)
+    {
+      CLog::Log(LOGDEBUG, "PGS PQ->SDR: refNits={:.0f} saturation={:.0f}% sdrPeakLoc={} satLoc={}",
+                refNits, saturation * 100.0f, sdrPeakLoc, satLoc);
+      logged = true;
+    }
   }
 
   GLint posLoc = renderSystem->GUIShaderGetPos();

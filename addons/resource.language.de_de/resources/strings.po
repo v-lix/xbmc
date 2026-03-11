@@ -19528,6 +19528,14 @@ msgctxt "#69201"
 msgid "Reference brightness for mapping PGS subtitles to SDR. 203 nits is the BT.2408 standard. Lower values make subtitles brighter, higher values make them darker."
 msgstr "Referenzhelligkeit für die Zuordnung von PGS-Untertiteln zu SDR. 203 Nits ist der BT.2408-Standard. Niedrigere Werte machen Untertitel heller, höhere Werte dunkler."
 
+msgctxt "#69202"
+msgid "PGS color saturation"
+msgstr "PGS-Farbsättigung"
+
+msgctxt "#69203"
+msgid "Adjust color saturation of converted PGS subtitles. 100% is accurate. Increase if colors appear washed out after conversion."
+msgstr "Farbsättigung der konvertierten PGS-Untertitel anpassen. 100% ist korrekt. Erhöhen, falls die Farben nach der Konvertierung ausgewaschen wirken."
+
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."
 msgstr "Aktiviere diese Option, um die Rauschunterdrückung zu deaktivieren und die Videoverarbeitung zu verbessern. Ein Neustart ist erforderlich."

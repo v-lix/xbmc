@@ -26516,6 +26516,18 @@ msgctxt "#69201"
 msgid "Reference brightness for mapping PGS subtitles to SDR. 203 nits is the BT.2408 standard. Lower values make subtitles brighter, higher values make them darker."
 msgstr ""
 
+#. Label for setting "PGS color saturation"
+#: system/settings/settings.xml
+msgctxt "#69202"
+msgid "PGS color saturation"
+msgstr ""
+
+#. Help text for setting "PGS color saturation"
+#: system/settings/settings.xml
+msgctxt "#69203"
+msgid "Adjust color saturation of converted PGS subtitles. 100% is accurate. Increase if colors appear washed out after conversion."
+msgstr ""
+
 #: system/settings/settings.xml
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."

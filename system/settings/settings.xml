@@ -895,6 +895,19 @@
           </dependencies>
           <control type="slider" format="integer" />
         </setting>
+        <setting id="subtitles.pgshdrtosdr.saturation" parent="subtitles.pgshdrtosdr" type="integer" label="69202" help="69203">
+          <level>2</level>
+          <default>100</default>
+          <constraints>
+            <minimum>50</minimum>
+            <step>5</step>
+            <maximum>200</maximum>
+          </constraints>
+          <dependencies>
+            <dependency type="visible" setting="subtitles.pgshdrtosdr" operator="is">true</dependency>
+          </dependencies>
+          <control type="slider" format="integer" />
+        </setting>
         <setting id="subtitles.parsecaptions" type="boolean" label="24130" help="24131">
           <level>1</level>
           <default>false</default>
