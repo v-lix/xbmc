@@ -465,9 +465,14 @@ void COverlayTextureGLES::Render(SRenderState& state)
 
     GLint prog = 0;
     glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
-    glUniform1f(glGetUniformLocation(prog, "m_pqRefNits"), refNits);
-    glUniform1f(glGetUniformLocation(prog, "m_pqAccuracy"), accuracy);
-    glUniform1f(glGetUniformLocation(prog, "m_pqTonemap"), tonemap);
+    GLint locRefNits = glGetUniformLocation(prog, "m_pqRefNits");
+    GLint locAccuracy = glGetUniformLocation(prog, "m_pqAccuracy");
+    GLint locTonemap = glGetUniformLocation(prog, "m_pqTonemap");
+    glUniform1f(locRefNits, refNits);
+    glUniform1f(locAccuracy, accuracy);
+    glUniform1f(locTonemap, tonemap);
+    CLog::Log(LOGDEBUG, "PGS PQ->SDR: prog={} refNits={} accuracy={} tonemap={} locs={}/{}/{}",
+              prog, refNits, accuracy, tonemap, locRefNits, locAccuracy, locTonemap);
   }
 
   GLint posLoc = renderSystem->GUIShaderGetPos();

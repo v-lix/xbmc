@@ -133,6 +133,13 @@ bool CDVDOverlayCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &optio
     avcodec_free_context(&m_pCodecContext);
     return false;
   }
+  if (codecOpts)
+  {
+    AVDictionaryEntry* entry = nullptr;
+    while ((entry = av_dict_get(codecOpts, "", entry, AV_DICT_IGNORE_SUFFIX)))
+      CLog::Log(LOGWARNING, "{}: FFmpeg ignored codec option: {}={}", __FUNCTION__, entry->key,
+                entry->value);
+  }
   av_dict_free(&codecOpts);
 
   return true;
