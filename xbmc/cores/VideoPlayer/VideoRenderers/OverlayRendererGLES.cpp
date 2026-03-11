@@ -459,20 +459,15 @@ void COverlayTextureGLES::Render(SRenderState& state)
     auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
     float refNits = static_cast<float>(
         settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_REFNITS));
-    float saturation = static_cast<float>(
-        settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_SATURATION)) / 100.0f;
-
-    GLint sdrPeakLoc = renderSystem->GUIShaderGetSdrPeak();
-    glUniform1f(sdrPeakLoc, refNits);
+    float accuracy = static_cast<float>(
+        settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_ACCURACY)) / 100.0f;
+    float tonemap = settings->GetBool(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_TONEMAP) ? 1.0f : 0.0f;
 
     GLint prog = 0;
     glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
-    GLint satLoc = glGetUniformLocation(prog, "m_pqSaturation");
-    glUniform1f(satLoc, saturation);
-
-    float tonemap = settings->GetBool(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_TONEMAP) ? 1.0f : 0.0f;
-    GLint tmLoc = glGetUniformLocation(prog, "m_pqTonemap");
-    glUniform1f(tmLoc, tonemap);
+    glUniform1f(glGetUniformLocation(prog, "m_pqRefNits"), refNits);
+    glUniform1f(glGetUniformLocation(prog, "m_pqAccuracy"), accuracy);
+    glUniform1f(glGetUniformLocation(prog, "m_pqTonemap"), tonemap);
   }
 
   GLint posLoc = renderSystem->GUIShaderGetPos();

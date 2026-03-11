@@ -876,7 +876,7 @@
           <control type="list" format="string" />
         </setting>
       </group>
-      <group id="3" label="39187">
+      <group id="3" label="69206">
         <setting id="subtitles.pgshdrtosdr" type="boolean" label="69198" help="69199">
           <level>1</level>
           <default>true</default>
@@ -895,13 +895,13 @@
           </dependencies>
           <control type="slider" format="integer" />
         </setting>
-        <setting id="subtitles.pgshdrtosdr.saturation" parent="subtitles.pgshdrtosdr" type="integer" label="69202" help="69203">
+        <setting id="subtitles.pgshdrtosdr.accuracy" parent="subtitles.pgshdrtosdr" type="integer" label="69202" help="69203">
           <level>2</level>
           <default>100</default>
           <constraints>
-            <minimum>50</minimum>
+            <minimum>0</minimum>
             <step>5</step>
-            <maximum>200</maximum>
+            <maximum>100</maximum>
           </constraints>
           <dependencies>
             <dependency type="visible" setting="subtitles.pgshdrtosdr" operator="is">true</dependency>
@@ -916,6 +916,8 @@
           </dependencies>
           <control type="toggle" />
         </setting>
+      </group>
+      <group id="4" label="39187">
         <setting id="subtitles.parsecaptions" type="boolean" label="24130" help="24131">
           <level>1</level>
           <default>false</default>
@@ -937,7 +939,7 @@
           <control type="list" format="string" />
         </setting>
       </group>
-      <group id="4" label="14235">
+      <group id="5" label="14235">
         <setting id="subtitles.languages" type="list[string]" label="24111" help="24112">
           <level>1</level>
           <default>English</default>

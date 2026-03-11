@@ -28,7 +28,8 @@ precision mediump float;
 uniform sampler2D m_samp0;
 varying vec4 m_cord0;
 uniform float m_sdrPeak;
-uniform float m_pqSaturation;
+uniform float m_pqRefNits;
+uniform float m_pqAccuracy;
 uniform float m_pqTonemap;
 
 #if defined(KODI_PQ_TO_SDR)
@@ -44,26 +45,22 @@ vec3 pqToSdr(vec3 pq)
   vec3 linear = pow(max(p - ST2084_c1, vec3(0.0)) / (ST2084_c2 - ST2084_c3 * p),
                     vec3(1.0 / ST2084_m1));
   // linear is 0-1 representing 0-10000 nits.
-  // Scale so that m_sdrPeak nits (default 203, BT.2408 HDR ref white) -> SDR 1.0.
-  linear = linear * (10000.0 / m_sdrPeak);
+  // Scale so that m_pqRefNits (default 203, BT.2408 HDR ref white) -> SDR 1.0.
+  linear = linear * (10000.0 / m_pqRefNits);
   // BT.2020 -> BT.709 gamut conversion (linear domain)
+  // m_pqAccuracy blends between full conversion (1.0) and identity (0.0)
   const mat3 bt2020_to_bt709 = mat3(
      1.660496, -0.124546, -0.018154,
     -0.587656,  1.132895, -0.100597,
     -0.072840, -0.008348,  1.118751);
-  linear = max(bt2020_to_bt709 * linear, vec3(0.0));
+  vec3 converted = max(bt2020_to_bt709 * linear, vec3(0.0));
+  linear = mix(max(linear, vec3(0.0)), converted, m_pqAccuracy);
   // Tonemap: hard clip or Reinhard soft rolloff (preserves highlight detail)
   linear = mix(min(linear, vec3(1.0)), linear / (vec3(1.0) + linear), m_pqTonemap);
   // sRGB OETF (gamma encode with linear segment for dark values)
   vec3 lo = linear * 12.92;
   vec3 hi = 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055;
-  vec3 srgb = mix(lo, hi, step(vec3(0.0031308), linear));
-  // Saturation: power curve on color/luma ratio (multiplicative, preserves hue,
-  // works for near-gamut colors where linear mix clips immediately)
-  float luma = dot(srgb, vec3(0.299, 0.587, 0.114));
-  if (luma > 0.0)
-    srgb = clamp(luma * pow(srgb / luma, vec3(m_pqSaturation)), vec3(0.0), vec3(1.0));
-  return srgb;
+  return mix(lo, hi, step(vec3(0.0031308), linear));
 }
 #endif
 

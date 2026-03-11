@@ -41,7 +41,6 @@ public:
   GLfloat GetClipXOffset() { return m_clipXOffset; }
   GLfloat GetClipYFactor() { return m_clipYFactor; }
   GLfloat GetClipYOffset() { return m_clipYOffset; }
-  GLint GetSdrPeakLoc() { return static_cast<GLint>(m_sdrPeak); }
 
 protected:
   GLint m_hTex0 = 0;
