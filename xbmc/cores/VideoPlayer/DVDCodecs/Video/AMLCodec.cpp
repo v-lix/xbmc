@@ -2086,7 +2086,9 @@ bool CAMLCodec::OpenDecoder()
   // Skip DV compositor activation for windowed playback to avoid HDMI handshakes
   // (e.g. trailer previews in skins toggling DV on/off for each clip).
   m_fullscreen = m_processInfo.IsFullscreen();
-  if (m_fullscreen)
+  bool skipWindowed = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+      CSettings::SETTING_COREELEC_AMLOGIC_DV_SKIP_WINDOWED);
+  if (m_fullscreen || !skipWindowed)
     aml_dv_open(hints.hdrType, hints.bitdepth);
 
   // Now have the HDRType resolved, ok to set the transfer pq - so renderer can set the shaders as needed.
@@ -2335,7 +2337,8 @@ void CAMLCodec::CloseDecoder()
 
   CloseAmlVideo();
 
-  if (m_fullscreen)
+  if (m_fullscreen || !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+          CSettings::SETTING_COREELEC_AMLOGIC_DV_SKIP_WINDOWED))
     aml_dv_close();
 }
 

@@ -26462,6 +26462,14 @@ msgctxt "#60609"
 msgid "Skip automatic colour space and luminance detection from the display's EDID. Allows full manual control over VSVDB colour space and max luminance settings."
 msgstr ""
 
+msgctxt "#60610"
+msgid "Skip DV for windowed playback"
+msgstr ""
+
+msgctxt "#60611"
+msgid "When enabled, Dolby Vision mode switching is suppressed for windowed video playback. This avoids HDMI handshakes during e.g. trailer previews in skins, but also prevents DV activation in video screensavers. Disable this if you want screensavers to trigger Dolby Vision."
+msgstr ""
+
 #. Title of Dolby Vision RPU conversion setting
 #: system/settings/settings.xml
 msgctxt "#69196"

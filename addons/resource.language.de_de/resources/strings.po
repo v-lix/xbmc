@@ -19492,6 +19492,14 @@ msgctxt "#60609"
 msgid "Skip automatic colour space and luminance detection from the display's EDID. Allows full manual control over VSVDB colour space and max luminance settings."
 msgstr "Automatische Farbraum- und Luminanz-Erkennung aus der EDID des Displays überspringen. Ermöglicht die vollständige manuelle Kontrolle über VSVDB-Farbraum und Max-Luminanz-Einstellungen."
 
+msgctxt "#60610"
+msgid "Skip DV for windowed playback"
+msgstr "DV für Fenstermodus-Wiedergabe überspringen"
+
+msgctxt "#60611"
+msgid "When enabled, Dolby Vision mode switching is suppressed for windowed video playback. This avoids HDMI handshakes during e.g. trailer previews in skins, but also prevents DV activation in video screensavers. Disable this if you want screensavers to trigger Dolby Vision."
+msgstr "Wenn aktiviert, wird der Dolby-Vision-Moduswechsel bei Videowiedergabe im Fenstermodus unterdrückt. Dies vermeidet HDMI-Handshakes z.B. bei Trailer-Vorschauen in Skins, verhindert aber auch die DV-Aktivierung in Video-Bildschirmschonern. Deaktivieren, wenn Bildschirmschoner Dolby Vision auslösen sollen."
+
 msgctxt "#69196"
 msgid "Convert DV Profile 7 FEL to MEL or to Profile 8.1"
 msgstr "DV Profil 7 umwandeln"
