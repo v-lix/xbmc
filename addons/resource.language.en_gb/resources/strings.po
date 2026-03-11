@@ -26492,6 +26492,30 @@ msgctxt "#69302"
 msgid "to P8.1"
 msgstr ""
 
+#. Label for setting "Use correct colors for PGS"
+#: system/settings/settings.xml
+msgctxt "#69198"
+msgid "Use correct colors for PGS"
+msgstr ""
+
+#. Help text for setting "Use correct colors for PGS"
+#: system/settings/settings.xml
+msgctxt "#69199"
+msgid "Convert PGS subtitle colors from BT.2020 PQ to SDR BT.709 for correct display. Disable if subtitle colors appear wrong on non-HDR content or you like the old colors better."
+msgstr ""
+
+#. Label for setting "PGS reference brightness"
+#: system/settings/settings.xml
+msgctxt "#69200"
+msgid "PGS reference brightness (nits)"
+msgstr ""
+
+#. Help text for setting "PGS reference brightness"
+#: system/settings/settings.xml
+msgctxt "#69201"
+msgid "Reference brightness for mapping PGS subtitles to SDR. 203 nits is the BT.2408 standard. Lower values make subtitles brighter, higher values make them darker."
+msgstr ""
+
 #: system/settings/settings.xml
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."

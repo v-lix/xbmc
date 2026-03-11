@@ -19,6 +19,8 @@
 #include "cores/VideoPlayer/DVDCodecs/Overlay/DVDOverlaySpu.h"
 #include "rendering/MatrixGL.h"
 #include "rendering/gles/RenderSystemGLES.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/GLUtils.h"
 #include "utils/MathUtils.h"
 #include "utils/log.h"
@@ -165,6 +167,8 @@ COverlayTextureGLES::COverlayTextureGLES(const CDVDOverlayImage& o, CRect& rSour
     convert_rgba(o, m_pma, rgba);
     LoadTexture(GL_TEXTURE_2D, o.width, o.height, o.width * 4, &m_u, &m_v, false, rgba.data());
   }
+
+  m_isHdrPqAuthored = o.m_isHdrPq;
 
   glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -446,7 +450,18 @@ void COverlayTextureGLES::Render(SRenderState& state)
 
   CRenderSystemGLES* renderSystem =
       dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
-  renderSystem->EnableGUIShader(ShaderMethodGLES::SM_TEXTURE_NOBLEND);
+  renderSystem->EnableGUIShader(m_isHdrPqAuthored
+                                    ? ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR
+                                    : ShaderMethodGLES::SM_TEXTURE_NOBLEND);
+
+  if (m_isHdrPqAuthored)
+  {
+    float refNits = static_cast<float>(
+        CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+            CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_REFNITS));
+    glUniform1f(renderSystem->GUIShaderGetSdrPeak(), refNits);
+  }
+
   GLint posLoc = renderSystem->GUIShaderGetPos();
   GLint tex0Loc = renderSystem->GUIShaderGetCoord0();
   GLint depthLoc = renderSystem->GUIShaderGetDepth();

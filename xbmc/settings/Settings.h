@@ -151,6 +151,8 @@ public:
   static constexpr auto SETTING_MYVIDEOS_EXTRACTTHUMB = "myvideos.extractthumb";
   static constexpr auto SETTING_MYVIDEOS_STACKVIDEOS = "myvideos.stackvideos";
   static constexpr auto SETTING_LOCALE_SUBTITLELANGUAGE = "locale.subtitlelanguage";
+  static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR = "subtitles.pgshdrtosdr";
+  static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_REFNITS = "subtitles.pgshdrtosdr.refnits";
   static constexpr auto SETTING_SUBTITLES_PARSECAPTIONS = "subtitles.parsecaptions";
   static constexpr auto SETTING_SUBTITLES_CAPTIONSALIGN = "subtitles.captionsalign";
   static constexpr auto SETTING_SUBTITLES_ALIGN = "subtitles.align";

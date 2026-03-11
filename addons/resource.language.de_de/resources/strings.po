@@ -19512,6 +19512,22 @@ msgctxt "#69302"
 msgid "to P8.1"
 msgstr "Profile 8.1"
 
+msgctxt "#69198"
+msgid "Use correct colors for PGS"
+msgstr "Korrekte Farben für PGS verwenden"
+
+msgctxt "#69199"
+msgid "Convert PGS subtitle colors from BT.2020 PQ to SDR BT.709 for correct display. Disable if subtitle colors appear wrong on non-HDR content or you like the old colors better."
+msgstr "PGS-Untertitelfarben von BT.2020 PQ nach SDR BT.709 konvertieren. Deaktivieren, falls die Untertitelfarben bei Nicht-HDR-Inhalten falsch aussehen oder die alten Farben bevorzugt werden."
+
+msgctxt "#69200"
+msgid "PGS reference brightness (nits)"
+msgstr "PGS-Referenzhelligkeit (Nits)"
+
+msgctxt "#69201"
+msgid "Reference brightness for mapping PGS subtitles to SDR. 203 nits is the BT.2408 standard. Lower values make subtitles brighter, higher values make them darker."
+msgstr "Referenzhelligkeit für die Zuordnung von PGS-Untertiteln zu SDR. 203 Nits ist der BT.2408-Standard. Niedrigere Werte machen Untertitel heller, höhere Werte dunkler."
+
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."
 msgstr "Aktiviere diese Option, um die Rauschunterdrückung zu deaktivieren und die Videoverarbeitung zu verbessern. Ein Neustart ist erforderlich."

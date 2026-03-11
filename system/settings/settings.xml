@@ -877,6 +877,24 @@
         </setting>
       </group>
       <group id="3" label="39187">
+        <setting id="subtitles.pgshdrtosdr" type="boolean" label="69198" help="69199">
+          <level>1</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="subtitles.pgshdrtosdr.refnits" parent="subtitles.pgshdrtosdr" type="integer" label="69200" help="69201">
+          <level>2</level>
+          <default>203</default>
+          <constraints>
+            <minimum>50</minimum>
+            <step>1</step>
+            <maximum>500</maximum>
+          </constraints>
+          <dependencies>
+            <dependency type="visible" setting="subtitles.pgshdrtosdr" operator="is">true</dependency>
+          </dependencies>
+          <control type="slider" format="integer" />
+        </setting>
         <setting id="subtitles.parsecaptions" type="boolean" label="24130" help="24131">
           <level>1</level>
           <default>false</default>
