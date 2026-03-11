@@ -57,8 +57,10 @@ vec3 pqToSdr(vec3 pq)
   // Saturation adjustment in linear BT.709 domain
   float luma = dot(linear, vec3(0.2126, 0.7152, 0.0722));
   linear = clamp(mix(vec3(luma), linear, m_pqSaturation), vec3(0.0), vec3(1.0));
-  // BT.709 OETF (gamma encode)
-  return pow(linear, vec3(0.45));
+  // sRGB OETF (gamma encode with linear segment for dark values)
+  vec3 lo = linear * 12.92;
+  vec3 hi = 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055;
+  return mix(lo, hi, step(vec3(0.0031308), linear));
 }
 #endif
 
