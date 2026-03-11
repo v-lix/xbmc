@@ -28,11 +28,11 @@ precision mediump float;
 uniform sampler2D m_samp0;
 varying vec4 m_cord0;
 uniform float m_sdrPeak;
+
+#if defined(KODI_PQ_TO_SDR)
 uniform float m_pqRefNits;
 uniform float m_pqAccuracy;
 uniform float m_pqTonemap;
-
-#if defined(KODI_PQ_TO_SDR)
 vec3 pqToSdr(vec3 pq)
 {
   const float ST2084_m1 = 2610.0 / (4096.0 * 4.0);

@@ -654,6 +654,8 @@ void CRenderSystemGLES::EnableGUIShader(ShaderMethodGLES method)
   if (m_pShader[m_method])
   {
     m_pShader[m_method]->Enable();
+    if (method == ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR)
+      CLog::Log(LOGDEBUG, "PGS shader: progHandle={}", m_pShader[m_method]->ProgramHandle());
   }
   else
   {
