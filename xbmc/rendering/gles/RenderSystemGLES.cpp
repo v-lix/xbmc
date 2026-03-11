@@ -509,6 +509,18 @@ void CRenderSystemGLES::InitialiseShaders()
     CLog::Log(LOGERROR, "GUI Shader gles_shader_texture_noblend.frag - compile and link failed");
   }
 
+  // PQ-to-SDR variant for PGS subtitles rendered on SDR OSD (e.g. DV G_SDR_RGB mode).
+  m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR] =
+      std::make_unique<CGLESShader>("gles_shader_texture_noblend.frag",
+                                    defines + "#define KODI_PQ_TO_SDR 1\n");
+  if (!m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR]->CompileAndLink())
+  {
+    m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR]->Free();
+    m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR].reset();
+    CLog::Log(LOGERROR,
+              "GUI Shader gles_shader_texture_noblend.frag (PQ to SDR) - compile and link failed");
+  }
+
   m_pShader[ShaderMethodGLES::SM_MULTI_BLENDCOLOR] =
       std::make_unique<CGLESShader>("gles_shader_multi_blendcolor.frag", defines);
   if (!m_pShader[ShaderMethodGLES::SM_MULTI_BLENDCOLOR]->CompileAndLink())
@@ -602,6 +614,10 @@ void CRenderSystemGLES::ReleaseShaders()
   if (m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND])
     m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND]->Free();
   m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND].reset();
+
+  if (m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR])
+    m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR]->Free();
+  m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR].reset();
 
   if (m_pShader[ShaderMethodGLES::SM_MULTI_BLENDCOLOR])
     m_pShader[ShaderMethodGLES::SM_MULTI_BLENDCOLOR]->Free();

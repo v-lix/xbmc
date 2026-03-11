@@ -19520,6 +19520,42 @@ msgctxt "#69302"
 msgid "to P8.1"
 msgstr "Profile 8.1"
 
+msgctxt "#69198"
+msgid "Use correct colors for PGS"
+msgstr "Korrekte Farben für PGS verwenden"
+
+msgctxt "#69199"
+msgid "Convert PGS subtitle colors from BT.2020 PQ to SDR BT.709 for correct display. In Dolby Vision mode, the DV compositor reprocesses OSD colors, so fine-tuning settings below may have limited effect. Disable if subtitle colors appear wrong on non-HDR content."
+msgstr "PGS-Untertitelfarben von BT.2020 PQ nach SDR BT.709 konvertieren. Im Dolby-Vision-Modus verarbeitet der DV-Compositor die OSD-Farben nach, sodass die Feineinstellungen unten nur begrenzt wirken. Deaktivieren, falls die Untertitelfarben bei Nicht-HDR-Inhalten falsch aussehen."
+
+msgctxt "#69200"
+msgid "PGS reference brightness (nits)"
+msgstr "PGS-Referenzhelligkeit (Nits)"
+
+msgctxt "#69201"
+msgid "Reference brightness for mapping PGS subtitles to SDR. 203 nits is the BT.2408 standard. Lower values make subtitles brighter, higher values make them darker."
+msgstr "Referenzhelligkeit für die Zuordnung von PGS-Untertiteln zu SDR. 203 Nits ist der BT.2408-Standard. Niedrigere Werte machen Untertitel heller, höhere Werte dunkler."
+
+msgctxt "#69202"
+msgid "PGS color saturation"
+msgstr "PGS-Farbsättigung"
+
+msgctxt "#69203"
+msgid "Adjust color saturation of converted PGS subtitles. 100% is accurate. Increase if colors appear washed out, decrease to desaturate."
+msgstr "Farbsättigung der konvertierten PGS-Untertitel anpassen. 100% ist korrekt. Erhöhen, falls die Farben ausgewaschen wirken, verringern zum Entsättigen."
+
+msgctxt "#69204"
+msgid "Use Reinhard tonemap for PGS"
+msgstr "Reinhard-Tonemap für PGS verwenden"
+
+msgctxt "#69205"
+msgid "Use Reinhard soft rolloff instead of hard clipping when converting PGS subtitles. Preserves more detail in bright highlights but makes the overall image slightly darker."
+msgstr "Reinhard-Tonemap anstelle von hartem Clipping bei der Konvertierung von PGS-Untertiteln verwenden. Bewahrt mehr Details in hellen Bereichen, macht das Bild aber insgesamt etwas dunkler."
+
+msgctxt "#69206"
+msgid "Image based subtitles"
+msgstr "Bildbasierte Untertitel"
+
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."
 msgstr "Aktiviere diese Option, um die Rauschunterdrückung zu deaktivieren und die Videoverarbeitung zu verbessern. Ein Neustart ist erforderlich."

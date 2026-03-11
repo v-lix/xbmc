@@ -4093,7 +4093,13 @@ bool CVideoPlayer::OpenSubtitleStream(const CDVDStreamInfo& hint)
   if(m_CurrentSubtitle.id < 0 ||
      m_CurrentSubtitle.hint != hint)
   {
-    if (!player->OpenStream(hint))
+    // Propagate video color info so subtitle codecs can detect PGS HDR authoring.
+    CDVDStreamInfo subHint(hint);
+    subHint.colorPrimaries = m_CurrentVideo.hint.colorPrimaries;
+    subHint.colorTransferCharacteristic = m_CurrentVideo.hint.colorTransferCharacteristic;
+    subHint.dovi = m_CurrentVideo.hint.dovi;
+
+    if (!player->OpenStream(subHint))
       return false;
   }
 

@@ -10,9 +10,12 @@
 
 #include "DVDOverlayImage.h"
 #include "DVDStreamInfo.h"
+#include "ServiceBroker.h"
 #include "cores/FFmpeg.h"
 #include "cores/VideoPlayer/Interface/DemuxPacket.h"
 #include "cores/VideoPlayer/Interface/TimingConstants.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/EndianSwap.h"
 #include "utils/log.h"
 #include "windowing/GraphicContext.h"
@@ -105,12 +108,39 @@ bool CDVDOverlayCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &optio
     delete[] parse_extra;
   }
 
-  if (avcodec_open2(m_pCodecContext, pCodec, NULL) < 0)
+  AVDictionary* codecOpts = nullptr;
+  if (hints.codec == AV_CODEC_ID_HDMV_PGS_SUBTITLE)
+  {
+    // Detect PGS HDR authoring via video stream's color info (propagated by VideoPlayer).
+    // BT.2020 PQ or DV video => PGS palettes are BT.2020 PQ; otherwise BT.709.
+    m_pgsIsPqAuthored = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+                            CSettings::SETTING_SUBTITLES_PGSHDRTOSDR) &&
+                        (hints.dovi.dv_profile != 0 ||
+                         (hints.colorPrimaries == AVCOL_PRI_BT2020 &&
+                          hints.colorTransferCharacteristic == AVCOL_TRC_SMPTE2084));
+
+    const char* matrix = m_pgsIsPqAuthored ? "bt2020" : "auto";
+    av_dict_set(&codecOpts, "pgs_matrix", matrix, 0);
+    CLog::Log(LOGDEBUG, "{}: PGS using {} matrix (primaries={}, transfer={})",
+              __FUNCTION__, matrix, hints.colorPrimaries,
+              hints.colorTransferCharacteristic);
+  }
+
+  if (avcodec_open2(m_pCodecContext, pCodec, &codecOpts) < 0)
   {
     CLog::Log(LOGDEBUG,"CDVDVideoCodecFFmpeg::Open() Unable to open codec");
+    av_dict_free(&codecOpts);
     avcodec_free_context(&m_pCodecContext);
     return false;
   }
+  if (codecOpts)
+  {
+    AVDictionaryEntry* entry = nullptr;
+    while ((entry = av_dict_get(codecOpts, "", entry, AV_DICT_IGNORE_SUFFIX)))
+      CLog::Log(LOGWARNING, "{}: FFmpeg ignored codec option: {}={}", __FUNCTION__, entry->key,
+                entry->value);
+  }
+  av_dict_free(&codecOpts);
 
   return true;
 }
@@ -287,6 +317,8 @@ std::shared_ptr<CDVDOverlay> CDVDOverlayCodecFFmpeg::GetOverlay()
 
     for (int i = 0; i < rect.nb_colors; i++)
       overlay->palette[i] = Endian_SwapLE32(((uint32_t *)rect.data[1])[i]);
+
+    overlay->m_isHdrPq = m_pgsIsPqAuthored;
 
     m_SubtitleIndex++;
 
