@@ -908,6 +908,14 @@
           </dependencies>
           <control type="slider" format="integer" />
         </setting>
+        <setting id="subtitles.pgshdrtosdr.tonemap" parent="subtitles.pgshdrtosdr" type="boolean" label="69204" help="69205">
+          <level>2</level>
+          <default>false</default>
+          <dependencies>
+            <dependency type="visible" setting="subtitles.pgshdrtosdr" operator="is">true</dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
         <setting id="subtitles.parsecaptions" type="boolean" label="24130" help="24131">
           <level>1</level>
           <default>false</default>

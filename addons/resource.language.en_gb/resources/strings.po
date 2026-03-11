@@ -26528,6 +26528,18 @@ msgctxt "#69203"
 msgid "Adjust color saturation of converted PGS subtitles. 100% is accurate. Increase if colors appear washed out after conversion."
 msgstr ""
 
+#. Label for setting "PGS Reinhard tonemap"
+#: system/settings/settings.xml
+msgctxt "#69204"
+msgid "Use Reinhard tonemap for PGS"
+msgstr ""
+
+#. Help text for setting "PGS Reinhard tonemap"
+#: system/settings/settings.xml
+msgctxt "#69205"
+msgid "Use Reinhard soft rolloff instead of hard clipping when converting PGS subtitles. Preserves more detail in bright highlights but makes the overall image slightly darker."
+msgstr ""
+
 #: system/settings/settings.xml
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."

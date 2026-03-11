@@ -29,6 +29,7 @@ uniform sampler2D m_samp0;
 varying vec4 m_cord0;
 uniform float m_sdrPeak;
 uniform float m_pqSaturation;
+uniform float m_pqTonemap;
 
 #if defined(KODI_PQ_TO_SDR)
 vec3 pqToSdr(vec3 pq)
@@ -50,7 +51,9 @@ vec3 pqToSdr(vec3 pq)
      1.660496, -0.124546, -0.018154,
     -0.587656,  1.132895, -0.100597,
     -0.072840, -0.008348,  1.118751);
-  linear = clamp(bt2020_to_bt709 * linear, vec3(0.0), vec3(1.0));
+  linear = max(bt2020_to_bt709 * linear, vec3(0.0));
+  // Tonemap: hard clip or Reinhard soft rolloff (preserves highlight detail)
+  linear = mix(min(linear, vec3(1.0)), linear / (vec3(1.0) + linear), m_pqTonemap);
   // Saturation adjustment in linear BT.709 domain
   float luma = dot(linear, vec3(0.2126, 0.7152, 0.0722));
   linear = clamp(mix(vec3(luma), linear, m_pqSaturation), vec3(0.0), vec3(1.0));

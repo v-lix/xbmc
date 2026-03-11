@@ -470,13 +470,9 @@ void COverlayTextureGLES::Render(SRenderState& state)
     GLint satLoc = glGetUniformLocation(prog, "m_pqSaturation");
     glUniform1f(satLoc, saturation);
 
-    static bool logged = false;
-    if (!logged)
-    {
-      CLog::Log(LOGDEBUG, "PGS PQ->SDR: refNits={:.0f} saturation={:.0f}% sdrPeakLoc={} satLoc={}",
-                refNits, saturation * 100.0f, sdrPeakLoc, satLoc);
-      logged = true;
-    }
+    float tonemap = settings->GetBool(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_TONEMAP) ? 1.0f : 0.0f;
+    GLint tmLoc = glGetUniformLocation(prog, "m_pqTonemap");
+    glUniform1f(tmLoc, tonemap);
   }
 
   GLint posLoc = renderSystem->GUIShaderGetPos();
