@@ -58,9 +58,12 @@ vec3 pqToSdr(vec3 pq)
   vec3 lo = linear * 12.92;
   vec3 hi = 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055;
   vec3 srgb = mix(lo, hi, step(vec3(0.0031308), linear));
-  // Saturation adjustment in gamma space (more perceptual headroom than linear)
+  // Saturation: power curve on color/luma ratio (multiplicative, preserves hue,
+  // works for near-gamut colors where linear mix clips immediately)
   float luma = dot(srgb, vec3(0.299, 0.587, 0.114));
-  return clamp(mix(vec3(luma), srgb, m_pqSaturation), vec3(0.0), vec3(1.0));
+  if (luma > 0.0)
+    srgb = clamp(luma * pow(srgb / luma, vec3(m_pqSaturation)), vec3(0.0), vec3(1.0));
+  return srgb;
 }
 #endif
 
