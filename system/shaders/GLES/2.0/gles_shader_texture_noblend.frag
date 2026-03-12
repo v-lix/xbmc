@@ -50,7 +50,11 @@ vec3 pqToSdr(vec3 pq)
     -0.587656,  1.132895, -0.100597,
     -0.072840, -0.008348,  1.118751);
   linear = max(bt2020_to_bt709 * linear, vec3(0.0));
-  linear = mix(min(linear, vec3(1.0)), linear / (vec3(1.0) + linear), m_pqTonemap);
+  // Luminance-based tonemap: compress brightness while preserving color ratios.
+  // Per-channel tonemap destroys saturation (R:G:B 6.6:1:2.3 -> 1.1:1:1.1).
+  float lum = dot(linear, vec3(0.2126, 0.7152, 0.0722));
+  float lum_tm = mix(min(lum, 1.0), lum / (1.0 + lum), m_pqTonemap);
+  linear = linear * (lum_tm / max(lum, 1e-6));
   vec3 srgb = pow(clamp(linear, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.3));
   float luma = dot(srgb, vec3(0.2126, 0.7152, 0.0722));
   srgb = clamp(mix(vec3(luma), srgb, m_pqSaturation), vec3(0.0), vec3(1.0));
