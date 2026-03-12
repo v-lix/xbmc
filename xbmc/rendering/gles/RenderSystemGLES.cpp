@@ -510,9 +510,12 @@ void CRenderSystemGLES::InitialiseShaders()
   }
 
   // PQ-to-SDR variant for PGS subtitles rendered on SDR OSD (e.g. DV G_SDR_RGB mode).
+  // In DV/VS10 mode (!m_transferPQ), Core2 expects full-range OSD input,
+  // so exclude KODI_LIMITED_RANGE from the defines.
   m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR] =
       std::make_unique<CGLESShader>("gles_shader_texture_noblend.frag",
-                                    defines + "#define KODI_PQ_TO_SDR 1\n");
+                                    (m_transferPQ ? defines : "") +
+                                        "#define KODI_PQ_TO_SDR 1\n");
   if (!m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR]->CompileAndLink())
   {
     m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND_PQ_TO_SDR]->Free();

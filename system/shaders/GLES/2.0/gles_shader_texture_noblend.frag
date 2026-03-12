@@ -51,10 +51,8 @@ vec3 pqToSdr(vec3 pq)
     -0.072840, -0.008348,  1.118751);
   linear = max(bt2020_to_bt709 * linear, vec3(0.0));
   linear = mix(min(linear, vec3(1.0)), linear / (vec3(1.0) + linear), m_pqTonemap);
-  vec3 lo = linear * 12.92;
-  vec3 hi = 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055;
-  vec3 srgb = mix(lo, hi, step(vec3(0.0031308), linear));
-  float luma = dot(srgb, vec3(0.299, 0.587, 0.114));
+  vec3 srgb = pow(clamp(linear, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.3));
+  float luma = dot(srgb, vec3(0.2126, 0.7152, 0.0722));
   srgb = clamp(mix(vec3(luma), srgb, m_pqSaturation), vec3(0.0), vec3(1.0));
   return srgb;
 }
