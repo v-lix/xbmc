@@ -45,18 +45,13 @@ vec3 pqToSdr(vec3 pq)
   vec3 linear = pow(max(p - ST2084_c1, vec3(0.0)) / (ST2084_c2 - ST2084_c3 * p),
                     vec3(1.0 / ST2084_m1));
   linear = linear * (10000.0 / m_pqRefNits);
-  const mat3 bt2020_to_bt709 = mat3(
-     1.660496, -0.124546, -0.018154,
-    -0.587656,  1.132895, -0.100597,
-    -0.072840, -0.008348,  1.118751);
-  linear = max(bt2020_to_bt709 * linear, vec3(0.0));
-  // Luminance-based tonemap: compress brightness while preserving color ratios.
-  // Per-channel tonemap destroys saturation (R:G:B 6.6:1:2.3 -> 1.1:1:1.1).
-  float lum = dot(linear, vec3(0.2126, 0.7152, 0.0722));
+  // Stay in BT.2020 — display is BT.2020 in DV/HDR10 mode, gamut conversion
+  // clips saturated primaries (1.66x amplification for pure red).
+  float lum = dot(linear, vec3(0.2627, 0.6780, 0.0593));
   float lum_tm = mix(min(lum, 1.0), lum / (1.0 + lum), m_pqTonemap);
   linear = linear * (lum_tm / max(lum, 1e-6));
   vec3 srgb = pow(clamp(linear, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.3));
-  float luma = dot(srgb, vec3(0.2126, 0.7152, 0.0722));
+  float luma = dot(srgb, vec3(0.2627, 0.6780, 0.0593));
   srgb = clamp(mix(vec3(luma), srgb, m_pqSaturation), vec3(0.0), vec3(1.0));
   return srgb;
 }

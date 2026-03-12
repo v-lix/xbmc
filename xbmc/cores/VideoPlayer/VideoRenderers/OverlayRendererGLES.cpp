@@ -23,6 +23,7 @@
 #include "settings/SettingsComponent.h"
 #include "utils/GLUtils.h"
 #include "utils/MathUtils.h"
+#include "utils/AMLUtils.h"
 #include "utils/log.h"
 #include "windowing/WinSystem.h"
 
@@ -457,8 +458,21 @@ void COverlayTextureGLES::Render(SRenderState& state)
   if (m_isHdrPqAuthored)
   {
     auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-    float refNits = static_cast<float>(
-        settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_REFNITS));
+
+    // Use OSD brightness (graphic_max) as reference nits so the shader's SDR [0,1]
+    // range maps 1:1 to the hardware's [0, graphic_max] nits output.
+    // This avoids clipping PQ content that's within the OSD brightness range.
+    float refNits;
+    unsigned int dvMode = aml_dv_dolby_vision_mode();
+    if (dvMode == DOLBY_VISION_OUTPUT_MODE_HDR10)
+      refNits = static_cast<float>(
+          settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS));
+    else
+      refNits = static_cast<float>(
+          settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS));
+    if (refNits <= 0.0f)
+      refNits = 300.0f;
+
     float saturation = static_cast<float>(
         settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_SATURATION)) / 100.0f;
     float tonemap = settings->GetBool(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_TONEMAP) ? 1.0f : 0.0f;
