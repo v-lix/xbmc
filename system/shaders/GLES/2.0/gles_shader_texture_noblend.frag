@@ -45,14 +45,22 @@ vec3 pqToSdr(vec3 pq)
   vec3 linear = pow(max(p - ST2084_c1, vec3(0.0)) / (ST2084_c2 - ST2084_c3 * p),
                     vec3(1.0 / ST2084_m1));
   linear = linear * (10000.0 / m_pqRefNits);
+#if defined(KODI_TRANSFER_PQ)
+  // Native HDR10 (no DV): convert BT.2020 -> BT.709 for SDR display
   const mat3 bt2020_to_bt709 = mat3(
      1.660496, -0.124546, -0.018154,
     -0.587656,  1.132895, -0.100597,
     -0.072840, -0.008348,  1.118751);
   linear = max(bt2020_to_bt709 * linear, vec3(0.0));
+#endif
   linear = mix(min(linear, vec3(1.0)), linear / (vec3(1.0) + linear), m_pqTonemap);
   vec3 srgb = pow(clamp(linear, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.3));
+#if defined(KODI_TRANSFER_PQ)
   float luma = dot(srgb, vec3(0.2126, 0.7152, 0.0722));
+#else
+  // DV mode: output stays BT.2020, use BT.2020 luma coefficients
+  float luma = dot(srgb, vec3(0.2627, 0.6780, 0.0593));
+#endif
   srgb = clamp(mix(vec3(luma), srgb, m_pqSaturation), vec3(0.0), vec3(1.0));
   return srgb;
 }
