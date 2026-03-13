@@ -33,6 +33,7 @@ uniform float m_sdrPeak;
 uniform float m_pqRefNits;
 uniform float m_pqSaturation;
 uniform float m_pqTonemap;
+uniform float m_pqMode;
 vec3 pqToSdr(vec3 pq)
 {
   const float ST2084_m1 = 2610.0 / (4096.0 * 4.0);
@@ -45,14 +46,43 @@ vec3 pqToSdr(vec3 pq)
   vec3 linear = pow(max(p - ST2084_c1, vec3(0.0)) / (ST2084_c2 - ST2084_c3 * p),
                     vec3(1.0 / ST2084_m1));
   linear = linear * (10000.0 / m_pqRefNits);
-  const mat3 bt2020_to_bt709 = mat3(
-     1.660496, -0.124546, -0.018154,
-    -0.587656,  1.132895, -0.100597,
-    -0.072840, -0.008348,  1.118751);
-  linear = max(bt2020_to_bt709 * linear, vec3(0.0));
-  linear = mix(min(linear, vec3(1.0)), linear / (vec3(1.0) + linear), m_pqTonemap);
-  vec3 srgb = pow(clamp(linear, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.3));
-  float luma = dot(srgb, vec3(0.2126, 0.7152, 0.0722));
+  vec3 srgb;
+  float luma;
+  if (m_pqMode < 0.5)
+  {
+    // Classic: BT.2020->BT.709 gamut + per-channel tonemap
+    const mat3 bt2020_to_bt709 = mat3(
+       1.660496, -0.124546, -0.018154,
+      -0.587656,  1.132895, -0.100597,
+      -0.072840, -0.008348,  1.118751);
+    linear = max(bt2020_to_bt709 * linear, vec3(0.0));
+    linear = mix(min(linear, vec3(1.0)), linear / (vec3(1.0) + linear), m_pqTonemap);
+    srgb = pow(clamp(linear, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.3));
+    luma = dot(srgb, vec3(0.2126, 0.7152, 0.0722));
+  }
+  else if (m_pqMode < 1.5)
+  {
+    // Linear: BT.2020->BT.709 gamut + luminance-based tonemap
+    const mat3 bt2020_to_bt709 = mat3(
+       1.660496, -0.124546, -0.018154,
+      -0.587656,  1.132895, -0.100597,
+      -0.072840, -0.008348,  1.118751);
+    linear = max(bt2020_to_bt709 * linear, vec3(0.0));
+    float lum = dot(linear, vec3(0.2126, 0.7152, 0.0722));
+    float lum_tm = mix(min(lum, 1.0), lum / (1.0 + lum), m_pqTonemap);
+    linear = linear * (lum_tm / max(lum, 1e-6));
+    srgb = pow(clamp(linear, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.3));
+    luma = dot(srgb, vec3(0.2126, 0.7152, 0.0722));
+  }
+  else
+  {
+    // Luma: no gamut conversion, BT.2020 luma + luminance-based tonemap
+    float lum = dot(linear, vec3(0.2627, 0.6780, 0.0593));
+    float lum_tm = mix(min(lum, 1.0), lum / (1.0 + lum), m_pqTonemap);
+    linear = linear * (lum_tm / max(lum, 1e-6));
+    srgb = pow(clamp(linear, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.3));
+    luma = dot(srgb, vec3(0.2627, 0.6780, 0.0593));
+  }
   srgb = clamp(mix(vec3(luma), srgb, m_pqSaturation), vec3(0.0), vec3(1.0));
   return srgb;
 }

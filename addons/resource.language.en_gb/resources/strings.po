@@ -26554,6 +26554,36 @@ msgctxt "#69206"
 msgid "Image based subtitles"
 msgstr ""
 
+#. Label for setting "PGS tonemap mode"
+#: system/settings/settings.xml
+msgctxt "#69207"
+msgid "PGS tonemap mode"
+msgstr ""
+
+#. Help text for setting "PGS tonemap mode"
+#: system/settings/settings.xml
+msgctxt "#69208"
+msgid "Select the tonemapping algorithm for PGS subtitles. Classic: BT.709 gamut + per-channel tonemap. Linear: BT.709 gamut + luminance-based tonemap (preserves color ratios). Luma: BT.2020 native + luminance-based tonemap (no gamut conversion)."
+msgstr ""
+
+#. Option label for PGS tonemap mode "Classic"
+#: system/settings/settings.xml
+msgctxt "#69209"
+msgid "Classic"
+msgstr ""
+
+#. Option label for PGS tonemap mode "Linear"
+#: system/settings/settings.xml
+msgctxt "#69210"
+msgid "Linear"
+msgstr ""
+
+#. Option label for PGS tonemap mode "Luma"
+#: system/settings/settings.xml
+msgctxt "#69211"
+msgid "Luma"
+msgstr ""
+
 #: system/settings/settings.xml
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."

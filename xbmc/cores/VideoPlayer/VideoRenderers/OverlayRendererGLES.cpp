@@ -462,12 +462,15 @@ void COverlayTextureGLES::Render(SRenderState& state)
     float saturation = static_cast<float>(
         settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_SATURATION)) / 100.0f;
     float tonemap = settings->GetBool(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_TONEMAP) ? 1.0f : 0.0f;
+    float mode = static_cast<float>(
+        settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_MODE));
 
     GLint prog = 0;
     glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
     glUniform1f(glGetUniformLocation(prog, "m_pqRefNits"), refNits);
     glUniform1f(glGetUniformLocation(prog, "m_pqSaturation"), saturation);
     glUniform1f(glGetUniformLocation(prog, "m_pqTonemap"), tonemap);
+    glUniform1f(glGetUniformLocation(prog, "m_pqMode"), mode);
   }
 
   GLint posLoc = renderSystem->GUIShaderGetPos();

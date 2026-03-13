@@ -155,6 +155,7 @@ public:
   static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_REFNITS = "subtitles.pgshdrtosdr.refnits";
   static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_SATURATION = "subtitles.pgshdrtosdr.saturation";
   static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_TONEMAP = "subtitles.pgshdrtosdr.tonemap";
+  static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_MODE = "subtitles.pgshdrtosdr.mode";
   static constexpr auto SETTING_SUBTITLES_PARSECAPTIONS = "subtitles.parsecaptions";
   static constexpr auto SETTING_SUBTITLES_CAPTIONSALIGN = "subtitles.captionsalign";
   static constexpr auto SETTING_SUBTITLES_ALIGN = "subtitles.align";

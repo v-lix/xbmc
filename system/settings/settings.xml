@@ -916,6 +916,21 @@
           </dependencies>
           <control type="toggle" />
         </setting>
+        <setting id="subtitles.pgshdrtosdr.mode" parent="subtitles.pgshdrtosdr" type="integer" label="69207" help="69208">
+          <level>2</level>
+          <default>0</default>
+          <constraints>
+            <options>
+              <option label="69209">0</option>
+              <option label="69210">1</option>
+              <option label="69211">2</option>
+            </options>
+          </constraints>
+          <dependencies>
+            <dependency type="visible" setting="subtitles.pgshdrtosdr" operator="is">true</dependency>
+          </dependencies>
+          <control type="list" format="string" />
+        </setting>
       </group>
       <group id="4" label="39187">
         <setting id="subtitles.parsecaptions" type="boolean" label="24130" help="24131">

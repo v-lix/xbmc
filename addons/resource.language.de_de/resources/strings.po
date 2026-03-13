@@ -19556,6 +19556,26 @@ msgctxt "#69206"
 msgid "Image based subtitles"
 msgstr "Bildbasierte Untertitel"
 
+msgctxt "#69207"
+msgid "PGS tonemap mode"
+msgstr "PGS-Tonemap-Modus"
+
+msgctxt "#69208"
+msgid "Select the tonemapping algorithm for PGS subtitles. Classic: BT.709 gamut + per-channel tonemap. Linear: BT.709 gamut + luminance-based tonemap (preserves color ratios). Luma: BT.2020 native + luminance-based tonemap (no gamut conversion)."
+msgstr "Tonemapping-Algorithmus für PGS-Untertitel wählen. Classic: BT.709-Farbraum + kanalweises Tonemap. Linear: BT.709-Farbraum + luminanzbasiertes Tonemap (erhält Farbverhältnisse). Luma: BT.2020 nativ + luminanzbasiertes Tonemap (keine Farbraumkonvertierung)."
+
+msgctxt "#69209"
+msgid "Classic"
+msgstr "Classic"
+
+msgctxt "#69210"
+msgid "Linear"
+msgstr "Linear"
+
+msgctxt "#69211"
+msgid "Luma"
+msgstr "Luma"
+
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."
 msgstr "Aktiviere diese Option, um die Rauschunterdrückung zu deaktivieren und die Videoverarbeitung zu verbessern. Ein Neustart ist erforderlich."
