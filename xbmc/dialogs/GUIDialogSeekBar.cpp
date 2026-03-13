@@ -30,6 +30,14 @@ CGUIDialogSeekBar::CGUIDialogSeekBar(void)
 
 CGUIDialogSeekBar::~CGUIDialogSeekBar(void) = default;
 
+void CGUIDialogSeekBar::OnWindowLoaded()
+{
+  CGUIDialog::OnWindowLoaded();
+  // Keep textures allocated between open/close cycles to avoid synchronous
+  // image decodes on the GUI thread when the seekbar appears during playback.
+  DynamicResourceAlloc(false);
+}
+
 bool CGUIDialogSeekBar::OnMessage(CGUIMessage& message)
 {
   switch (message.GetMessage())

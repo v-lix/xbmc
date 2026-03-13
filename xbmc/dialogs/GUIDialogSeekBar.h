@@ -17,6 +17,8 @@ public:
   ~CGUIDialogSeekBar(void) override;
   bool OnMessage(CGUIMessage& message) override;
   void FrameMove() override;
+protected:
+  void OnWindowLoaded() override;
 private:
   int GetProgress() const;
   int GetEpgEventProgress() const;
