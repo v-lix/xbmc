@@ -26470,6 +26470,14 @@ msgctxt "#60611"
 msgid "When enabled, Dolby Vision mode switching is suppressed for windowed video playback. This avoids HDMI handshakes during e.g. trailer previews in skins, but also prevents DV activation in video screensavers. Disable this if you want screensavers to trigger Dolby Vision."
 msgstr ""
 
+msgctxt "#60612"
+msgid "Reduce color banding (VS10)"
+msgstr ""
+
+msgctxt "#60613"
+msgid "Preserve 12-bit precision through the VPP and enable HDMI TX dithering to reduce visible banding in color gradients during VS10 playback. Disabled by default as it changes the VPP data path."
+msgstr ""
+
 #. Title of Dolby Vision RPU conversion setting
 #: system/settings/settings.xml
 msgctxt "#69196"

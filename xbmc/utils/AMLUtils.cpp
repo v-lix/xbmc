@@ -647,6 +647,9 @@ unsigned int aml_dv_on(unsigned int mode)
   // Force CD/CS for all DV modes
   aml_kodi_set_cd_cs(1);
 
+  bool dv_dither(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DITHER));
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_dither", dv_dither);
+
   // For VS10 non-IPT output (HDR10, SDR), the DV module is active but the
   // kernel HDMI TX may still have a stale DV EOTF from a previous IPT mode.
   // Tell the kernel to skip DV tunnel overrides so normal colour params apply.
@@ -927,6 +930,7 @@ void aml_dv_off()
   aml_linux_force_422 = false;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_non_ipt", false);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_dither", false);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp_tm", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);

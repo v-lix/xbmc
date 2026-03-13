@@ -494,6 +494,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES = "coreelec.amlogic.dolbyvision.force.modes";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID = "coreelec.amlogic.dolbyvision.override.edid";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_SKIP_WINDOWED = "coreelec.amlogic.dolbyvision.skip.windowed";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_DV_DITHER = "coreelec.amlogic.dolbyvision.dither";
   static constexpr auto SETTING_COREELEC_RESET_PTS_ON_SEEK = "coreelec.resetptsonseek";
   static constexpr auto SETTING_COREELEC_AUDIO_AC3_DIALNORM = "coreelec.audio.ac3.dialnorm";
   static constexpr auto SETTING_COREELEC_AUDIO_EAC3_ATMOS_DIALNORM = "coreelec.audio.eac3.atmos.dialnorm";

@@ -19500,6 +19500,14 @@ msgctxt "#60611"
 msgid "When enabled, Dolby Vision mode switching is suppressed for windowed video playback. This avoids HDMI handshakes during e.g. trailer previews in skins, but also prevents DV activation in video screensavers. Disable this if you want screensavers to trigger Dolby Vision."
 msgstr "Wenn aktiviert, wird der Dolby-Vision-Moduswechsel bei Videowiedergabe im Fenstermodus unterdrückt. Dies vermeidet HDMI-Handshakes z.B. bei Trailer-Vorschauen in Skins, verhindert aber auch die DV-Aktivierung in Video-Bildschirmschonern. Deaktivieren, wenn Bildschirmschoner Dolby Vision auslösen sollen."
 
+msgctxt "#60612"
+msgid "Reduce color banding (VS10)"
+msgstr "Farbbanding reduzieren (VS10)"
+
+msgctxt "#60613"
+msgid "Preserve 12-bit precision through the VPP and enable HDMI TX dithering to reduce visible banding in color gradients during VS10 playback. Disabled by default as it changes the VPP data path."
+msgstr "12-Bit-Präzision im VPP beibehalten und HDMI-TX-Dithering aktivieren, um sichtbares Banding in Farbverläufen bei VS10-Wiedergabe zu reduzieren. Standardmäßig deaktiviert, da der VPP-Datenpfad geändert wird."
+
 msgctxt "#69196"
 msgid "Convert DV Profile 7 FEL to MEL or to Profile 8.1"
 msgstr "DV Profil 7 umwandeln"
