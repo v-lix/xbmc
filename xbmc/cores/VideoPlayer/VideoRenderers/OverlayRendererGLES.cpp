@@ -457,8 +457,9 @@ void COverlayTextureGLES::Render(SRenderState& state)
   if (m_isHdrPqAuthored)
   {
     auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-    float refNits = static_cast<float>(
-        settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_REFNITS));
+    float brightness = static_cast<float>(
+        settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_BRIGHTNESS));
+    float refNits = 20300.0f / std::max(brightness, 10.0f);
     float saturation = static_cast<float>(
         settings->GetInt(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_SATURATION)) / 100.0f;
     float tonemap = settings->GetBool(CSettings::SETTING_SUBTITLES_PGSHDRTOSDR_TONEMAP) ? 1.0f : 0.0f;

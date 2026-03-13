@@ -26520,16 +26520,16 @@ msgctxt "#69199"
 msgid "Convert PGS subtitle colors from BT.2020 PQ to SDR BT.709 for correct display. In Dolby Vision mode, the DV compositor reprocesses OSD colors, so fine-tuning settings below may have limited effect. Disable if subtitle colors appear wrong on non-HDR content."
 msgstr ""
 
-#. Label for setting "PGS reference brightness"
+#. Label for setting "PGS brightness"
 #: system/settings/settings.xml
 msgctxt "#69200"
-msgid "PGS reference brightness (nits)"
+msgid "PGS brightness"
 msgstr ""
 
-#. Help text for setting "PGS reference brightness"
+#. Help text for setting "PGS brightness"
 #: system/settings/settings.xml
 msgctxt "#69201"
-msgid "Reference brightness for mapping PGS subtitles to SDR. 203 nits is the BT.2408 standard. Lower values make subtitles brighter, higher values make them darker."
+msgid "Controls brightness of PGS subtitles. 100% is accurate per BT.2408 (203 nits reference). Increase if subtitles appear too dim, decrease if they are too bright."
 msgstr ""
 
 #. Label for setting "PGS color saturation"

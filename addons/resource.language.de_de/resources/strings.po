@@ -19537,12 +19537,12 @@ msgid "Convert PGS subtitle colors from BT.2020 PQ to SDR BT.709 for correct dis
 msgstr "PGS-Untertitelfarben von BT.2020 PQ nach SDR BT.709 konvertieren. Im Dolby-Vision-Modus verarbeitet der DV-Compositor die OSD-Farben nach, sodass die Feineinstellungen unten nur begrenzt wirken. Deaktivieren, falls die Untertitelfarben bei Nicht-HDR-Inhalten falsch aussehen."
 
 msgctxt "#69200"
-msgid "PGS reference brightness (nits)"
-msgstr "PGS-Referenzhelligkeit (Nits)"
+msgid "PGS brightness"
+msgstr "PGS-Helligkeit"
 
 msgctxt "#69201"
-msgid "Reference brightness for mapping PGS subtitles to SDR. 203 nits is the BT.2408 standard. Lower values make subtitles brighter, higher values make them darker."
-msgstr "Referenzhelligkeit für die Zuordnung von PGS-Untertiteln zu SDR. 203 Nits ist der BT.2408-Standard. Niedrigere Werte machen Untertitel heller, höhere Werte dunkler."
+msgid "Controls brightness of PGS subtitles. 100% is accurate per BT.2408 (203 nits reference). Increase if subtitles appear too dim, decrease if they are too bright."
+msgstr "Steuert die Helligkeit der PGS-Untertitel. 100% entspricht dem BT.2408-Standard (203 Nits Referenz). Erhöhen, falls Untertitel zu dunkel erscheinen, verringern, falls sie zu hell sind."
 
 msgctxt "#69202"
 msgid "PGS color saturation"

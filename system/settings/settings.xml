@@ -882,18 +882,18 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
-        <setting id="subtitles.pgshdrtosdr.refnits" parent="subtitles.pgshdrtosdr" type="integer" label="69200" help="69201">
+        <setting id="subtitles.pgshdrtosdr.brightness" parent="subtitles.pgshdrtosdr" type="integer" label="69200" help="69201">
           <level>2</level>
-          <default>203</default>
+          <default>100</default>
           <constraints>
-            <minimum>50</minimum>
-            <step>1</step>
-            <maximum>500</maximum>
+            <minimum>10</minimum>
+            <step>5</step>
+            <maximum>300</maximum>
           </constraints>
           <dependencies>
             <dependency type="visible" setting="subtitles.pgshdrtosdr" operator="is">true</dependency>
           </dependencies>
-          <control type="slider" format="integer" />
+          <control type="slider" format="percentage" />
         </setting>
         <setting id="subtitles.pgshdrtosdr.saturation" parent="subtitles.pgshdrtosdr" type="integer" label="69202" help="69203">
           <level>2</level>

@@ -152,7 +152,7 @@ public:
   static constexpr auto SETTING_MYVIDEOS_STACKVIDEOS = "myvideos.stackvideos";
   static constexpr auto SETTING_LOCALE_SUBTITLELANGUAGE = "locale.subtitlelanguage";
   static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR = "subtitles.pgshdrtosdr";
-  static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_REFNITS = "subtitles.pgshdrtosdr.refnits";
+  static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_BRIGHTNESS = "subtitles.pgshdrtosdr.brightness";
   static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_SATURATION = "subtitles.pgshdrtosdr.saturation";
   static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_TONEMAP = "subtitles.pgshdrtosdr.tonemap";
   static constexpr auto SETTING_SUBTITLES_PGSHDRTOSDR_MODE = "subtitles.pgshdrtosdr.mode";
