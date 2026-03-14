@@ -14579,8 +14579,8 @@ msgid "Use system HDR/SDR brightness balance"
 msgstr "Systemeinstellung für HDR-/SDR-Helligkeitsbalance verwenden"
 
 msgctxt "#36097"
-msgid "GUI peak luminance in HDR PQ mode"
-msgstr "Maximale Leuchtdichte der GUI im HDR-PQ-Modus"
+msgid "OSD base brightness (HDR/DV)"
+msgstr "OSD-Grundhelligkeit (HDR/DV)"
 
 msgctxt "#36098"
 msgid "Use 10 bit for SDR"
@@ -16127,8 +16127,8 @@ msgid "Sets the visual depth of subtitles for stereoscopic 3D videos. The higher
 msgstr "Legt die visuelle Tiefe der Untertitel für stereoskopische 3D-Videos fest. Je höher der Wert, desto näher wirken die Untertitel."
 
 msgctxt "#36547"
-msgid "Sets the peak luminance level for GUI elements while the display is in HDR PQ mode. This affects all OSD, subtitles and graphics that are SDR in origin. Not used when Dolby Vision VS10 is active, as the DV compositor handles OSD brightness separately."
-msgstr "Einstellen der maximalen Leuchtdichte für GUI-Elemente, wenn der Bildschirm im HDR-PQ-Modus ist. Dies betrifft alle OSDs, Untertitel und Grafiken, die ursprünglich SDR sind. Wird nicht verwendet, wenn Dolby Vision VS10 aktiv ist, da der DV-Compositor die OSD-Helligkeit separat steuert."
+msgid "Sets the base brightness level for OSD, subtitles and GUI elements. Applies to both native HDR10 and DV VS10 playback. In VS10 mode, this does not affect the DV OSD peak nits setting — it scales the overall OSD brightness independently."
+msgstr "Stellt die Grundhelligkeit für OSD, Untertitel und GUI-Elemente ein. Gilt sowohl für native HDR10- als auch DV-VS10-Wiedergabe. Im VS10-Modus wird die DV-OSD-Spitzenhelligkeit nicht beeinflusst — die OSD-Helligkeit wird unabhängig davon skaliert."
 
 msgctxt "#36548"
 msgid "Limits resolution of GUI to save memory. Does not affect video playback. Requires restart."
