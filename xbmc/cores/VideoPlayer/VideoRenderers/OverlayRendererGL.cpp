@@ -109,6 +109,8 @@ COverlayTextureGL::COverlayTextureGL(const CDVDOverlayImage& o, CRect& rSource)
 
   glBindTexture(GL_TEXTURE_2D, 0);
 
+  m_isBitmapOverlay = true;
+
   if (o.source_width > 0 && o.source_height > 0)
   {
     m_pos = POSITION_RELATIVE;
@@ -182,6 +184,7 @@ COverlayTextureGL::COverlayTextureGL(const CDVDOverlaySpu& o)
   m_width = static_cast<float>(max_x - min_x);
   m_height = static_cast<float>(max_y - min_y);
   m_pma = !!USE_PREMULTIPLIED_ALPHA;
+  m_isBitmapOverlay = true;
 }
 
 std::shared_ptr<COverlay> COverlay::Create(ASS_Image* images, float width, float height)

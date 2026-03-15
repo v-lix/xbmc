@@ -226,6 +226,8 @@ COverlayImageDX::COverlayImageDX(const CDVDOverlayImage& o, CRect& rSource)
     Load(rgba.data(), o.width, o.height, o.width * 4);
   }
 
+  m_isBitmapOverlay = true;
+
   if (o.source_width > 0 && o.source_height > 0)
   {
     m_pos = POSITION_RELATIVE;
@@ -286,6 +288,7 @@ COverlayImageDX::COverlayImageDX(const CDVDOverlaySpu& o)
   m_y = static_cast<float>(min_y + o.y);
   m_width = static_cast<float>(max_x - min_x);
   m_height = static_cast<float>(max_y - min_y);
+  m_isBitmapOverlay = true;
 }
 
 void COverlayImageDX::Load(const uint32_t* rgba, int width, int height, int stride)

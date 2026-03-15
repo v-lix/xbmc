@@ -82,6 +82,7 @@ namespace OVERLAY {
 
     int m_3dSubtitleDepth{0};
     bool m_pgsSubtitle{false};
+    bool m_isBitmapOverlay{false};
 
   protected:
     /*!

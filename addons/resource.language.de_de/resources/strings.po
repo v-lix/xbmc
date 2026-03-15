@@ -19584,6 +19584,14 @@ msgctxt "#69211"
 msgid "Luma"
 msgstr "Luma"
 
+msgctxt "#69212"
+msgid "Bitmap subtitle zoom"
+msgstr "Bitmap-Untertitel Zoom"
+
+msgctxt "#69213"
+msgid "Scale bitmap-based subtitles (PGS, VobSub). 100% is original size. Lower values shrink, higher values enlarge."
+msgstr "Bildbasierte Untertitel (PGS, VobSub) skalieren. 100% ist die Originalgröße. Niedrigere Werte verkleinern, höhere vergrößern."
+
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."
 msgstr "Aktiviere diese Option, um die Rauschunterdrückung zu deaktivieren und die Videoverarbeitung zu verbessern. Ein Neustart ist erforderlich."

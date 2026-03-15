@@ -931,6 +931,18 @@
           </dependencies>
           <control type="list" format="string" />
         </setting>
+        <setting id="subtitles.bitmapzoom" type="integer" label="69212" help="69213">
+          <level>1</level>
+          <default>100</default>
+          <constraints>
+            <minimum>50</minimum>
+            <step>5</step>
+            <maximum>200</maximum>
+          </constraints>
+          <control type="slider" format="integer">
+            <formatlabel>14047</formatlabel>
+          </control>
+        </setting>
       </group>
       <group id="4" label="39187">
         <setting id="subtitles.parsecaptions" type="boolean" label="24130" help="24131">

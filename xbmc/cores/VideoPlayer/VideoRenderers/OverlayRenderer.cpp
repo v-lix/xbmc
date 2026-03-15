@@ -243,6 +243,34 @@ void CRenderer::Render(COverlay* o)
 
   state.x += GetStereoscopicDepth(o->m_pgsSubtitle, o->m_3dSubtitleDepth);
 
+  if (o->m_isBitmapOverlay)
+  {
+    float zoom = static_cast<float>(
+                     CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+                         CSettings::SETTING_SUBTITLES_BITMAPZOOM)) /
+                 100.0f;
+    if (zoom != 1.0f)
+    {
+      if (o->m_pos == COverlay::POSITION_RELATIVE)
+      {
+        // x/y are center-based; shift center down by half the height difference
+        // so the scaled subtitle visually centers within its old bounding box
+        state.y += state.height * (1.0f - zoom) * 0.5f;
+        state.width *= zoom;
+        state.height *= zoom;
+      }
+      else
+      {
+        // x/y are top-left; keep horizontal center, shift down by height difference
+        float cx = state.x + state.width * 0.5f;
+        state.y += state.height * (1.0f - zoom);
+        state.width *= zoom;
+        state.height *= zoom;
+        state.x = cx - state.width * 0.5f;
+      }
+    }
+  }
+
   o->Render(state);
 }
 

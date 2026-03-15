@@ -169,7 +169,9 @@ COverlayTextureGLES::COverlayTextureGLES(const CDVDOverlayImage& o, CRect& rSour
   }
 
   m_isHdrPqAuthored = o.m_isHdrPq;
+  m_isBitmapOverlay = true;
 
+  glGenerateMipmap(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, 0);
 
   if (o.source_width > 0 && o.source_height > 0)
@@ -236,6 +238,7 @@ COverlayTextureGLES::COverlayTextureGLES(const CDVDOverlaySpu& o)
   LoadTexture(GL_TEXTURE_2D, max_x - min_x, max_y - min_y, o.width * 4, &m_u, &m_v, false,
               rgba.data() + min_x + min_y * o.width);
 
+  glGenerateMipmap(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, 0);
 
   m_align = ALIGN_VIDEO;
@@ -245,6 +248,7 @@ COverlayTextureGLES::COverlayTextureGLES(const CDVDOverlaySpu& o)
   m_width = static_cast<float>(max_x - min_x);
   m_height = static_cast<float>(max_y - min_y);
   m_pma = !!USE_PREMULTIPLIED_ALPHA;
+  m_isBitmapOverlay = true;
 }
 
 std::shared_ptr<COverlay> COverlay::Create(ASS_Image* images, float width, float height)
@@ -426,7 +430,8 @@ void COverlayTextureGLES::Render(SRenderState& state)
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                  m_isBitmapOverlay ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
 
   CRect rd;
   if (m_pos == POSITION_RELATIVE)

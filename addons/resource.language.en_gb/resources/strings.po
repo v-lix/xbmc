@@ -26592,6 +26592,18 @@ msgctxt "#69211"
 msgid "Luma"
 msgstr ""
 
+#. Label for setting "Bitmap subtitle zoom"
+#: system/settings/settings.xml
+msgctxt "#69212"
+msgid "Bitmap subtitle zoom"
+msgstr ""
+
+#. Help text for setting "Bitmap subtitle zoom"
+#: system/settings/settings.xml
+msgctxt "#69213"
+msgid "Scale bitmap-based subtitles (PGS, VobSub). 100% is original size. Lower values shrink, higher values enlarge."
+msgstr ""
+
 #: system/settings/settings.xml
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."
