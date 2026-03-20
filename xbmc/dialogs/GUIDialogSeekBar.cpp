@@ -30,21 +30,19 @@ CGUIDialogSeekBar::CGUIDialogSeekBar(void)
 
 CGUIDialogSeekBar::~CGUIDialogSeekBar(void) = default;
 
-void CGUIDialogSeekBar::OnWindowLoaded()
-{
-  CGUIDialog::OnWindowLoaded();
-  // Keep textures allocated between open/close cycles to avoid synchronous
-  // image decodes on the GUI thread when the seekbar appears during playback.
-  DynamicResourceAlloc(false);
-}
-
 bool CGUIDialogSeekBar::OnMessage(CGUIMessage& message)
 {
   switch (message.GetMessage())
   {
   case GUI_MSG_WINDOW_INIT:
-  case GUI_MSG_WINDOW_DEINIT:
     return CGUIDialog::OnMessage(message);
+  case GUI_MSG_WINDOW_DEINIT:
+    // Keep textures allocated across close/open cycles to avoid synchronous
+    // image decodes on the GUI thread causing frame drops during playback.
+    m_dynamicResourceAlloc = false;
+    CGUIDialog::OnMessage(message);
+    m_dynamicResourceAlloc = true;
+    return true;
   case GUI_MSG_ITEM_SELECT:
     if (message.GetSenderId() == GetID() &&
         (message.GetControlId() == POPUP_SEEK_PROGRESS ||

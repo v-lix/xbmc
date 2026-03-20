@@ -28,20 +28,9 @@ CGUIDialogVideoOSD::CGUIDialogVideoOSD(void)
     : CGUIDialog(WINDOW_DIALOG_VIDEO_OSD, "VideoOSD.xml")
 {
   m_loadType = LOAD_ON_GUI_INIT;
-  m_dynamicResourceAlloc = false;
 }
 
 CGUIDialogVideoOSD::~CGUIDialogVideoOSD(void) = default;
-
-void CGUIDialogVideoOSD::OnWindowLoaded()
-{
-  CGUIDialog::OnWindowLoaded();
-  // CGUIWindow::OnWindowLoaded() resets DynamicResourceAlloc to true for all controls.
-  // Override back to false so OSD textures stay allocated between open/close cycles,
-  // avoiding synchronous FFmpegImage decodes (swscaler) on the GUI thread that cause
-  // frame drops during playback.
-  DynamicResourceAlloc(false);
-}
 
 void CGUIDialogVideoOSD::FrameMove()
 {
@@ -107,8 +96,14 @@ bool CGUIDialogVideoOSD::OnMessage(CGUIMessage& message)
       pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_SUBTITLE_OSD_SETTINGS);
       if (pDialog && pDialog->IsDialogRunning())
         pDialog->Close(true);
+
+      // Keep textures allocated across close/open cycles to avoid synchronous
+      // image decodes (swscaler) on the GUI thread causing frame drops.
+      m_dynamicResourceAlloc = false;
+      CGUIDialog::OnMessage(message);
+      m_dynamicResourceAlloc = true;
+      return true;
     }
-    break;
   }
   return CGUIDialog::OnMessage(message);
 }
