@@ -18773,48 +18773,48 @@ msgid "DV VS10 for SDR8 video"
 msgstr "SDR8"
 
 msgctxt "#60052"
-msgid "Use DV VS10 output target mode for SDR8 video."
-msgstr "DV VS10-Zielmodus für SDR8-Inhalte."
+msgid "Select output format when playing 8-bit SDR content. Off = passthrough. SDR BT.2020 content always bypasses VS10 to preserve the original color gamut."
+msgstr "Ausgabeformat für 8-Bit-SDR-Inhalte wählen. Aus = Durchleitung. SDR-BT.2020-Inhalte umgehen VS10 immer, um den originalen Farbraum zu erhalten."
 
 msgctxt "#60053"
 msgid "DV VS10 for SDR10 video"
 msgstr "SDR10"
 
 msgctxt "#60054"
-msgid "Use DV VS10 output target mode for SDR10 video."
-msgstr "DV VS10-Zielmodus für SDR10-Inhalte."
+msgid "Select output format when playing 10-bit SDR content. Off = passthrough. SDR BT.2020 content always bypasses VS10 to preserve the original color gamut."
+msgstr "Ausgabeformat für 10-Bit-SDR-Inhalte wählen. Aus = Durchleitung. SDR-BT.2020-Inhalte umgehen VS10 immer, um den originalen Farbraum zu erhalten."
 
 msgctxt "#60055"
 msgid "DV VS10 for HDR10 video"
 msgstr "HDR10"
 
 msgctxt "#60056"
-msgid "Use DV VS10 output target mode for HDR10 video."
-msgstr "DV VS10-Zielmodus für HDR10-Inhalte."
+msgid "Select output format when playing HDR10 content. Off = native HDR10 passthrough."
+msgstr "Ausgabeformat für HDR10-Inhalte wählen. Aus = native HDR10-Durchleitung."
 
 msgctxt "#60057"
-msgid "DV VS10 for HDR10+ video (HDR10 data only)"
-msgstr "HDR10+ (nur HDR10-Daten)"
+msgid "DV VS10 for HDR10+ video"
+msgstr "HDR10+"
 
 msgctxt "#60058"
-msgid "Use DV VS10 output target mode for HDR10+ video (does not use the HDR10+ dynamic metadata)."
-msgstr "DV VS10 Zielmodus für HDR10+-Inhalte (ohne Nutzung der dynamischen HDR10+-Metadaten)."
+msgid "Select output format when playing HDR10+ content. Only static HDR10 metadata is used — dynamic HDR10+ metadata is not passed to the DV engine."
+msgstr "Ausgabeformat für HDR10+-Inhalte wählen. Nur statische HDR10-Metadaten werden verwendet — dynamische HDR10+-Metadaten werden nicht an die DV-Engine übergeben."
 
 msgctxt "#60059"
 msgid "DV VS10 for HLG video"
 msgstr "HLG-HDR"
 
 msgctxt "#60060"
-msgid "Use DV VS10 output target mode for HLG video."
-msgstr "DV VS10 Zielmodus für HDR-HLG-Inhalte."
+msgid "Select output format when playing HLG content. Off = native HLG passthrough."
+msgstr "Ausgabeformat für HLG-Inhalte wählen. Aus = native HLG-Durchleitung."
 
 msgctxt "#60061"
 msgid "DV VS10 for DV video"
 msgstr "Dolby Vision"
 
 msgctxt "#60062"
-msgid "Use DV VS10 output target mode for DV video."
-msgstr "DV VS10 Zielmodus für Dolby Vision-Inhalte."
+msgid "Select output format when playing Dolby Vision content. DV = native DV tunnel. SDR = convert to SDR."
+msgstr "Ausgabeformat für Dolby Vision-Inhalte wählen. DV = nativer DV-Tunnel. SDR = Konvertierung zu SDR."
 
 msgctxt "#60063"
 msgid "Off"

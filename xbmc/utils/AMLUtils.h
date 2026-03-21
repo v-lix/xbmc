@@ -11,6 +11,10 @@
 #include "windowing/Resolution.h"
 #include "utils/StreamDetails.h"
 
+extern "C" {
+#include <libavutil/pixfmt.h>
+}
+
 #include <string>
 #include <vector>
 
@@ -132,7 +136,7 @@ struct xbmc_dv_cap
   static inline std::string dv_vsvdb_s = "";
 };
 unsigned int aml_dv_dolby_vision_mode();
-void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth);
+void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries = AVCOL_PRI_UNSPECIFIED);
 void aml_dv_close();
 void aml_dv_set_osd_max(int max);
 void aml_dv_set_osd_brightness(int nits);

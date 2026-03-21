@@ -25394,7 +25394,7 @@ msgstr ""
 #. "Dolby Vision VS10"
 #: system/settings/settings.xml
 msgctxt "#60052"
-msgid "Use DV VS10 output target mode for SDR8 video."
+msgid "Select output format when playing 8-bit SDR content. Off = passthrough. SDR BT.2020 content always bypasses VS10 to preserve the original color gamut."
 msgstr ""
 
 #. "Dolby Vision VS10"
@@ -25406,7 +25406,7 @@ msgstr ""
 #. "Dolby Vision VS10"
 #: system/settings/settings.xml
 msgctxt "#60054"
-msgid "Use DV VS10 output target mode for SDR10 video."
+msgid "Select output format when playing 10-bit SDR content. Off = passthrough. SDR BT.2020 content always bypasses VS10 to preserve the original color gamut."
 msgstr ""
 
 #. "Dolby Vision VS10"
@@ -25418,19 +25418,19 @@ msgstr ""
 #. "Dolby Vision VS10"
 #: system/settings/settings.xml
 msgctxt "#60056"
-msgid "Use DV VS10 output target mode for HDR10 video."
+msgid "Select output format when playing HDR10 content. Off = native HDR10 passthrough."
 msgstr ""
 
 #. "Dolby Vision VS10"
 #: system/settings/settings.xml
 msgctxt "#60057"
-msgid "DV VS10 for HDR10+ video (HDR10 data only)"
+msgid "DV VS10 for HDR10+ video"
 msgstr ""
 
 #. "Dolby Vision VS10"
 #: system/settings/settings.xml
 msgctxt "#60058"
-msgid "Use DV VS10 output target mode for HDR10+ video (does not use the HDR10+ dynamic metadata)."
+msgid "Select output format when playing HDR10+ content. Only static HDR10 metadata is used — dynamic HDR10+ metadata is not passed to the DV engine."
 msgstr ""
 
 #. "Dolby Vision VS10"
@@ -25442,7 +25442,7 @@ msgstr ""
 #. "Dolby Vision VS10"
 #: system/settings/settings.xml
 msgctxt "#60060"
-msgid "Use DV VS10 output target mode for HLG video."
+msgid "Select output format when playing HLG content. Off = native HLG passthrough."
 msgstr ""
 
 #. "Dolby Vision VS10"
@@ -25454,7 +25454,7 @@ msgstr ""
 #. "Dolby Vision VS10"
 #: system/settings/settings.xml
 msgctxt "#60062"
-msgid "Use DV VS10 output target mode for DV video."
+msgid "Select output format when playing Dolby Vision content. DV = native DV tunnel. SDR = convert to SDR."
 msgstr ""
 
 #. "Dolby Vision VS10"

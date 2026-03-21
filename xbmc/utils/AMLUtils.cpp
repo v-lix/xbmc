@@ -951,11 +951,21 @@ unsigned int aml_dv_dolby_vision_mode()
   return dolby_vision_mode.Get<unsigned int>().value();
 }
 
-void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth)
+void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries)
 {
   enum DV_MODE dv_mode(aml_dv_mode());
   CLog::Log(LOGINFO, "AMLUtils::{} - Checking DV for DV mode: [{}], DV type: [{}]", __FUNCTION__, aml_dv_mode_to_string(dv_mode), aml_dv_type_to_string(aml_dv_type()));
   if (dv_mode == DV_MODE_ON || dv_mode == DV_MODE_ON_DEMAND) {
+
+    // SDR BT.2020 content: bypass VS10 — the DV library assumes SDR is BT.709
+    // and can't handle BT.2020 gamut correctly. Bypass preserves original signaling.
+    if (hdrType == StreamHdrType::HDR_TYPE_NONE && colorPrimaries == AVCOL_PRI_BT2020)
+    {
+      CLog::Log(LOGINFO, "AMLUtils::{} - SDR BT.2020 detected, bypassing VS10 to preserve gamut", __FUNCTION__);
+      if (aml_is_dv_enable())
+        aml_dv_off();
+      return;
+    }
 
     unsigned int vs10_mode = aml_vs10_by_hdrtype(hdrType, bitDepth);    
 
