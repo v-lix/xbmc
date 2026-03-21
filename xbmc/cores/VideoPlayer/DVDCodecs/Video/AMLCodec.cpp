@@ -2089,7 +2089,7 @@ bool CAMLCodec::OpenDecoder()
   bool skipWindowed = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
       CSettings::SETTING_COREELEC_AMLOGIC_DV_SKIP_WINDOWED);
   if (m_fullscreen || !skipWindowed)
-    aml_dv_open(hints.hdrType, hints.bitdepth);
+    aml_dv_open(hints.hdrType, hints.bitdepth, hints.colorPrimaries);
 
   // Now have the HDRType resolved, ok to set the transfer pq - so renderer can set the shaders as needed.
   aml_set_transfer_pq(hints.hdrType, hints.bitdepth);
