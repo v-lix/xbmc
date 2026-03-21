@@ -633,9 +633,10 @@ void CDVDAudioCodecPassthrough::Reset()
     m_nextPts = DVD_NOPTS_VALUE;
     m_parser.Reset();
 
-    // Reset PackerMAT state for TrueHD to avoid stale state after seek
-    if (m_packerMAT)
-      m_packerMAT->Reset();
+    // Do NOT reset PackerMAT here — the baseline path's built-in seek detection
+    // (padding overflow > MAT_BUFFER_SIZE*5 → self-reset) handles stale state
+    // correctly and provides a natural ~500ms settling time before first MAT
+    // output, which TrueHD HBR receivers need after an HDMI audio interruption.
   }
 }
 
