@@ -8711,7 +8711,7 @@ msgstr ""
 
 #: system/settings/settings.xml
 msgctxt "#14281"
-msgid "Enable this to disable noise reduction. Requires reboot."
+msgid "Turn off the hardware noise reduction filter. Recommended for better video quality. Requires reboot."
 msgstr ""
 
 #: system/settings/settings.xml
@@ -25292,7 +25292,7 @@ msgstr ""
 #. "Dolby Vision"
 #: system/settings/settings.xml
 msgctxt "#60017"
-msgid "Set the maximum luminance for the GUI menus in cd/m^2"
+msgid "Limits the OSD peak brightness when DV mode is set to On. The DV OSD peak brightness setting takes over during video playback."
 msgstr ""
 
 #. "Dolby Vision Type"
@@ -25304,7 +25304,7 @@ msgstr ""
 #. "Dolby Vision Type"
 #: system/settings/settings.xml
 msgctxt "#60022"
-msgid "Set type of DV output to use with display capability."
+msgid "Select how Dolby Vision content is processed. Display-Led: sends the full DV stream to the TV, which handles tonemapping. Player-Led modes: the player tonemaps and outputs as DV low-latency (LLDV) or HDR10, depending on the variant. VS10 Only: disables DV tunnel and only uses VS10 format conversion."
 msgstr ""
 
 #. "Dolby Vision Type"
@@ -25340,7 +25340,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60032"
-msgid "Set DV VSVDB to replace Display DV VSVDB EDID with your specified values for Display \"Colour Space\" and \"Maximum Luminance\". If Display does not have a DV VSVDB EDID then these settings values will be used even if the \"Set DV VSVDB\" is set to Off. Toggle this setting from Off-On-Off to show your Display DV VSVDB EDID values."
+msgid "When Off, colour space and max luminance are auto-detected from the display's EDID. When On, the max luminance below is used instead of the EDID value (colour space is still auto-detected unless manually set). Use Override EDID for full manual control."
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25514,7 +25514,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60072"
-msgid "Set DV Colour Space based on your Display capability. If Display does not have a DV VSVDB EDID then this setting value will be used even if the \"Set DV VSVDB\" is set to Off. Toggle the \"Set DV VSVDB\" setting from Off-On-Off to show your Display Colour Space DV VSVDB EDID value - DISPLAY will show if non-standard Colour Space."
+msgid "Colour gamut reported to the DV engine. Should match your display's actual capability. DISPLAY uses the raw EDID primaries. Auto-detected from EDID when DV VSVDB is Off."
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25526,7 +25526,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60074"
-msgid "Set DV VSVDB Payload Minimum Luminance in PQ (cd/m^2)"
+msgid "Minimum luminance (in PQ values) reported in the VSVDB payload. Only editable when Override EDID is enabled."
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25538,7 +25538,7 @@ msgstr ""
 #. "Dolby Vision VSVDB"
 #: system/settings/settings.xml
 msgctxt "#60076"
-msgid "Set DV Maximum Luminance based on your Display capability. If Display does not have a DV VSVDB EDID then this setting value will be used even if the \"Set DV VSVDB\" is set to Off. Toggle the \"Set DV VSVDB\" setting from Off-On-Off to show your Display Maximum Luminance DV VSVDB EDID value."
+msgid "Peak brightness (nits) of your display, reported to the DV engine. Auto-detected from EDID when DV VSVDB is Off. Set manually when DV VSVDB is On or when the display has no EDID DV data."
 msgstr ""
 
 #. "Dolby Vision VSVDB"
@@ -25592,7 +25592,7 @@ msgstr ""
 #. "Dolby Vision HDR10+"
 #: system/settings/settings.xml
 msgctxt "#60102"
-msgid "Set to On to dynamically convert HDR10+ video to DV profile 8.1 video during playback."
+msgid "Converts HDR10+ dynamic metadata to DV profile 8.1 in real time, allowing the DV engine to apply scene-by-scene tonemapping for HDR10+ content."
 msgstr ""
 
 #. "Dolby Vision HDR10+"
@@ -25604,7 +25604,7 @@ msgstr ""
 #. "Dolby Vision HDR10+"
 #: system/settings/settings.xml
 msgctxt "#60104"
-msgid "Source for Peak Brightness when converting from HDR10+ to DV profile 8.1. (port from dovi_tool Aug. 2024)"
+msgid "Method used to determine scene peak brightness during HDR10+ to DV conversion. Histogram uses the brightness distribution, max-scl uses the brightest pixel per channel, histogram-plus combines both approaches."
 msgstr ""
 
 #. "Dolby Vision HDR10+"
@@ -25688,13 +25688,13 @@ msgstr ""
 #. "Dolby Vision Display Led Level 5 Handling"
 #: system/settings/settings.xml
 msgctxt "#60152"
-msgid "Enable this setting when using Level 5 as Source and the OSD/Subtitles are being hidden"
+msgid "Fix OSD/subtitles with Level 5 source metadata"
 msgstr ""
 
 #. "Dolby Vision Display Led Level 5 Handling"
 #: system/settings/settings.xml
 msgctxt "#60153"
-msgid "This setting allows you to see the OSD or Subtitles when using Level 5 as Source and your display not displaying them correctly."
+msgid "Enable if OSD or subtitles are invisible when using Level 5 as source. Some displays crop or hide overlays based on the Level 5 active area metadata."
 msgstr ""
 
 #. "Dolby Vision Display Led Level 5 Handling"
@@ -25826,7 +25826,7 @@ msgstr ""
 #. "Dolby Vision Video Processor"
 #: system/settings/settings.xml
 msgctxt "#60502"
-msgid "Set when using a Video Processor (VP) since there will be no DV Dynamic Tone Mapping (DTM). All DV video output signal types are full capability DV (i.e., FEL). The VP feature only works with DV Mode On Demand. HDR10 modes include HDR10 InfoFrame Metadata and can be used without a VP with displays that perform well with HDR10."
+msgid "Select the DV output format for VP mode. VP bypasses the DV library's tonemapping and outputs the content with minimal processing. Designed for external video processors (e.g. MadVR Envy), but the HDR10 modes can also be used with displays that handle HDR10 tonemapping well. Requires DV Mode On Demand."
 msgstr ""
 
 #. "Dolby Vision Video Processor"
@@ -26047,7 +26047,7 @@ msgstr ""
 #. "Dolby Vision Video Processor"
 #: system/settings/settings.xml
 msgctxt "#60539"
-msgid "Options for DV Video Processor Mode are:  A) No DV Dynamic Tone Mapping (DTM) applied. B) Maintains colorist DV (L2) trims DTM without maximum luminance compression."
+msgid "Controls which DV processing stages are bypassed in VP mode. Higher levels bypass more: CVM (tonemapping), CSC (colour space conversion), Core3 output. Currently auto-configured based on content profile and VP mode."
 msgstr ""
 
 #. "Dolby Vision Video Processor"
@@ -26425,13 +26425,13 @@ msgstr ""
 #. VP Auto setting label
 #: system/settings/settings.xml
 msgctxt "#60602"
-msgid "Set for Auto selection between Player Led and Video Processor settings"
+msgid "Auto VP based on content brightness"
 msgstr ""
 
 #. Help text for VP Auto setting
 #: system/settings/settings.xml
 msgctxt "#60603"
-msgid "Set this option to let the software automatically select between using normal Player Led versus Video Processor (VP) settings depending on your Display Max Lum capability (shown below) and the DV Video mastered MDL. When VP is in use the OSD will be a different colour. This feature only works with DV Mode On Demand."
+msgid "Automatically switch to VP mode (no tonemapping) when the content's mastered brightness is within your display's capability. When content exceeds the display's max luminance, Player-Led mode with full DV tonemapping is used instead. Requires DV Mode On Demand."
 msgstr ""
 
 #. Reset PTS offset on seek setting
