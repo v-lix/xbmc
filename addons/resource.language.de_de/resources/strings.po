@@ -19505,8 +19505,8 @@ msgid "Reduce color banding (VS10)"
 msgstr "Farbbanding reduzieren (VS10)"
 
 msgctxt "#60613"
-msgid "Preserve 12-bit precision through the VPP and enable HDMI TX dithering to reduce visible banding in color gradients during VS10 playback. Disabled by default as it changes the VPP data path."
-msgstr "12-Bit-Präzision im VPP beibehalten und HDMI-TX-Dithering aktivieren, um sichtbares Banding in Farbverläufen bei VS10-Wiedergabe zu reduzieren. Standardmäßig deaktiviert, da der VPP-Datenpfad geändert wird."
+msgid "Preserve 12-bit precision through the VPP and enable HDMI TX dithering to reduce visible banding in color gradients during VS10 playback. Disabled by default."
+msgstr "12-Bit-Präzision im VPP beibehalten und HDMI-TX-Dithering aktivieren, um sichtbares Banding in Farbverläufen bei VS10-Wiedergabe zu reduzieren. Standardmäßig aktiviert."
 
 msgctxt "#69196"
 msgid "Convert DV Profile 7 FEL to MEL or to Profile 8.1"
