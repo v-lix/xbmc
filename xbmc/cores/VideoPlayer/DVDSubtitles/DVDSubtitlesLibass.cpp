@@ -312,7 +312,11 @@ ASS_Image* CDVDSubtitlesLibass::RenderImage(double pts,
         static_cast<int>((opts.frameWidth - std::min(opts.videoWidth, opts.frameWidth)) / 2);
   }
 
-  ass_set_margins(m_renderer, marginTop, marginTop, marginLeft, marginLeft);
+  ass_set_margins(m_renderer,
+                  marginTop + opts.activeAreaMarginTop,
+                  marginTop + opts.activeAreaMarginBottom,
+                  marginLeft + opts.activeAreaMarginLeft,
+                  marginLeft + opts.activeAreaMarginRight);
   ass_set_use_margins(m_renderer, 0);
 
   float fontScale{1.0f};

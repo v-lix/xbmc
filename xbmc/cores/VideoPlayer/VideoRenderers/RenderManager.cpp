@@ -697,27 +697,35 @@ RESOLUTION CRenderManager::GetResolution()
   return res;
 }
 
-bool CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst)
+void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst)
 {
-  // Setup - DV Active Area (L5) Overlay handling.
+  // DV L5 active area: compute margins to push text subs inside the active content area.
+  // Only modifies libass margins — does not touch src/dst rects or font scaling.
+  // PGS bitmap subs are unaffected (they don't go through the libass margin path).
   if ((m_picture.hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION) || !aml_dv_use_active_area())
-    return false;
+  {
+    m_overlays.SetActiveAreaMargins(0, 0, 0, 0);
+    m_overlays.SetForceInside(false);
+    return;
+  }
 
-  // Calculate scaling factors from source to destination
+  const auto doviStreamMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
+  if (!doviStreamMeta.has_level5_metadata)
+  {
+    m_overlays.SetActiveAreaMargins(0, 0, 0, 0);
+    m_overlays.SetForceInside(false);
+    return;
+  }
+
   float scaleX = static_cast<float>(dst.Width()) / src.Width();
   float scaleY = static_cast<float>(dst.Height()) / src.Height();
 
-  // Use stream-level L5 metadata (stable, avoids per-frame PTS timing flicker)
-  const auto doviStreamMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
-  if (!doviStreamMeta.has_level5_metadata)
-    return false;
-
-  dst.x1 += static_cast<int>(doviStreamMeta.level5_active_area_left_offset   * scaleX);
-  dst.x2 -= static_cast<int>(doviStreamMeta.level5_active_area_right_offset  * scaleX);
-  dst.y1 += static_cast<int>(doviStreamMeta.level5_active_area_top_offset    * scaleY);
-  dst.y2 -= static_cast<int>(doviStreamMeta.level5_active_area_bottom_offset * scaleY);
-
-  return true;
+  m_overlays.SetActiveAreaMargins(
+      static_cast<int>(doviStreamMeta.level5_active_area_top_offset    * scaleY),
+      static_cast<int>(doviStreamMeta.level5_active_area_bottom_offset * scaleY),
+      static_cast<int>(doviStreamMeta.level5_active_area_left_offset   * scaleX),
+      static_cast<int>(doviStreamMeta.level5_active_area_right_offset  * scaleX));
+  m_overlays.SetForceInside(true);
 }
 
 void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
@@ -753,7 +761,7 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
     m_renderedOverlay = m_overlays.HasOverlay(m_presentsource);
     CRect src, dst, view;
     m_pRenderer->GetVideoRect(src, dst, view);
-    m_overlays.SetForceInside(CalcOverlayActiveArea(src, dst));
+    CalcOverlayActiveArea(src, dst);
     m_overlays.SetVideoRect(src, dst, view);
     m_overlays.Render(m_presentsource);
 

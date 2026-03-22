@@ -258,7 +258,7 @@ protected:
   bool m_hasCaptures = false;
 
 private:
-  bool CalcOverlayActiveArea(CRect& src, CRect& dst);
+  void CalcOverlayActiveArea(CRect& src, CRect& dst);
 
   CDataCacheCore &m_dataCacheCore;
   std::shared_ptr<const CApplicationPlayer> m_appPlayer;

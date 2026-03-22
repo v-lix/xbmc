@@ -122,6 +122,7 @@ namespace OVERLAY {
     void SetVideoRect(CRect &source, CRect &dest, CRect &view);
     void SetStereoMode(const std::string &stereomode);
     void SetForceInside(bool forceInside);
+    void SetActiveAreaMargins(int top, int bottom, int left, int right);
 
     /*!
      * \brief Set the subtitle vertical position,
@@ -190,6 +191,10 @@ namespace OVERLAY {
     CRect m_rd; // Video size, may be influenced by video settings (e.g. zoom)
     std::string m_stereomode;
     bool m_forceInside = false;
+    int m_activeAreaMarginTop{0};
+    int m_activeAreaMarginBottom{0};
+    int m_activeAreaMarginLeft{0};
+    int m_activeAreaMarginRight{0};
     // Current subtitle position
     int m_subtitlePosition{0};
     // Current subtitle position from resolution info,

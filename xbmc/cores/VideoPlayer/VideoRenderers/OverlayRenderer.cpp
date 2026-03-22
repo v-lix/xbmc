@@ -318,6 +318,14 @@ void CRenderer::SetForceInside(bool forceInside)
   m_forceInside = forceInside;
 }
 
+void CRenderer::SetActiveAreaMargins(int top, int bottom, int left, int right)
+{
+  m_activeAreaMarginTop = top;
+  m_activeAreaMarginBottom = bottom;
+  m_activeAreaMarginLeft = left;
+  m_activeAreaMarginRight = right;
+}
+
 void CRenderer::SetSubtitleVerticalPosition(const int value, bool save)
 {
   std::unique_lock<CCriticalSection> lock(m_section);
@@ -541,11 +549,17 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
   {
     if (m_subtitleAlign == SUBTITLES::Align::BOTTOM_OUTSIDE)
       m_subtitleAlign = SUBTITLES::Align::BOTTOM_INSIDE;
-    else if (m_subtitleAlign == SUBTITLES::Align::TOP_OUTSIDE) 
+    else if (m_subtitleAlign == SUBTITLES::Align::TOP_OUTSIDE)
       m_subtitleAlign = SUBTITLES::Align::TOP_INSIDE;
-    
+
     rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::INSIDE_VIDEO;
   }
+
+  // DV L5 active area: add extra margins to keep text subs inside active content area
+  rOpts.activeAreaMarginTop = m_activeAreaMarginTop;
+  rOpts.activeAreaMarginBottom = m_activeAreaMarginBottom;
+  rOpts.activeAreaMarginLeft = m_activeAreaMarginLeft;
+  rOpts.activeAreaMarginRight = m_activeAreaMarginRight;
 
   // changes: Detect changes from previously rendered images, if > 0 they are changed
   int changes = 0;
