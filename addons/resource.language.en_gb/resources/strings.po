@@ -25754,13 +25754,13 @@ msgstr ""
 #. "Dolby Vision Display Led Restrict Overlays"
 #: system/settings/settings.xml
 msgctxt "#60190"
-msgid "Set to On to auto adjust subtitles further into the DV video/screen area"
+msgid "Restrict subtitles to DV active area"
 msgstr ""
 
 #. "Dolby Vision Display Led Restrict Overlays"
 #: system/settings/settings.xml
 msgctxt "#60191"
-msgid "Set to On only if subtitles are being position outside of the DV video/screen and not visible. This setting will automatically adjust the subtitles further into the DV video/screen area so they become visible. This setting only works for DV videos."
+msgid "Reposition subtitles to fit within the Level 5 active content area during Display-Led DV playback. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles that are positioned outside the active video area."
 msgstr ""
 
 #. "Dolby Vision Display LL Dolby VSVDB Limit"

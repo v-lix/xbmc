@@ -707,12 +707,15 @@ bool CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst)
   float scaleX = static_cast<float>(dst.Width()) / src.Width();
   float scaleY = static_cast<float>(dst.Height()) / src.Height();
 
-  // Create active area rectangle based on scaled offsets
-  const auto& doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
-  dst.x1 += static_cast<int>(doviMeta.level5_active_area_left_offset   * scaleX);
-  dst.x2 -= static_cast<int>(doviMeta.level5_active_area_right_offset  * scaleX);
-  dst.y1 += static_cast<int>(doviMeta.level5_active_area_top_offset    * scaleY);
-  dst.y2 -= static_cast<int>(doviMeta.level5_active_area_bottom_offset * scaleY);
+  // Use stream-level L5 metadata (stable, avoids per-frame PTS timing flicker)
+  const auto doviStreamMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
+  if (!doviStreamMeta.has_level5_metadata)
+    return false;
+
+  dst.x1 += static_cast<int>(doviStreamMeta.level5_active_area_left_offset   * scaleX);
+  dst.x2 -= static_cast<int>(doviStreamMeta.level5_active_area_right_offset  * scaleX);
+  dst.y1 += static_cast<int>(doviStreamMeta.level5_active_area_top_offset    * scaleY);
+  dst.y2 -= static_cast<int>(doviStreamMeta.level5_active_area_bottom_offset * scaleY);
 
   return true;
 }

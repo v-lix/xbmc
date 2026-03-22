@@ -415,6 +415,15 @@ static void get_dovi_rpu_info(uint8_t* nal_buf, uint32_t nal_size, bool first_fr
       aml_dv_hdr10plus_conversion(hdr10plus_conversion);
     }
 	
+    if (vdr_dm_data && vdr_dm_data->dm_data.level5)
+    {
+      dovi_stream_metadata.has_level5_metadata = true;
+      dovi_stream_metadata.level5_active_area_left_offset = vdr_dm_data->dm_data.level5->active_area_left_offset;
+      dovi_stream_metadata.level5_active_area_right_offset = vdr_dm_data->dm_data.level5->active_area_right_offset;
+      dovi_stream_metadata.level5_active_area_top_offset = vdr_dm_data->dm_data.level5->active_area_top_offset;
+      dovi_stream_metadata.level5_active_area_bottom_offset = vdr_dm_data->dm_data.level5->active_area_bottom_offset;
+    }
+
     dovi_stream_metadata.meta_version = meta_version;
     dataCacheCore.SetVideoDoViStreamMetadata(dovi_stream_metadata);
     aml_dv_send_md_levels();

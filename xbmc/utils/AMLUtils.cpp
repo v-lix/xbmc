@@ -1062,7 +1062,9 @@ void aml_dv_set_xbmc_osd()
 
 bool aml_dv_use_active_area()
 {
-  return false;
+  return aml_is_dv_enable() &&
+         (aml_dv_dolby_vision_mode() == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL) &&
+         settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_ACTIVE_AREA);
 }
 
 enum DV_MODE aml_dv_mode()

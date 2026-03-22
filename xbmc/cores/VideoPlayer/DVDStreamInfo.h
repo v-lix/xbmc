@@ -57,6 +57,12 @@ struct DOVIStreamMetadata
   uint16_t level6_max_cll = 0;
   uint16_t level6_max_fall = 0;
 
+  bool has_level5_metadata = false;
+  uint16_t level5_active_area_left_offset = 0;
+  uint16_t level5_active_area_right_offset = 0;
+  uint16_t level5_active_area_top_offset = 0;
+  uint16_t level5_active_area_bottom_offset = 0;
+
   std::string meta_version = "";
 };
 

@@ -19013,12 +19013,12 @@ msgid "When using Display Led (DV-Std) and sending the source's level 6 metadata
 msgstr "Bei Verwendung von \"TV-Led (DV-Standard)\" und Senden der Level 6-Metadaten der Quelle festlegen, wie die Metadaten verarbeitet werden."
 
 msgctxt "#60190"
-msgid "Set to On to auto adjust subtitles further into the DV video/screen area"
-msgstr "Overlays einschränken"
+msgid "Restrict subtitles to DV active area"
+msgstr "Untertitel auf DV-Aktivbereich beschränken"
 
 msgctxt "#60191"
-msgid "Set to On only if subtitles are being position outside of the DV video/screen and not visible. This setting will automatically adjust the subtitles further into the DV video/screen area so they become visible. This setting only works for DV videos."
-msgstr "Nur auf \"Ein\" setzen, wenn Untertitel außerhalb des Video-/Bildschirmbereichs positioniert sind und nicht sichtbar sind. Diese Einstellung verschiebt die Untertitel automatisch weiter in den Video-/Bildschirmbereich, sodass sie sichtbar werden. Funktioniert nur bei DV-Videos."
+msgid "Reposition subtitles to fit within the Level 5 active content area during Display-Led DV playback. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles that are positioned outside the active video area."
+msgstr "Untertitel während TV-Led-DV-Wiedergabe in den Level-5-Aktivbereich verschieben. Aktivieren, wenn das Display Letterbox-Balken basierend auf Level-5-Metadaten beschneidet und Untertitel außerhalb des aktiven Videobereichs verborgen werden."
 
 msgctxt "#60200"
 msgid "Set Limit VSVDB luminance"
