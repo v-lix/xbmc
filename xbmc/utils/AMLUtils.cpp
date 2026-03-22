@@ -1016,6 +1016,13 @@ void aml_dv_display_trigger()
   }
 }
 
+void aml_hdr10plus_vsif_hold(bool hold)
+{
+  CSysfsPath p{"/sys/module/amhdmitx/parameters/hdr10plus_vsif_hold"};
+  if (p.Exists())
+    p.Set(hold ? 1 : 0);
+}
+
 void aml_dv_display_auto_now()
 {
   // hdmi tx store attr "now" - will trigger set_disp_mode_auto. 

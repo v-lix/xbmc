@@ -212,6 +212,7 @@ void CWinSystemAmlogicGLESContext::PresentRenderImpl(bool rendered)
     // tell any shared resources
     for (std::vector<IDispResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
       (*i)->OnResetDisplay();
+    aml_hdr10plus_vsif_hold(false);
   }
   if (!rendered)
     return;

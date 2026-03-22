@@ -143,6 +143,7 @@ void aml_dv_set_osd_brightness(int nits);
 void aml_dv_set_hdr10_osd_brightness(int nits);
 bool aml_is_dv_enable();
 void aml_dv_display_trigger();
+void aml_hdr10plus_vsif_hold(bool hold);
 void aml_dv_display_auto_now();
 void aml_dv_start();
 void aml_dv_set_subtitles(bool visible);

@@ -143,6 +143,10 @@ bool CWinSystemAmlogic::CreateNewWindow(const std::string& name,
     m_dispResetTimer.Set(std::chrono::milliseconds(static_cast<unsigned int>(delay * 100)));
   }
 
+  // Hold HDR10+ VSIF during mode switch to prevent TVs from receiving it
+  // before they have finished processing the resolution/HDR change.
+  aml_hdr10plus_vsif_hold(true);
+
   {
     std::unique_lock<CCriticalSection> lock(m_resourceSection);
     for (std::vector<IDispResource *>::iterator i = m_resources.begin(); i != m_resources.end(); ++i)
@@ -163,6 +167,7 @@ bool CWinSystemAmlogic::CreateNewWindow(const std::string& name,
     {
       (*i)->OnResetDisplay();
     }
+    aml_hdr10plus_vsif_hold(false);
   }
 
   // Make sure DV Display activates if enabled - TODO: Why needed?
