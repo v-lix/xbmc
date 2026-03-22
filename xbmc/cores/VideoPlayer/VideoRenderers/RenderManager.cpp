@@ -759,6 +759,10 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
       m_pRenderer->Update();
 
     m_renderedOverlay = m_overlays.HasOverlay(m_presentsource);
+    // Only signal subtitle presence for L5 suppression if subs aren't already
+    // restricted to the active area via margins. When restricted, L5 can stay
+    // active since subs won't be outside the cropped region.
+    aml_dv_set_subtitles(!aml_dv_use_active_area() && m_overlays.HasTextOverlay(m_presentsource));
     CRect src, dst, view;
     m_pRenderer->GetVideoRect(src, dst, view);
     CalcOverlayActiveArea(src, dst);

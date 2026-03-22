@@ -18969,12 +18969,12 @@ msgid "Enable this setting to send the original Source DV level 5 metadata to th
 msgstr "Ursprüngliche Level 5-Metadaten (Quelle) an das Display senden. Andernfalls wird für Level 5 der Metadatenwert 0 (Null) verwendet."
 
 msgctxt "#60152"
-msgid "Fix OSD/subtitles with Level 5 source metadata"
-msgstr "OSD/Untertitel-Fix bei Level-5-Quellmetadaten"
+msgid "Suppress Level 5 while overlays are visible"
+msgstr "Level 5 unterdrücken wenn Overlays sichtbar"
 
 msgctxt "#60153"
-msgid "Enable if OSD or subtitles are invisible when using Level 5 as source. Some displays crop or hide overlays based on the Level 5 active area metadata."
-msgstr "Aktivieren, wenn OSD oder Untertitel unsichtbar sind bei Verwendung von Level 5 als Quelle. Manche Displays beschneiden oder verbergen Overlays basierend auf den Level-5-Active-Area-Metadaten."
+msgid "Dynamically drops Level 5 source metadata while OSD or text subtitles are on screen, and restores it when they disappear. Image-based subtitles (PGS, VOBSUB) are excluded as they are already within the active area. When 'Restrict subtitles to DV active area' is also enabled, only OSD triggers suppression."
+msgstr "Level-5-Quellmetadaten werden dynamisch unterdrückt solange OSD oder Text-Untertitel angezeigt werden, und wiederhergestellt wenn sie verschwinden. Bildbasierte Untertitel (PGS, VOBSUB) sind ausgenommen, da sie bereits im Aktivbereich liegen. Bei aktivierter Untertitel-Aktivbereich-Beschränkung löst nur das OSD die Unterdrückung aus."
 
 msgctxt "#60160"
 msgid "Level 5"
@@ -19017,8 +19017,8 @@ msgid "Restrict subtitles to DV active area"
 msgstr "Untertitel auf DV-Aktivbereich beschränken"
 
 msgctxt "#60191"
-msgid "Reposition subtitles to fit within the Level 5 active content area during Display-Led DV playback. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles that are positioned outside the active video area."
-msgstr "Untertitel während TV-Led-DV-Wiedergabe in den Level-5-Aktivbereich verschieben. Aktivieren, wenn das Display Letterbox-Balken basierend auf Level-5-Metadaten beschneidet und Untertitel außerhalb des aktiven Videobereichs verborgen werden."
+msgid "Reposition text subtitles to fit within the Level 5 active content area during Display-Led DV playback. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles outside the active area. When combined with Level 5 suppression, only OSD triggers L5 drops since subtitles are already inside the active area."
+msgstr "Text-Untertitel während TV-Led-DV-Wiedergabe in den Level-5-Aktivbereich verschieben. Aktivieren, wenn das Display Letterbox-Balken basierend auf Level-5-Metadaten beschneidet. In Kombination mit Level-5-Unterdrückung löst nur das OSD L5-Drops aus, da Untertitel bereits im Aktivbereich liegen."
 
 msgctxt "#60200"
 msgid "Set Limit VSVDB luminance"

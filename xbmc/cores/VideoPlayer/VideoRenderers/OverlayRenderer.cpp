@@ -292,6 +292,20 @@ bool CRenderer::HasOverlay(int idx)
   return hasOverlay;
 }
 
+bool CRenderer::HasTextOverlay(int idx)
+{
+  std::unique_lock<CCriticalSection> lock(m_section);
+
+  for (const auto& e : m_buffers[idx])
+  {
+    if (e.overlay_dvd &&
+        (e.overlay_dvd->IsOverlayType(DVDOVERLAY_TYPE_TEXT) ||
+         e.overlay_dvd->IsOverlayType(DVDOVERLAY_TYPE_SSA)))
+      return true;
+  }
+  return false;
+}
+
 void CRenderer::SetVideoRect(CRect &source, CRect &dest, CRect &view)
 {
   if (m_rv != view) // Screen resolution is changed

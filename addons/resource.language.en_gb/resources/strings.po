@@ -25688,13 +25688,13 @@ msgstr ""
 #. "Dolby Vision Display Led Level 5 Handling"
 #: system/settings/settings.xml
 msgctxt "#60152"
-msgid "Fix OSD/subtitles with Level 5 source metadata"
+msgid "Suppress Level 5 while overlays are visible"
 msgstr ""
 
 #. "Dolby Vision Display Led Level 5 Handling"
 #: system/settings/settings.xml
 msgctxt "#60153"
-msgid "Enable if OSD or subtitles are invisible when using Level 5 as source. Some displays crop or hide overlays based on the Level 5 active area metadata."
+msgid "Dynamically drops Level 5 source metadata while OSD or text subtitles are on screen, and restores it when they disappear. Image-based subtitles (PGS, VOBSUB) are excluded as they are already within the active area. When 'Restrict subtitles to DV active area' is also enabled, only OSD triggers suppression."
 msgstr ""
 
 #. "Dolby Vision Display Led Level 5 Handling"
@@ -25760,7 +25760,7 @@ msgstr ""
 #. "Dolby Vision Display Led Restrict Overlays"
 #: system/settings/settings.xml
 msgctxt "#60191"
-msgid "Reposition subtitles to fit within the Level 5 active content area during Display-Led DV playback. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles that are positioned outside the active video area."
+msgid "Reposition text subtitles to fit within the Level 5 active content area during Display-Led DV playback. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles outside the active area. When combined with Level 5 suppression, only OSD triggers L5 drops since subtitles are already inside the active area."
 msgstr ""
 
 #. "Dolby Vision Display LL Dolby VSVDB Limit"

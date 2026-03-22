@@ -990,7 +990,6 @@ void CVideoPlayer::OpenDefaultStreams(bool reset)
       else if(stream.flags & StreamFlags::FLAG_FORCED)
         visible = true;
       break;
-      aml_dv_set_subtitles(visible); //TODO: Maybe not needed here
     }
   }
   if(!valid)
@@ -3608,7 +3607,6 @@ void CVideoPlayer::SetSubtitleVisible(bool bVisible)
   m_messenger.Put(
       std::make_shared<CDVDMsgBool>(CDVDMsg::PLAYER_SET_SUBTITLESTREAM_VISIBLE, bVisible));
   m_processInfo->GetVideoSettingsLocked().SetSubtitleVisible(bVisible);
-  aml_dv_set_subtitles(bVisible);
   CVariant data;
   data["player"]["playerid"] = m_item.GetProperty("playlist_type_hint").asInteger32(-1);
   data["property"]["subtitleenabled"] = bVisible;
@@ -3630,7 +3628,6 @@ void CVideoPlayer::SetSubtitleVisibleInternal(bool bVisible)
     std::static_pointer_cast<CDVDInputStreamNavigator>(m_pInputStream)->EnableSubtitleStream(bVisible);
 
   CServiceBroker::GetDataCacheCore().SignalSubtitleInfoChange();
-  aml_dv_set_subtitles(bVisible);
 }
 
 void CVideoPlayer::SetSubtitleVerticalPosition(int value, bool save)
