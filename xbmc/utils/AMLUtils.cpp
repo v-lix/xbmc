@@ -1018,7 +1018,7 @@ void aml_dv_display_trigger()
 
 void aml_hdr10plus_vsif_hold(bool hold)
 {
-  CSysfsPath p{"/sys/module/amhdmitx/parameters/hdr10plus_vsif_hold"};
+  CSysfsPath p{"/sys/module/hdmitx20/parameters/hdr10plus_vsif_hold"};
   if (p.Exists())
     p.Set(hold ? 1 : 0);
 }
