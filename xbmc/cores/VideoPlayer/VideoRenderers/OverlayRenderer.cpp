@@ -332,9 +332,10 @@ void CRenderer::SetForceInside(bool forceInside)
   m_forceInside = forceInside;
 }
 
-void CRenderer::SetActiveAreaBottomOffset(int pixels)
+void CRenderer::SetActiveAreaBottomOffset(int pixels, bool applyUserPos)
 {
   m_activeAreaBottomOffset = pixels;
+  m_activeAreaApplyUserPos = applyUserPos;
 }
 
 void CRenderer::SetSubtitleVerticalPosition(const int value, bool save)
@@ -555,13 +556,17 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
       rOpts.horizontalAlignment = SUBTITLES::STYLE::HorizontalAlign::CENTER;
   }
 
-  // DV L5 active area: set subtitle position to the active area bottom boundary.
-  // Overrides user position and disables style margins so only the L5 boundary
-  // determines placement.
+  // DV L5 active area: position subtitles at or relative to the active area boundary.
   if (m_activeAreaBottomOffset > 0 && rOpts.frameHeight > 0)
   {
-    rOpts.position = static_cast<double>(m_activeAreaBottomOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
-    rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
+    double l5Pos = static_cast<double>(m_activeAreaBottomOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
+    if (m_activeAreaApplyUserPos)
+      rOpts.position += l5Pos;
+    else
+    {
+      rOpts.position = l5Pos;
+      rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
+    }
   }
 
   // Force subs to be inside the video rect.

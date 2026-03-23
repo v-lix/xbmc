@@ -704,20 +704,22 @@ void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst)
   // offset in the renderer — no rect changes, no font scaling, PGS unaffected.
   if ((m_picture.hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION) || !aml_dv_use_active_area())
   {
-    m_overlays.SetActiveAreaBottomOffset(0);
+    m_overlays.SetActiveAreaBottomOffset(0, false);
     return;
   }
 
   const auto doviStreamMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
   if (!doviStreamMeta.has_level5_metadata)
   {
-    m_overlays.SetActiveAreaBottomOffset(0);
+    m_overlays.SetActiveAreaBottomOffset(0, false);
     return;
   }
 
+  bool applyUserPos = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+      CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_USER_POS);
   float scaleY = static_cast<float>(dst.Height()) / src.Height();
   m_overlays.SetActiveAreaBottomOffset(
-      static_cast<int>(doviStreamMeta.level5_active_area_bottom_offset * scaleY));
+      static_cast<int>(doviStreamMeta.level5_active_area_bottom_offset * scaleY), applyUserPos);
 }
 
 void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
