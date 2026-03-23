@@ -980,8 +980,16 @@ void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries 
 
 void aml_dv_close()
 {
-  if (aml_is_dv_enable() && (aml_dv_mode() == DV_MODE_ON_DEMAND)) aml_dv_off();
-  aml_dv_start(); // If DV Mode ON in Kodi Menu.
+  // DV_MODE_ON: leave DV enabled in its current output mode.  This avoids
+  // costly HDMI mode-switch cycles (off->IPT->playback-mode) during live-TV
+  // channel changes where a new aml_dv_open() follows immediately.
+  // IPT is restored for the GUI by the Player.OnStop announcement handler
+  // in CDolbyVisionAML when playback truly ends.
+  if (aml_dv_mode() == DV_MODE_ON)
+    return;
+
+  if (aml_is_dv_enable())
+    aml_dv_off();
 }
 
 void aml_dv_set_osd_max(int max)

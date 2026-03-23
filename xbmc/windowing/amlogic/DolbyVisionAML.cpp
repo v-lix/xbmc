@@ -788,4 +788,15 @@ void CDolbyVisionAML::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
 {
   // When Wake from Suspend re-trigger DV if in DV_MODE_ON
   if ((flag == ANNOUNCEMENT::System) && (message == "OnWake")) aml_dv_start();
+
+  // When video playback fully stops (not channel-switch), restore DV to IPT
+  // mode for the GUI.  aml_dv_close() defers this for DV_MODE_ON to avoid
+  // unnecessary HDMI mode switches during live-TV channel changes.
+  if ((flag == ANNOUNCEMENT::Player) && (message == "OnStop") &&
+      (aml_dv_mode() == DV_MODE_ON) && aml_is_dv_enable())
+  {
+    unsigned int mode = aml_dv_dolby_vision_mode();
+    if (mode != DOLBY_VISION_OUTPUT_MODE_IPT && mode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
+      aml_dv_start();
+  }
 }
