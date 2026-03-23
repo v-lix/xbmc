@@ -332,12 +332,9 @@ void CRenderer::SetForceInside(bool forceInside)
   m_forceInside = forceInside;
 }
 
-void CRenderer::SetActiveAreaMargins(int top, int bottom, int left, int right)
+void CRenderer::SetActiveAreaBottomOffset(int pixels)
 {
-  m_activeAreaMarginTop = top;
-  m_activeAreaMarginBottom = bottom;
-  m_activeAreaMarginLeft = left;
-  m_activeAreaMarginRight = right;
+  m_activeAreaBottomOffset = pixels;
 }
 
 void CRenderer::SetSubtitleVerticalPosition(const int value, bool save)
@@ -558,6 +555,11 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
       rOpts.horizontalAlignment = SUBTITLES::STYLE::HorizontalAlign::CENTER;
   }
 
+  // DV L5 active area: set subtitle position to the active area bottom boundary.
+  // Overrides user position — the active area edge becomes the baseline.
+  if (m_activeAreaBottomOffset > 0 && rOpts.frameHeight > 0)
+    rOpts.position = static_cast<double>(m_activeAreaBottomOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
+
   // Force subs to be inside the video rect.
   if (m_forceInside)
   {
@@ -568,12 +570,6 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
 
     rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::INSIDE_VIDEO;
   }
-
-  // DV L5 active area: add extra margins to keep text subs inside active content area
-  rOpts.activeAreaMarginTop = m_activeAreaMarginTop;
-  rOpts.activeAreaMarginBottom = m_activeAreaMarginBottom;
-  rOpts.activeAreaMarginLeft = m_activeAreaMarginLeft;
-  rOpts.activeAreaMarginRight = m_activeAreaMarginRight;
 
   // changes: Detect changes from previously rendered images, if > 0 they are changed
   int changes = 0;

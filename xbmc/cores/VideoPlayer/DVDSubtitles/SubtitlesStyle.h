@@ -127,11 +127,6 @@ struct renderOpts
   // only for bottom alignment, 0 = bottom (no change), 100 = on top
   double position = 0;
   HorizontalAlign horizontalAlignment = HorizontalAlign::DISABLED;
-  // DV Level 5 active area margins (pixels, added to libass margins)
-  int activeAreaMarginTop{0};
-  int activeAreaMarginBottom{0};
-  int activeAreaMarginLeft{0};
-  int activeAreaMarginRight{0};
 };
 
 } // namespace STYLE

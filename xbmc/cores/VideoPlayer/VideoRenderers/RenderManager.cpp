@@ -699,33 +699,25 @@ RESOLUTION CRenderManager::GetResolution()
 
 void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst)
 {
-  // DV L5 active area: compute margins to push text subs inside the active content area.
-  // Only modifies libass margins — does not touch src/dst rects or font scaling.
-  // PGS bitmap subs are unaffected (they don't go through the libass margin path).
+  // DV L5 active area: set the bottom offset so the overlay renderer pushes
+  // text subtitles up into the active content area. Applied as a position
+  // offset in the renderer — no rect changes, no font scaling, PGS unaffected.
   if ((m_picture.hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION) || !aml_dv_use_active_area())
   {
-    m_overlays.SetActiveAreaMargins(0, 0, 0, 0);
-    m_overlays.SetForceInside(false);
+    m_overlays.SetActiveAreaBottomOffset(0);
     return;
   }
 
   const auto doviStreamMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
   if (!doviStreamMeta.has_level5_metadata)
   {
-    m_overlays.SetActiveAreaMargins(0, 0, 0, 0);
-    m_overlays.SetForceInside(false);
+    m_overlays.SetActiveAreaBottomOffset(0);
     return;
   }
 
-  float scaleX = static_cast<float>(dst.Width()) / src.Width();
   float scaleY = static_cast<float>(dst.Height()) / src.Height();
-
-  m_overlays.SetActiveAreaMargins(
-      static_cast<int>(doviStreamMeta.level5_active_area_top_offset    * scaleY),
-      static_cast<int>(doviStreamMeta.level5_active_area_bottom_offset * scaleY),
-      static_cast<int>(doviStreamMeta.level5_active_area_left_offset   * scaleX),
-      static_cast<int>(doviStreamMeta.level5_active_area_right_offset  * scaleX));
-  m_overlays.SetForceInside(true);
+  m_overlays.SetActiveAreaBottomOffset(
+      static_cast<int>(doviStreamMeta.level5_active_area_bottom_offset * scaleY));
 }
 
 void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
