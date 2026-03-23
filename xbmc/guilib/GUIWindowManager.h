@@ -207,6 +207,7 @@ public:
   bool HasVisibleModalDialog() const;
   bool IsDialogTopmost(int id, bool modal = false) const;
   bool IsDialogTopmost(const std::string &xmlFile, bool modal = false) const;
+  CGUIWindow* FindActiveDialog(const std::string &xmlFile) const;
   bool IsModalDialogTopmost(int id) const;
   bool IsModalDialogTopmost(const std::string &xmlFile) const;
   bool IsWindowActive(int id, bool ignoreClosing = true) const;

@@ -1064,6 +1064,20 @@ void aml_dv_set_xbmc_osd()
                     wm.IsWindowVisible(WINDOW_VIDEO_MENU) ||
                     CServiceBroker::GetDataCacheCore().GetAVChangeExtended();
 
+  // PM4K keeps an invisible overlay dialog active during playback.
+  // When PM4K is active, check its seek dialog's show.OSD property
+  // to determine if the OSD is actually visible.
+  if (osd_active)
+  {
+    auto *home = wm.GetWindow(WINDOW_HOME);
+    if (home && !home->GetProperty("script.plex.is_active").asString().empty())
+    {
+      auto *seekDialog = wm.FindActiveDialog("script-plex-seek_dialog.xml");
+      if (seekDialog)
+        osd_active = seekDialog->GetProperty("show.OSD").asString() == "1";
+    }
+  }
+
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_xbmc_osd", osd_active ? 1 : 0);
 }
 
