@@ -332,9 +332,10 @@ void CRenderer::SetForceInside(bool forceInside)
   m_forceInside = forceInside;
 }
 
-void CRenderer::SetActiveAreaBottomOffset(int pixels, bool applyUserPos)
+void CRenderer::SetActiveAreaOffsets(int topPixels, int bottomPixels, bool applyUserPos)
 {
-  m_activeAreaBottomOffset = pixels;
+  m_activeAreaTopOffset = topPixels;
+  m_activeAreaBottomOffset = bottomPixels;
   m_activeAreaApplyUserPos = applyUserPos;
 }
 
@@ -557,15 +558,33 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
   }
 
   // DV L5 active area: position subtitles at or relative to the active area boundary.
-  if (m_activeAreaBottomOffset > 0 && rOpts.frameHeight > 0)
+  if (rOpts.frameHeight > 0)
   {
-    double l5Pos = static_cast<double>(m_activeAreaBottomOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
-    if (m_activeAreaApplyUserPos)
-      rOpts.position += l5Pos;
-    else
+    if (m_activeAreaBottomOffset > 0 &&
+        m_subtitleAlign != SUBTITLES::Align::TOP_INSIDE &&
+        m_subtitleAlign != SUBTITLES::Align::TOP_OUTSIDE)
     {
-      rOpts.position = l5Pos;
-      rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
+      double l5Pos = static_cast<double>(m_activeAreaBottomOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
+      if (m_activeAreaApplyUserPos)
+        rOpts.position = std::clamp(rOpts.position + l5Pos, 0.0, 100.0);
+      else
+      {
+        rOpts.position = l5Pos;
+        rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
+      }
+    }
+    else if (m_activeAreaTopOffset > 0 &&
+             (m_subtitleAlign == SUBTITLES::Align::TOP_INSIDE ||
+              m_subtitleAlign == SUBTITLES::Align::TOP_OUTSIDE))
+    {
+      double l5Pos = 100.0 - static_cast<double>(m_activeAreaTopOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
+      if (m_activeAreaApplyUserPos)
+        rOpts.position = std::clamp(std::min(rOpts.position, l5Pos), 0.0, 100.0);
+      else
+      {
+        rOpts.position = l5Pos;
+        rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
+      }
     }
   }
 

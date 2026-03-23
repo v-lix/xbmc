@@ -699,27 +699,28 @@ RESOLUTION CRenderManager::GetResolution()
 
 void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst)
 {
-  // DV L5 active area: set the bottom offset so the overlay renderer pushes
-  // text subtitles up into the active content area. Applied as a position
-  // offset in the renderer — no rect changes, no font scaling, PGS unaffected.
+  // DV L5 active area: use per-frame L5 offsets to position subtitles inside
+  // the active content area. Tracks IMAX/aspect ratio changes in real time.
   if ((m_picture.hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION) || !aml_dv_use_active_area())
   {
-    m_overlays.SetActiveAreaBottomOffset(0, false);
+    m_overlays.SetActiveAreaOffsets(0, 0, false);
     return;
   }
 
-  const auto doviStreamMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
-  if (!doviStreamMeta.has_level5_metadata)
+  const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
+  if (!doviMeta.has_level5_metadata)
   {
-    m_overlays.SetActiveAreaBottomOffset(0, false);
+    m_overlays.SetActiveAreaOffsets(0, 0, false);
     return;
   }
 
   bool applyUserPos = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
       CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_USER_POS);
   float scaleY = static_cast<float>(dst.Height()) / src.Height();
-  m_overlays.SetActiveAreaBottomOffset(
-      static_cast<int>(doviStreamMeta.level5_active_area_bottom_offset * scaleY), applyUserPos);
+  m_overlays.SetActiveAreaOffsets(
+      static_cast<int>(doviMeta.level5_active_area_top_offset * scaleY),
+      static_cast<int>(doviMeta.level5_active_area_bottom_offset * scaleY),
+      applyUserPos);
 }
 
 void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
