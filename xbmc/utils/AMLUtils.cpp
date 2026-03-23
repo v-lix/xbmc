@@ -745,7 +745,6 @@ unsigned int aml_dv_on(unsigned int mode)
   else if (mode == DOLBY_VISION_OUTPUT_MODE_HDR10)
   {
     aml_dv_set_hdr10_osd_brightness(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS));
-    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
   }
   else if (mode != DOLBY_VISION_OUTPUT_MODE_SDR10 && mode != DOLBY_VISION_OUTPUT_MODE_SDR8)
   {
@@ -998,8 +997,8 @@ void aml_dv_set_osd_brightness(int nits)
 
 void aml_dv_set_hdr10_osd_brightness(int nits)
 {
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 1);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dv_HDR10_graphics_max", nits);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", nits);
 }
 
 bool aml_is_dv_enable()
