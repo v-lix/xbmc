@@ -556,9 +556,13 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
   }
 
   // DV L5 active area: set subtitle position to the active area bottom boundary.
-  // Overrides user position — the active area edge becomes the baseline.
+  // Overrides user position and disables style margins so only the L5 boundary
+  // determines placement.
   if (m_activeAreaBottomOffset > 0 && rOpts.frameHeight > 0)
+  {
     rOpts.position = static_cast<double>(m_activeAreaBottomOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
+    rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
+  }
 
   // Force subs to be inside the video rect.
   if (m_forceInside)
