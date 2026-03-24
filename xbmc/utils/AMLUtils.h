@@ -146,6 +146,7 @@ void aml_dv_display_trigger();
 void aml_hdr10plus_vsif_hold(bool hold);
 void aml_dv_display_auto_now();
 void aml_dv_start();
+void aml_dv_wait_for_pipeline();
 void aml_dv_set_subtitles(bool visible);
 void aml_dv_set_xbmc_osd();
 bool aml_dv_use_active_area();

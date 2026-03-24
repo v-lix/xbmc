@@ -155,6 +155,11 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
     return false;
   }
 
+  // Wait for any in-progress DV pipeline restoration to complete before
+  // creating the EGL surface. Prevents color corruption when the OnStop
+  // handler is restoring IPT while we recreate the GL context.
+  aml_dv_wait_for_pipeline();
+
   if (!m_pGLContext.CreateSurface(static_cast<EGLNativeWindowType>(m_nativeWindow)))
   {
     return false;

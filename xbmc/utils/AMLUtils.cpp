@@ -18,6 +18,7 @@
 #include <numeric>
 #include <cmath>
 #include <algorithm>
+#include <mutex>
 
 #include "AMLUtils.h"
 
@@ -1037,8 +1038,14 @@ void aml_dv_display_auto_now()
   if (attr.Exists()) attr.Set("now");
 }
 
+// Serializes aml_dv_start() and aml_dv_wait_for_pipeline() so EGL context
+// recreation doesn't race with DV pipeline restoration.
+static std::mutex s_dvStartMutex;
+
 void aml_dv_start()
 {
+  std::lock_guard<std::mutex> lock(s_dvStartMutex);
+
   // Clean up stale DV kernel state (e.g. from a previous crash where
   // aml_dv_off() never ran).  This ensures the display returns to SDR
   // before we (re-)initialize DV according to the user's settings.
@@ -1049,6 +1056,14 @@ void aml_dv_start()
     aml_dv_reset_osd_max();
     aml_dv_on(DOLBY_VISION_OUTPUT_MODE_IPT);
   }
+}
+
+void aml_dv_wait_for_pipeline()
+{
+  // Block until any in-progress aml_dv_start() completes. Called from
+  // CreateNewWindow to prevent EGL surface creation while the DV pipeline
+  // is transitioning through Bypass mode (causes color corruption).
+  std::lock_guard<std::mutex> lock(s_dvStartMutex);
 }
 
 void aml_dv_set_subtitles(bool visible)
