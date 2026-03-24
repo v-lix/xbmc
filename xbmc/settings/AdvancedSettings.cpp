@@ -397,6 +397,8 @@ void CAdvancedSettings::Initialize()
 
   m_playlistRetries = 100;
   m_playlistTimeout = 20; // 20 seconds timeout
+  m_addonScriptStopTimeout = 30; // 30 seconds to wait for addon script to exit
+  m_pythonScriptTerminateTimeout = 5000; // 5000ms for Python thread cleanup
   m_GLRectangleHack = false;
   m_iSkipLoopFilter = 0;
   m_bVirtualShares = true;
@@ -1034,6 +1036,8 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
   XMLUtils::GetInt(pRootElement, "songinfoduration", m_songInfoDuration, 0, INT_MAX);
   XMLUtils::GetInt(pRootElement, "playlistretries", m_playlistRetries, -1, 5000);
   XMLUtils::GetInt(pRootElement, "playlisttimeout", m_playlistTimeout, 0, 5000);
+  XMLUtils::GetInt(pRootElement, "addonscriptstoptimeout", m_addonScriptStopTimeout, 1, 120);
+  XMLUtils::GetInt(pRootElement, "pythonscriptterminatetimeout", m_pythonScriptTerminateTimeout, 1000, 30000);
 
   XMLUtils::GetBoolean(pRootElement,"glrectanglehack", m_GLRectangleHack);
   XMLUtils::GetInt(pRootElement,"skiploopfilter", m_iSkipLoopFilter, -16, 48);

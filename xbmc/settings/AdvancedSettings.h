@@ -316,6 +316,8 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_alwaysOnTop;  /* makes xbmc to run always on top .. osx/win32 only .. */
     int m_playlistRetries;
     int m_playlistTimeout;
+    int m_addonScriptStopTimeout; // seconds to wait for addon script to exit gracefully
+    int m_pythonScriptTerminateTimeout; // ms to wait for Python thread cleanup after stop
     bool m_GLRectangleHack;
     int m_iSkipLoopFilter;
 

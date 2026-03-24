@@ -10,6 +10,8 @@
 
 #include "ServiceBroker.h"
 #include "URL.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "dialogs/GUIDialogBusy.h"
 #include "dialogs/GUIDialogProgress.h"
 #include "guilib/GUIComponent.h"
@@ -155,8 +157,10 @@ bool CScriptRunner::WaitOnScriptResult(int scriptId,
            !m_scriptDone.Wait(20ms))
       ;
 
-    // give the script 30 seconds to exit before we attempt to stop it
-    XbmcThreads::EndTime<> timer(30s);
+    // give the script time to exit before we attempt to stop it
+    auto timeout = std::chrono::seconds(
+        CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_addonScriptStopTimeout);
+    XbmcThreads::EndTime<> timer(timeout);
     while (!timer.IsTimePast() && CScriptInvocationManager::GetInstance().IsRunning(scriptId) &&
            !m_scriptDone.Wait(20ms))
       ;

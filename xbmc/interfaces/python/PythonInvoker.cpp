@@ -27,6 +27,8 @@
 #include "interfaces/python/pythreadstate.h"
 #include "interfaces/python/swig.h"
 #include "messaging/ApplicationMessenger.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "threads/SingleLock.h"
 #include "threads/SystemClock.h"
 #include "utils/CharsetConverter.h"
@@ -60,8 +62,7 @@ extern "C" FILE* fopen_utf8(const char* _Filename, const char* _Mode);
 
 #define PY_PATH_SEP DELIM
 
-// Time before ill-behaved scripts are terminated
-#define PYTHON_SCRIPT_TIMEOUT 5000ms // ms
+// Time before ill-behaved scripts are terminated (default 5000ms, configurable via advancedsettings.xml)
 
 using namespace XFILE;
 using namespace std::chrono_literals;
@@ -497,7 +498,9 @@ bool CPythonInvoker::stop(bool abort)
       //Release the lock while waiting for threads to finish
       lock.unlock();
 
-    XbmcThreads::EndTime<> timeout(PYTHON_SCRIPT_TIMEOUT);
+    const auto pythonScriptTimeout = std::chrono::milliseconds(
+        CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_pythonScriptTerminateTimeout);
+    XbmcThreads::EndTime<> timeout(pythonScriptTimeout);
     while (!m_stoppedEvent.Wait(15ms))
     {
       if (timeout.IsTimePast())
@@ -505,7 +508,7 @@ bool CPythonInvoker::stop(bool abort)
         CLog::Log(LOGERROR,
                   "CPythonInvoker({}, {}): script didn't stop in {} seconds - let's kill it",
                   GetId(), m_sourceFile,
-                  std::chrono::duration_cast<std::chrono::seconds>(PYTHON_SCRIPT_TIMEOUT).count());
+                  std::chrono::duration_cast<std::chrono::seconds>(pythonScriptTimeout).count());
         break;
       }
 
@@ -525,7 +528,7 @@ bool CPythonInvoker::stop(bool abort)
     // Useful for add-on performance metrics
     if (!timeout.IsTimePast())
       CLog::Log(LOGDEBUG, "CPythonInvoker({}, {}): script termination took {}ms", GetId(),
-                m_sourceFile, (PYTHON_SCRIPT_TIMEOUT - timeout.GetTimeLeft()).count());
+                m_sourceFile, (pythonScriptTimeout - timeout.GetTimeLeft()).count());
 
     // Since we released the m_critical it's possible that the state is cleaned up
     // so we need to recheck for m_threadState == NULL
