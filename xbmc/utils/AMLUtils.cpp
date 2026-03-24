@@ -1051,9 +1051,15 @@ void aml_dv_start()
   }
 }
 
-void aml_dv_set_subtitles(bool visible) 
+void aml_dv_set_subtitles(bool visible)
 {
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_subtitles", visible ? 1 : 0);
+  static int s_last = -1;
+  int val = visible ? 1 : 0;
+  if (val != s_last)
+  {
+    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_subtitles", val);
+    s_last = val;
+  }
 }
 
 void aml_dv_set_xbmc_osd()
@@ -1088,7 +1094,13 @@ void aml_dv_set_xbmc_osd()
     }
   }
 
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_xbmc_osd", osd_active ? 1 : 0);
+  static int s_lastOsd = -1;
+  int val = osd_active ? 1 : 0;
+  if (val != s_lastOsd)
+  {
+    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_xbmc_osd", val);
+    s_lastOsd = val;
+  }
 }
 
 bool aml_dv_use_active_area()
