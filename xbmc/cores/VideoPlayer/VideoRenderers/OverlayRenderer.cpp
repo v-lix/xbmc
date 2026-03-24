@@ -577,9 +577,12 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
              (m_subtitleAlign == SUBTITLES::Align::TOP_INSIDE ||
               m_subtitleAlign == SUBTITLES::Align::TOP_OUTSIDE))
     {
+      // Convert top-aligned to bottom-aligned positioned at the top active area
+      // boundary. This uses the same line_position mechanism as bottom subs.
       double l5Pos = 100.0 - static_cast<double>(m_activeAreaTopOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
+      m_subtitleAlign = SUBTITLES::Align::BOTTOM_OUTSIDE;
       if (m_activeAreaApplyUserPos)
-        rOpts.position = std::clamp(std::min(rOpts.position, l5Pos), 0.0, 100.0);
+        rOpts.position = std::clamp(rOpts.position + l5Pos, 0.0, 100.0);
       else
       {
         rOpts.position = l5Pos;
