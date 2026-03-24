@@ -1058,6 +1058,8 @@ void aml_dv_set_subtitles(bool visible)
 
 void aml_dv_set_xbmc_osd()
 {
+  static int s_pm4kSeekDialogId = WINDOW_INVALID;
+
   auto &wm = CServiceBroker::GetGUI()->GetWindowManager();
 
   bool osd_active = wm.HasVisibleDialog() ||
@@ -1067,12 +1069,20 @@ void aml_dv_set_xbmc_osd()
   // PM4K keeps an invisible overlay dialog active during playback.
   // When PM4K is active, check its seek dialog's show.OSD property
   // to determine if the OSD is actually visible.
+  // Cache the seek dialog window ID to avoid iterating active dialogs every frame.
   if (osd_active)
   {
     auto *home = wm.GetWindow(WINDOW_HOME);
     if (home && !home->GetProperty("script.plex.is_active").asString().empty())
     {
-      auto *seekDialog = wm.FindActiveDialog("script-plex-seek_dialog.xml");
+      CGUIWindow *seekDialog = nullptr;
+      if (s_pm4kSeekDialogId != WINDOW_INVALID)
+        seekDialog = wm.GetWindow(s_pm4kSeekDialogId);
+      if (!seekDialog)
+      {
+        seekDialog = wm.FindActiveDialog("script-plex-seek_dialog.xml");
+        s_pm4kSeekDialogId = seekDialog ? seekDialog->GetID() : WINDOW_INVALID;
+      }
       if (seekDialog)
         osd_active = seekDialog->GetProperty("show.OSD").asString() == "1";
     }
