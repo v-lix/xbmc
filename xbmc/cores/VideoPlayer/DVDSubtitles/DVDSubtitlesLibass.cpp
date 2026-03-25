@@ -330,6 +330,15 @@ ASS_Image* CDVDSubtitlesLibass::RenderImage(double pts,
     // window (e.g. cropped videos, zoom effect) and player add black bars.
     fontScale *= std::max(opts.frameHeight / opts.videoHeight, 1.0f);
   }
+  else if (opts.marginsMode == MarginsMode::INSIDE_ACTIVE_AREA)
+  {
+    // Compensate for margins reducing the effective rendering area
+    float activeAreaHeight = opts.frameHeight -
+        static_cast<float>(opts.activeAreaTopMargin) -
+        static_cast<float>(opts.activeAreaBottomMargin);
+    if (activeAreaHeight > 0.0f)
+      fontScale *= opts.frameHeight / activeAreaHeight;
+  }
 
   ass_set_font_scale(m_renderer, static_cast<double>(fontScale));
 
