@@ -74,6 +74,8 @@ enum class MarginsMode
   DEFAULT,
   // Apply margins to position text within the video area (cropped videos)
   INSIDE_VIDEO,
+  // Apply margins like INSIDE_VIDEO but without font scaling (L5 active area)
+  INSIDE_ACTIVE_AREA,
   // Disable any kind of margin
   DISABLED
 };
@@ -127,7 +129,8 @@ struct renderOpts
   // only for bottom alignment, 0 = bottom (no change), 100 = on top
   double position = 0;
   HorizontalAlign horizontalAlignment = HorizontalAlign::DISABLED;
-  bool forceBottomAlign{false}; // L5: override top-aligned ASS style to bottom
+  int activeAreaTopMargin{0}; // L5: top margin in pixels for INSIDE_ACTIVE_AREA
+  int activeAreaBottomMargin{0}; // L5: bottom margin in pixels for INSIDE_ACTIVE_AREA
 };
 
 } // namespace STYLE

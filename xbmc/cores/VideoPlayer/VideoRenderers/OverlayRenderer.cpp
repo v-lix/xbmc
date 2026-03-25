@@ -555,37 +555,14 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
       rOpts.horizontalAlignment = SUBTITLES::STYLE::HorizontalAlign::CENTER;
   }
 
-  // DV L5 active area: position subtitles at or relative to the active area boundary.
-  // Always disable margins when L5 overrides position to prevent INSIDE_VIDEO
-  // font scaling from interfering.
-  if (rOpts.frameHeight > 0)
+  // DV L5 active area: restrict subtitles to the active content area.
+  // Uses INSIDE_ACTIVE_AREA margins mode which constrains the libass rendering
+  // area to the L5 boundaries via ass_set_margins, without font scaling.
+  if (m_activeAreaTopOffset > 0 || m_activeAreaBottomOffset > 0)
   {
-    if (m_activeAreaBottomOffset > 0 &&
-        subtitleAlign != SUBTITLES::Align::TOP_INSIDE &&
-        subtitleAlign != SUBTITLES::Align::TOP_OUTSIDE)
-    {
-      double l5Pos = static_cast<double>(m_activeAreaBottomOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
-      rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
-      if (m_activeAreaApplyUserPos)
-        rOpts.position = std::clamp(rOpts.position + l5Pos, 0.0, 100.0);
-      else
-        rOpts.position = l5Pos;
-    }
-    else if (m_activeAreaTopOffset > 0 &&
-             (subtitleAlign == SUBTITLES::Align::TOP_INSIDE ||
-              subtitleAlign == SUBTITLES::Align::TOP_OUTSIDE))
-    {
-      // Convert top-aligned to bottom-aligned positioned at the top active area
-      // boundary. This uses the same line_position mechanism as bottom subs.
-      double l5Pos = 100.0 - static_cast<double>(m_activeAreaTopOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
-      subtitleAlign = SUBTITLES::Align::BOTTOM_OUTSIDE;
-      rOpts.forceBottomAlign = true;
-      rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
-      if (m_activeAreaApplyUserPos)
-        rOpts.position = std::clamp(rOpts.position + l5Pos, 0.0, 100.0);
-      else
-        rOpts.position = l5Pos;
-    }
+    rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::INSIDE_ACTIVE_AREA;
+    rOpts.activeAreaTopMargin = m_activeAreaTopOffset;
+    rOpts.activeAreaBottomMargin = m_activeAreaBottomOffset;
   }
 
   // changes: Detect changes from previously rendered images, if > 0 they are changed

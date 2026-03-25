@@ -303,16 +303,23 @@ ASS_Image* CDVDSubtitlesLibass::RenderImage(double pts,
   }
 
   int marginTop{0};
+  int marginBottom{0};
   int marginLeft{0};
-  if (useFrameMargins)
+  if (opts.marginsMode == MarginsMode::INSIDE_ACTIVE_AREA)
+  {
+    marginTop = opts.activeAreaTopMargin;
+    marginBottom = opts.activeAreaBottomMargin;
+  }
+  else if (useFrameMargins)
   {
     marginTop =
         static_cast<int>((opts.frameHeight - std::min(opts.videoHeight, opts.frameHeight)) / 2);
+    marginBottom = marginTop;
     marginLeft =
         static_cast<int>((opts.frameWidth - std::min(opts.videoWidth, opts.frameWidth)) / 2);
   }
 
-  ass_set_margins(m_renderer, marginTop, marginTop, marginLeft, marginLeft);
+  ass_set_margins(m_renderer, marginTop, marginBottom, marginLeft, marginLeft);
   ass_set_use_margins(m_renderer, 0);
 
   float fontScale{1.0f};
@@ -327,14 +334,6 @@ ASS_Image* CDVDSubtitlesLibass::RenderImage(double pts,
   ass_set_font_scale(m_renderer, static_cast<double>(fontScale));
 
   ass_set_line_position(m_renderer, opts.position);
-
-  // L5 active area: override vertical alignment per-frame for ADAPTED subs.
-  // ApplyStyle only runs on settings change, but forceBottomAlign is per-frame.
-  if (opts.forceBottomAlign && m_subtitleType == ADAPTED && m_currentDefaultStyleId != ASS_NO_ID)
-  {
-    ASS_Style* activeStyle = &m_track->styles[m_currentDefaultStyleId];
-    activeStyle->Alignment = (activeStyle->Alignment & 0x3) | VALIGN_SUB;
-  }
 
   // For posterity ass_render_frame have an inconsistent rendering for overlapped subtitles cases,
   // if the playback occurs in sequence (without seeks) the overlapped subtitles lines will be rendered in right order
@@ -499,7 +498,8 @@ void CDVDSubtitlesLibass::ApplyStyle(const std::shared_ptr<struct style>& subSty
     style->Blur = (10.00 / 100 * subStyle->blur);
 
     // Set the margins (in pixel)
-    if (opts.marginsMode == MarginsMode::DISABLED)
+    if (opts.marginsMode == MarginsMode::DISABLED ||
+        opts.marginsMode == MarginsMode::INSIDE_ACTIVE_AREA)
     {
       style->MarginL = 0;
       style->MarginR = 0;
@@ -520,9 +520,7 @@ void CDVDSubtitlesLibass::ApplyStyle(const std::shared_ptr<struct style>& subSty
     }
 
     // Set the vertical alignment
-    if (opts.forceBottomAlign)
-      style->Alignment = VALIGN_SUB;
-    else if (subStyle->alignment == FontAlign::TOP_LEFT ||
+    if (subStyle->alignment == FontAlign::TOP_LEFT ||
         subStyle->alignment == FontAlign::TOP_CENTER || subStyle->alignment == FontAlign::TOP_RIGHT)
       style->Alignment = VALIGN_TOP;
     else if (subStyle->alignment == FontAlign::MIDDLE_LEFT ||
