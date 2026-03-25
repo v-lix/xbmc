@@ -1896,17 +1896,6 @@ bool CGUIWindowManager::IsDialogTopmost(const std::string &xmlFile, bool modal /
   return false;
 }
 
-CGUIWindow* CGUIWindowManager::FindActiveDialog(const std::string &xmlFile) const
-{
-  for (const auto& dialog : m_activeDialogs)
-  {
-    if (dialog && StringUtils::EqualsNoCase(
-            URIUtils::GetFileName(dialog->GetProperty("xmlfile").asString()), xmlFile))
-      return dialog.get();
-  }
-  return nullptr;
-}
-
 bool CGUIWindowManager::HasVisibleControls()
 {
   CSingleExit lock(CServiceBroker::GetWinSystem()->GetGfxContext());

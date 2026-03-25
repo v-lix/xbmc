@@ -697,11 +697,11 @@ RESOLUTION CRenderManager::GetResolution()
   return res;
 }
 
-void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst)
+void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, bool useActiveArea)
 {
   // DV L5 active area: use per-frame L5 offsets to position subtitles inside
   // the active content area. Tracks IMAX/aspect ratio changes in real time.
-  if ((m_picture.hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION) || !aml_dv_use_active_area())
+  if ((m_picture.hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION) || !useActiveArea)
   {
     m_overlays.SetActiveAreaOffsets(0, 0, false);
     return;
@@ -754,13 +754,14 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
       m_pRenderer->Update();
 
     m_renderedOverlay = m_overlays.HasOverlay(m_presentsource);
+    bool useActiveArea = aml_dv_use_active_area();
     // Only signal subtitle presence for L5 suppression if subs aren't already
     // restricted to the active area via margins. When restricted, L5 can stay
     // active since subs won't be outside the cropped region.
-    aml_dv_set_subtitles(!aml_dv_use_active_area() && m_overlays.HasTextOverlay(m_presentsource));
+    aml_dv_set_subtitles(!useActiveArea && m_overlays.HasTextOverlay(m_presentsource));
     CRect src, dst, view;
     m_pRenderer->GetVideoRect(src, dst, view);
-    CalcOverlayActiveArea(src, dst);
+    CalcOverlayActiveArea(src, dst, useActiveArea);
     m_overlays.SetVideoRect(src, dst, view);
     m_overlays.Render(m_presentsource);
 

@@ -51,11 +51,16 @@
 
 static bool vs10_conversion = false;
 static bool vs10_conversion_reset_hdr10 = true;
+static bool s_pm4kActive = false;
+static CGUIWindow* s_pm4kHome = nullptr;
 
 static std::shared_ptr<CSettings> settings()
 {
   return CServiceBroker::GetSettingsComponent()->GetSettings();
 }
+
+// Cached DV mode — updated by aml_dv_on/aml_dv_off, avoids per-frame sysfs reads.
+static unsigned int s_dvModeCached = DOLBY_VISION_OUTPUT_MODE_BYPASS;
 
 static void aml_dv_reset_osd_max()
 {
@@ -724,6 +729,7 @@ unsigned int aml_dv_on(unsigned int mode)
   bool modeChange(existing_mode != mode);
   CLog::Log(LOGDEBUG, "AMLUtils::{} - mode change [{}], existing mode [{}], this mode [{}]", __FUNCTION__, modeChange, aml_dv_output_mode_to_string(existing_mode), aml_dv_output_mode_to_string(mode));
   if (modeChange) CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_mode", mode);
+  s_dvModeCached = mode;
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", "Y");
 
@@ -926,6 +932,7 @@ void aml_dv_off()
   // Finally reset back to bypass for consistency.
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", DOLBY_VISION_FORCE_OUTPUT_MODE);
   if (modeChange) CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_mode", DOLBY_VISION_OUTPUT_MODE_BYPASS);
+  s_dvModeCached = DOLBY_VISION_OUTPUT_MODE_BYPASS;
 
   aml_linux_force_422 = false;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
@@ -953,6 +960,10 @@ unsigned int aml_dv_dolby_vision_mode()
 
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries)
 {
+  // Detect PM4K once at playback start for OSD visibility override.
+  s_pm4kHome = CServiceBroker::GetGUI()->GetWindowManager().GetWindow(WINDOW_HOME);
+  s_pm4kActive = s_pm4kHome && !s_pm4kHome->GetProperty("script.plex.is_active").asString().empty();
+
   enum DV_MODE dv_mode(aml_dv_mode());
   CLog::Log(LOGINFO, "AMLUtils::{} - Checking DV for DV mode: [{}], DV type: [{}]", __FUNCTION__, aml_dv_mode_to_string(dv_mode), aml_dv_type_to_string(aml_dv_type()));
   if (dv_mode == DV_MODE_ON || dv_mode == DV_MODE_ON_DEMAND) {
@@ -981,6 +992,9 @@ void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries 
 
 void aml_dv_close()
 {
+  s_pm4kActive = false;
+  s_pm4kHome = nullptr;
+
   // DV_MODE_ON: leave DV enabled in its current output mode.  This avoids
   // costly HDMI mode-switch cycles (off->IPT->playback-mode) during live-TV
   // channel changes where a new aml_dv_open() follows immediately.
@@ -1079,35 +1093,17 @@ void aml_dv_set_subtitles(bool visible)
 
 void aml_dv_set_xbmc_osd()
 {
-  static int s_pm4kSeekDialogId = WINDOW_INVALID;
-
   auto &wm = CServiceBroker::GetGUI()->GetWindowManager();
 
-  bool osd_active = wm.HasVisibleDialog() ||
-                    wm.IsWindowVisible(WINDOW_VIDEO_MENU) ||
-                    CServiceBroker::GetDataCacheCore().GetAVChangeExtended();
-
-  // PM4K keeps an invisible overlay dialog active during playback.
-  // When PM4K is active, check its seek dialog's show.OSD property
-  // to determine if the OSD is actually visible.
-  // Cache the seek dialog window ID to avoid iterating active dialogs every frame.
-  if (osd_active)
+  bool osd_active;
+  if (s_pm4kActive && s_pm4kHome)
   {
-    auto *home = wm.GetWindow(WINDOW_HOME);
-    if (home && !home->GetProperty("script.plex.is_active").asString().empty())
-    {
-      CGUIWindow *seekDialog = nullptr;
-      if (s_pm4kSeekDialogId != WINDOW_INVALID)
-        seekDialog = wm.GetWindow(s_pm4kSeekDialogId);
-      if (!seekDialog)
-      {
-        seekDialog = wm.FindActiveDialog("script-plex-seek_dialog.xml");
-        s_pm4kSeekDialogId = seekDialog ? seekDialog->GetID() : WINDOW_INVALID;
-      }
-      if (seekDialog)
-        osd_active = seekDialog->GetProperty("show.OSD").asString() == "1";
-    }
+    osd_active = s_pm4kHome->GetProperty("script.plex.osd_active").asString() == "1";
   }
+  else
+    osd_active = wm.HasVisibleDialog() ||
+                 wm.IsWindowVisible(WINDOW_VIDEO_MENU) ||
+                 CServiceBroker::GetDataCacheCore().GetAVChangeExtended();
 
   static int s_lastOsd = -1;
   int val = osd_active ? 1 : 0;
@@ -1120,9 +1116,18 @@ void aml_dv_set_xbmc_osd()
 
 bool aml_dv_use_active_area()
 {
-  return aml_is_dv_enable() &&
-         (aml_dv_dolby_vision_mode() == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL) &&
-         settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_ACTIVE_AREA);
+  // Use s_dvModeCached (updated by aml_dv_on/off) to avoid sysfs reads.
+  // Re-evaluate when mode changes. Setting lookup only on mode change.
+  static int s_result = -1;
+  static unsigned int s_lastMode = UINT_MAX;
+
+  if (s_dvModeCached != s_lastMode)
+  {
+    s_lastMode = s_dvModeCached;
+    s_result = (s_dvModeCached == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL &&
+                settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_ACTIVE_AREA)) ? 1 : 0;
+  }
+  return s_result == 1;
 }
 
 enum DV_MODE aml_dv_mode()
