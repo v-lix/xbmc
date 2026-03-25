@@ -328,6 +328,14 @@ ASS_Image* CDVDSubtitlesLibass::RenderImage(double pts,
 
   ass_set_line_position(m_renderer, opts.position);
 
+  // L5 active area: override vertical alignment per-frame for ADAPTED subs.
+  // ApplyStyle only runs on settings change, but forceBottomAlign is per-frame.
+  if (opts.forceBottomAlign && m_subtitleType == ADAPTED && m_currentDefaultStyleId != ASS_NO_ID)
+  {
+    ASS_Style* activeStyle = &m_track->styles[m_currentDefaultStyleId];
+    activeStyle->Alignment = (activeStyle->Alignment & 0x3) | VALIGN_SUB;
+  }
+
   // For posterity ass_render_frame have an inconsistent rendering for overlapped subtitles cases,
   // if the playback occurs in sequence (without seeks) the overlapped subtitles lines will be rendered in right order
   // if you seek forward/backward the video, the overlapped subtitles lines could be rendered in the wrong order
