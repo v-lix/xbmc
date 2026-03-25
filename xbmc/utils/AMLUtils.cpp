@@ -1116,18 +1116,10 @@ void aml_dv_set_xbmc_osd()
 
 bool aml_dv_use_active_area()
 {
-  // Use s_dvModeCached (updated by aml_dv_on/off) to avoid sysfs reads.
-  // Re-evaluate when mode changes. Setting lookup only on mode change.
-  static int s_result = -1;
-  static unsigned int s_lastMode = UINT_MAX;
-
-  if (s_dvModeCached != s_lastMode)
-  {
-    s_lastMode = s_dvModeCached;
-    s_result = (s_dvModeCached == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL &&
-                settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_ACTIVE_AREA)) ? 1 : 0;
-  }
-  return s_result == 1;
+  // s_dvModeCached avoids per-frame sysfs reads (updated by aml_dv_on/off).
+  // Setting is read live so toggling between playbacks takes effect immediately.
+  return s_dvModeCached == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL &&
+         settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_ACTIVE_AREA);
 }
 
 enum DV_MODE aml_dv_mode()

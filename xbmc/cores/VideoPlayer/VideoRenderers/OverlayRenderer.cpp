@@ -327,11 +327,6 @@ void CRenderer::SetStereoMode(const std::string &stereomode)
   m_stereomode = stereomode;
 }
 
-void CRenderer::SetForceInside(bool forceInside)
-{
-  m_forceInside = forceInside;
-}
-
 void CRenderer::SetActiveAreaOffsets(int topPixels, int bottomPixels, bool applyUserPos)
 {
   m_activeAreaTopOffset = topPixels;
@@ -461,6 +456,9 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
     const std::shared_ptr<struct SUBTITLES::STYLE::style>& overlayStyle)
 {
   SUBTITLES::STYLE::renderOpts rOpts;
+  // Local copy — L5 active area and forceInside may override alignment per-overlay
+  // without corrupting the persistent member for subsequent frames.
+  auto subtitleAlign = m_subtitleAlign;
 
   // libass render in a target area which named as frame. the frame size may bigger than video size,
   // and including margins between video to frame edge. libass allow to render subtitles into the margins.
@@ -502,7 +500,7 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
   {
     rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
   }
-  else if (m_subtitleAlign == SUBTITLES::Align::MANUAL)
+  else if (subtitleAlign == SUBTITLES::Align::MANUAL)
   {
     // When vertical margins are used Libass apply a displacement in percentage
     // of the height available to line position, this displacement causes
@@ -531,7 +529,7 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
 
     rOpts.position = 100 - pos * 100;
   }
-  else if (m_subtitleAlign == SUBTITLES::Align::BOTTOM_OUTSIDE)
+  else if (subtitleAlign == SUBTITLES::Align::BOTTOM_OUTSIDE)
   {
     // To keep consistent the position of text as other alignment positions
     // we avoid apply the displacement compensation
@@ -539,8 +537,8 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
         static_cast<double>(m_subtitlePosition + m_subtitleVerticalMargin - resInfo.Overscan.top);
     rOpts.position = 100 - posPx / static_cast<double>(rOpts.frameHeight) * 100;
   }
-  else if (m_subtitleAlign == SUBTITLES::Align::BOTTOM_INSIDE ||
-           m_subtitleAlign == SUBTITLES::Align::TOP_INSIDE)
+  else if (subtitleAlign == SUBTITLES::Align::BOTTOM_INSIDE ||
+           subtitleAlign == SUBTITLES::Align::TOP_INSIDE)
   {
     rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::INSIDE_VIDEO;
   }
@@ -558,48 +556,36 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
   }
 
   // DV L5 active area: position subtitles at or relative to the active area boundary.
+  // Always disable margins when L5 overrides position to prevent INSIDE_VIDEO
+  // font scaling from interfering.
   if (rOpts.frameHeight > 0)
   {
     if (m_activeAreaBottomOffset > 0 &&
-        m_subtitleAlign != SUBTITLES::Align::TOP_INSIDE &&
-        m_subtitleAlign != SUBTITLES::Align::TOP_OUTSIDE)
+        subtitleAlign != SUBTITLES::Align::TOP_INSIDE &&
+        subtitleAlign != SUBTITLES::Align::TOP_OUTSIDE)
     {
       double l5Pos = static_cast<double>(m_activeAreaBottomOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
+      rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
       if (m_activeAreaApplyUserPos)
         rOpts.position = std::clamp(rOpts.position + l5Pos, 0.0, 100.0);
       else
-      {
         rOpts.position = l5Pos;
-        rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
-      }
     }
     else if (m_activeAreaTopOffset > 0 &&
-             (m_subtitleAlign == SUBTITLES::Align::TOP_INSIDE ||
-              m_subtitleAlign == SUBTITLES::Align::TOP_OUTSIDE))
+             (subtitleAlign == SUBTITLES::Align::TOP_INSIDE ||
+              subtitleAlign == SUBTITLES::Align::TOP_OUTSIDE))
     {
       // Convert top-aligned to bottom-aligned positioned at the top active area
       // boundary. This uses the same line_position mechanism as bottom subs.
       double l5Pos = 100.0 - static_cast<double>(m_activeAreaTopOffset) / static_cast<double>(rOpts.frameHeight) * 100.0;
-      m_subtitleAlign = SUBTITLES::Align::BOTTOM_OUTSIDE;
+      subtitleAlign = SUBTITLES::Align::BOTTOM_OUTSIDE;
+      rOpts.forceBottomAlign = true;
+      rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
       if (m_activeAreaApplyUserPos)
         rOpts.position = std::clamp(rOpts.position + l5Pos, 0.0, 100.0);
       else
-      {
         rOpts.position = l5Pos;
-        rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::DISABLED;
-      }
     }
-  }
-
-  // Force subs to be inside the video rect.
-  if (m_forceInside)
-  {
-    if (m_subtitleAlign == SUBTITLES::Align::BOTTOM_OUTSIDE)
-      m_subtitleAlign = SUBTITLES::Align::BOTTOM_INSIDE;
-    else if (m_subtitleAlign == SUBTITLES::Align::TOP_OUTSIDE)
-      m_subtitleAlign = SUBTITLES::Align::TOP_INSIDE;
-
-    rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::INSIDE_VIDEO;
   }
 
   // changes: Detect changes from previously rendered images, if > 0 they are changed

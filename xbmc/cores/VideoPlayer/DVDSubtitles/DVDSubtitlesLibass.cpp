@@ -512,7 +512,9 @@ void CDVDSubtitlesLibass::ApplyStyle(const std::shared_ptr<struct style>& subSty
     }
 
     // Set the vertical alignment
-    if (subStyle->alignment == FontAlign::TOP_LEFT ||
+    if (opts.forceBottomAlign)
+      style->Alignment = VALIGN_SUB;
+    else if (subStyle->alignment == FontAlign::TOP_LEFT ||
         subStyle->alignment == FontAlign::TOP_CENTER || subStyle->alignment == FontAlign::TOP_RIGHT)
       style->Alignment = VALIGN_TOP;
     else if (subStyle->alignment == FontAlign::MIDDLE_LEFT ||

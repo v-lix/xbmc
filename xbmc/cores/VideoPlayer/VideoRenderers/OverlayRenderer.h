@@ -122,7 +122,6 @@ namespace OVERLAY {
     bool HasTextOverlay(int idx);
     void SetVideoRect(CRect &source, CRect &dest, CRect &view);
     void SetStereoMode(const std::string &stereomode);
-    void SetForceInside(bool forceInside);
     void SetActiveAreaOffsets(int topPixels, int bottomPixels, bool applyUserPos);
 
     /*!
@@ -191,7 +190,6 @@ namespace OVERLAY {
     CRect m_rs; // Source size
     CRect m_rd; // Video size, may be influenced by video settings (e.g. zoom)
     std::string m_stereomode;
-    bool m_forceInside = false;
     int m_activeAreaTopOffset{0};
     int m_activeAreaBottomOffset{0};
     bool m_activeAreaApplyUserPos{false};
