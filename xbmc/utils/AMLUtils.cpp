@@ -1936,7 +1936,9 @@ void aml_toogle_video_freerun_mode()
 }
 
 void aml_dv_hdr10plus_conversion (bool hdr10plus_conversion) {
-  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10plus_conv", hdr10plus_conversion);
+  // Kernel-side CMv4.0 injection via xbmc_dv_hdr10plus_conv is no longer
+  // needed: the RPU writer includes L3/L9/L11/L254 directly, matching
+  // avdvplus R9 which also does not use this flag.
 }
 
 void aml_reset_audio_from_player_open()
