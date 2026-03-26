@@ -25766,13 +25766,13 @@ msgstr ""
 #. "Dolby Vision Display Led Restrict Overlays - User Position"
 #: system/settings/settings.xml
 msgctxt "#60192"
-msgid "Apply user subtitle position"
+msgid "Apply configured subtitle margin"
 msgstr ""
 
 #. "Dolby Vision Display Led Restrict Overlays - User Position"
 #: system/settings/settings.xml
 msgctxt "#60193"
-msgid "Apply the user's subtitle position and style margins on top of the active area boundary. When off, subtitles are locked to the active area edge."
+msgid "Apply the configured vertical subtitle margin within the active area. Also honors manual subtitle positioning if set. When off, subtitles are placed directly at the active area boundary."
 msgstr ""
 
 #. "Dolby Vision Display LL Dolby VSVDB Limit"

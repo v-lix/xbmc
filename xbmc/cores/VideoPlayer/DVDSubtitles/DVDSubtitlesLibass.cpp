@@ -507,12 +507,20 @@ void CDVDSubtitlesLibass::ApplyStyle(const std::shared_ptr<struct style>& subSty
     style->Blur = (10.00 / 100 * subStyle->blur);
 
     // Set the margins (in pixel)
-    if (opts.marginsMode == MarginsMode::DISABLED ||
-        opts.marginsMode == MarginsMode::INSIDE_ACTIVE_AREA)
+    if (opts.marginsMode == MarginsMode::DISABLED)
     {
       style->MarginL = 0;
       style->MarginR = 0;
       style->MarginV = 0;
+    }
+    else if (opts.marginsMode == MarginsMode::INSIDE_ACTIVE_AREA)
+    {
+      if (opts.activeAreaApplyUserPos)
+        style->MarginV = static_cast<int>(subStyle->marginVertical * scaleDefault);
+      else
+        style->MarginV = 0;
+      style->MarginL = 0;
+      style->MarginR = 0;
     }
     else
     {

@@ -329,6 +329,9 @@ void CRenderer::SetStereoMode(const std::string &stereomode)
 
 void CRenderer::SetActiveAreaOffsets(int topPixels, int bottomPixels, bool applyUserPos)
 {
+  if (m_activeAreaTopOffset != topPixels || m_activeAreaBottomOffset != bottomPixels ||
+      m_activeAreaApplyUserPos != applyUserPos)
+    m_isSettingsChanged = true;
   m_activeAreaTopOffset = topPixels;
   m_activeAreaBottomOffset = bottomPixels;
   m_activeAreaApplyUserPos = applyUserPos;
@@ -558,11 +561,31 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
   // DV L5 active area: restrict subtitles to the active content area.
   // Uses INSIDE_ACTIVE_AREA margins mode which constrains the libass rendering
   // area to the L5 boundaries via ass_set_margins, without font scaling.
+  // When applyUserPos is off, subs sit at the L5 boundary with no extra margins.
+  // When on, the configured vertical margin is applied and manual positions are
+  // rescaled from frame-relative to active-area-relative.
   if (m_activeAreaTopOffset > 0 || m_activeAreaBottomOffset > 0)
   {
     rOpts.marginsMode = SUBTITLES::STYLE::MarginsMode::INSIDE_ACTIVE_AREA;
     rOpts.activeAreaTopMargin = m_activeAreaTopOffset;
     rOpts.activeAreaBottomMargin = m_activeAreaBottomOffset;
+    rOpts.activeAreaApplyUserPos = m_activeAreaApplyUserPos;
+    if (m_activeAreaApplyUserPos && rOpts.position > 0)
+    {
+      // Rescale position from frame-relative to active-area-relative so
+      // the same absolute screen position is maintained within the active area.
+      double activeAreaHeight = static_cast<double>(rOpts.frameHeight) -
+          m_activeAreaTopOffset - m_activeAreaBottomOffset;
+      if (activeAreaHeight > 0.0)
+        rOpts.position = std::clamp(
+            (rOpts.position / 100.0 * static_cast<double>(rOpts.frameHeight) -
+             m_activeAreaBottomOffset) / activeAreaHeight * 100.0,
+            0.0, 100.0);
+    }
+    else if (!m_activeAreaApplyUserPos)
+    {
+      rOpts.position = 0;
+    }
   }
 
   // changes: Detect changes from previously rendered images, if > 0 they are changed

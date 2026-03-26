@@ -19021,12 +19021,12 @@ msgid "Reposition text subtitles to fit within the Level 5 active content area d
 msgstr "Text-Untertitel während TV-Led-DV-Wiedergabe in den Level-5-Aktivbereich verschieben. Aktivieren, wenn das Display Letterbox-Balken basierend auf Level-5-Metadaten beschneidet. In Kombination mit Level-5-Unterdrückung löst nur das OSD L5-Drops aus, da Untertitel bereits im Aktivbereich liegen."
 
 msgctxt "#60192"
-msgid "Apply user subtitle position"
-msgstr "Benutzer-Untertitelposition anwenden"
+msgid "Apply configured subtitle margin"
+msgstr "Konfigurierten Untertitelrand anwenden"
 
 msgctxt "#60193"
-msgid "Apply the user's subtitle position and style margins on top of the active area boundary. When off, subtitles are locked to the active area edge."
-msgstr "Benutzer-Untertitelposition und Stil-Ränder zusätzlich zur Aktivbereich-Grenze anwenden. Bei Aus werden Untertitel an der Aktivbereich-Kante fixiert."
+msgid "Apply the configured vertical subtitle margin within the active area. Also honors manual subtitle positioning if set. When off, subtitles are placed directly at the active area boundary."
+msgstr "Den konfigurierten vertikalen Untertitelrand innerhalb des Aktivbereichs anwenden. Berücksichtigt auch manuelle Untertitelpositionierung, falls gesetzt. Bei Aus werden Untertitel direkt an der Aktivbereich-Grenze platziert."
 
 msgctxt "#60200"
 msgid "Set Limit VSVDB luminance"

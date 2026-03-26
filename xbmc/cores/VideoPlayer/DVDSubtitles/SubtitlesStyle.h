@@ -131,6 +131,7 @@ struct renderOpts
   HorizontalAlign horizontalAlignment = HorizontalAlign::DISABLED;
   int activeAreaTopMargin{0}; // L5: top margin in pixels for INSIDE_ACTIVE_AREA
   int activeAreaBottomMargin{0}; // L5: bottom margin in pixels for INSIDE_ACTIVE_AREA
+  bool activeAreaApplyUserPos{false}; // L5: honor user position and vertical margin
 };
 
 } // namespace STYLE
