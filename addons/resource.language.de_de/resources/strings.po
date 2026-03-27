@@ -18969,12 +18969,36 @@ msgid "Enable this setting to send the original Source DV level 5 metadata to th
 msgstr "Ursprüngliche Level 5-Metadaten (Quelle) an das Display senden. Andernfalls wird für Level 5 der Metadatenwert 0 (Null) verwendet."
 
 msgctxt "#60152"
-msgid "Suppress Level 5 while overlays are visible"
-msgstr "Level 5 unterdrücken wenn Overlays sichtbar"
+msgid "Set L5 to 0 when OSD on screen"
+msgstr "L5 auf 0 setzen wenn OSD sichtbar"
 
 msgctxt "#60153"
-msgid "Dynamically drops Level 5 source metadata while OSD or text subtitles are on screen, and restores it when they disappear. Image-based subtitles (PGS, VOBSUB) are excluded as they are already within the active area. When 'Restrict subtitles to DV active area' is also enabled, only OSD triggers suppression."
-msgstr "Level-5-Quellmetadaten werden dynamisch unterdrückt solange OSD oder Text-Untertitel angezeigt werden, und wiederhergestellt wenn sie verschwinden. Bildbasierte Untertitel (PGS, VOBSUB) sind ausgenommen, da sie bereits im Aktivbereich liegen. Bei aktivierter Untertitel-Aktivbereich-Beschränkung löst nur das OSD die Unterdrückung aus."
+msgid "Dynamically sets Level 5 metadata to zero while the OSD is on screen, and restores it when the OSD disappears. This prevents the display from cropping or dimming content outside the active area."
+msgstr "Level-5-Metadaten werden dynamisch auf Null gesetzt solange das OSD angezeigt wird, und wiederhergestellt wenn es verschwindet. Dies verhindert, dass das Display Inhalte außerhalb des Aktivbereichs beschneidet oder abdunkelt."
+
+msgctxt "#60154"
+msgid "DV Level 5 active area handling"
+msgstr "DV Level 5 Aktivbereich-Verwaltung"
+
+msgctxt "#60155"
+msgid "Enable Level 5 active area handling for Display-Led DV playback. Level 5 metadata defines the active content area within the frame (e.g., letterbox boundaries for scope content). When enabled, shows options for sending source L5 metadata, setting L5 to zero for OSD/subtitles, and restricting subtitles to the active area."
+msgstr "Level-5-Aktivbereich-Verwaltung für TV-Led-DV-Wiedergabe aktivieren. Level-5-Metadaten definieren den aktiven Inhaltsbereich im Bild (z.B. Letterbox-Grenzen bei Scope-Inhalten). Zeigt Optionen zum Senden der L5-Quellmetadaten, L5 auf Null setzen für OSD/Untertitel und Untertitel-Beschränkung auf den Aktivbereich."
+
+msgctxt "#60156"
+msgid "Set L5 to 0 for subtitles"
+msgstr "L5 auf 0 setzen für Untertitel"
+
+msgctxt "#60157"
+msgid "Dynamically sets Level 5 metadata to zero when subtitles are present, preventing the display from cropping or dimming them. 'Subtitle track enabled' sets L5 to zero whenever a subtitle track is turned on. 'Subtitles on screen' only sets L5 to zero when text subtitles are displayed or image-based subtitles extend outside the active area."
+msgstr "Level-5-Metadaten werden dynamisch auf Null gesetzt wenn Untertitel vorhanden sind, um Beschneidung oder Abdunklung zu verhindern. 'Untertitelspur aktiviert' setzt L5 auf Null sobald eine Untertitelspur eingeschaltet ist. 'Untertitel auf dem Bildschirm' setzt L5 nur auf Null wenn Text-Untertitel angezeigt werden oder bildbasierte Untertitel über den Aktivbereich hinausgehen."
+
+msgctxt "#60158"
+msgid "Subtitle track enabled"
+msgstr "Untertitelspur aktiviert"
+
+msgctxt "#60159"
+msgid "Subtitles on screen"
+msgstr "Wenn sichtbar"
 
 msgctxt "#60160"
 msgid "Level 5"

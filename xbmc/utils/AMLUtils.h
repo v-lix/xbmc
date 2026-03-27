@@ -150,6 +150,7 @@ void aml_dv_wait_for_pipeline();
 void aml_dv_set_subtitles(bool visible);
 void aml_dv_set_xbmc_osd();
 bool aml_dv_use_active_area();
+int aml_dv_l5_subs_signal_mode();
 enum DV_MODE aml_dv_mode();
 enum DV_TYPE aml_dv_type();
 unsigned int aml_vs10_by_setting(const std::string setting);

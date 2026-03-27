@@ -546,11 +546,15 @@ static bool aml_linux_force_422 = false;
 
 unsigned int aml_dv_on(unsigned int mode)
 {
-  bool dv_source_level_5(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5));
+  bool dv_level5_enabled(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5));
+  bool dv_source_level_5(dv_level5_enabled && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5));
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5", dv_source_level_5);
 
-  bool dv_source_level_5_osdst(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST));
+  bool dv_source_level_5_osdst(dv_source_level_5 && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST));
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5_osdst", dv_source_level_5_osdst);
+
+  int dv_l5_subs_signal_mode = dv_source_level_5 ? settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS) : 0;
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5_subt", dv_l5_subs_signal_mode > 0);
 
   unsigned int xbmc_dv_vsvdb_source_lum_limit_num = 0;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_source_lum_limit_num", xbmc_dv_vsvdb_source_lum_limit_num);
@@ -1117,9 +1121,18 @@ void aml_dv_set_xbmc_osd()
 bool aml_dv_use_active_area()
 {
   // s_dvModeCached avoids per-frame sysfs reads (updated by aml_dv_on/off).
-  // Setting is read live so toggling between playbacks takes effect immediately.
+  // Settings are read live so toggling between playbacks takes effect immediately.
   return s_dvModeCached == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL &&
+         settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5) &&
          settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_ACTIVE_AREA);
+}
+
+int aml_dv_l5_subs_signal_mode()
+{
+  if (s_dvModeCached != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL ||
+      !settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5))
+    return 0;
+  return settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS);
 }
 
 enum DV_MODE aml_dv_mode()

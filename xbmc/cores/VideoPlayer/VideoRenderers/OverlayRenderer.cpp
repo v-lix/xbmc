@@ -513,7 +513,7 @@ std::shared_ptr<COverlay> CRenderer::ConvertLibass(
     const std::shared_ptr<struct SUBTITLES::STYLE::style>& overlayStyle)
 {
   SUBTITLES::STYLE::renderOpts rOpts;
-  // Local copy — L5 active area and forceInside may override alignment per-overlay
+  // Local copy — L5 active area may override alignment per-overlay
   // without corrupting the persistent member for subsequent frames.
   auto subtitleAlign = m_subtitleAlign;
 

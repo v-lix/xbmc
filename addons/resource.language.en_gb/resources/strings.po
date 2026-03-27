@@ -25685,16 +25685,52 @@ msgctxt "#60151"
 msgid "Enable this setting to send the original Source DV level 5 metadata to the display, otherwise zero is used for DV level 5 metadata values."
 msgstr ""
 
-#. "Dolby Vision Display Led Level 5 Handling"
+#. "Dolby Vision Level 5 OSD Handling"
 #: system/settings/settings.xml
 msgctxt "#60152"
-msgid "Suppress Level 5 while overlays are visible"
+msgid "Set L5 to 0 when OSD on screen"
 msgstr ""
 
-#. "Dolby Vision Display Led Level 5 Handling"
+#. "Dolby Vision Level 5 OSD Handling"
 #: system/settings/settings.xml
 msgctxt "#60153"
-msgid "Dynamically drops Level 5 source metadata while OSD or text subtitles are on screen, and restores it when they disappear. Image-based subtitles (PGS, VOBSUB) are excluded as they are already within the active area. When 'Restrict subtitles to DV active area' is also enabled, only OSD triggers suppression."
+msgid "Dynamically sets Level 5 metadata to zero while the OSD is on screen, and restores it when the OSD disappears. This prevents the display from cropping or dimming content outside the active area."
+msgstr ""
+
+#. "Dolby Vision Level 5 Active Area Handling"
+#: system/settings/settings.xml
+msgctxt "#60154"
+msgid "DV Level 5 active area handling"
+msgstr ""
+
+#. "Dolby Vision Level 5 Active Area Handling"
+#: system/settings/settings.xml
+msgctxt "#60155"
+msgid "Enable Level 5 active area handling for Display-Led DV playback. Level 5 metadata defines the active content area within the frame (e.g., letterbox boundaries for scope content). When enabled, shows options for sending source L5 metadata, setting L5 to zero for OSD/subtitles, and restricting subtitles to the active area."
+msgstr ""
+
+#. "Dolby Vision Level 5 Subtitle Handling"
+#: system/settings/settings.xml
+msgctxt "#60156"
+msgid "Set L5 to 0 for subtitles"
+msgstr ""
+
+#. "Dolby Vision Level 5 Subtitle Handling"
+#: system/settings/settings.xml
+msgctxt "#60157"
+msgid "Dynamically sets Level 5 metadata to zero when subtitles are present, preventing the display from cropping or dimming them. 'Subtitle track enabled' sets L5 to zero whenever a subtitle track is turned on. 'Subtitles on screen' only sets L5 to zero when text subtitles are displayed or image-based subtitles extend outside the active area."
+msgstr ""
+
+#. "Dolby Vision Level 5 Subtitle Handling - Subtitle track active"
+#: system/settings/settings.xml
+msgctxt "#60158"
+msgid "Subtitle track enabled"
+msgstr ""
+
+#. "Dolby Vision Level 5 Subtitle Handling - Subtitles on screen"
+#: system/settings/settings.xml
+msgctxt "#60159"
+msgid "Subtitles on screen"
 msgstr ""
 
 #. "Dolby Vision Display Led Level 5 Handling"

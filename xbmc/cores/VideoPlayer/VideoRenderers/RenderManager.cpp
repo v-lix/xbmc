@@ -758,30 +758,41 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
     CRect src, dst, view;
     m_pRenderer->GetVideoRect(src, dst, view);
 
-    // Signal subtitle presence for L5 handling. When restriction is on, subs are
-    // already inside the active area — no signal needed. When off, signal so the
-    // kernel can decide whether to act based on the user's L5 suppression settings.
-    // Text subs: signal when visible (position depends on user config).
-    // Image subs: only signal when they extend outside the L5 active area.
-    bool hasSubsOutsideActiveArea = false;
-    if (!restrictSubsToActiveArea)
+    // Signal subtitle presence for L5 handling based on user's signal mode:
+    // 0 (Off): never signal — L5 stays at source regardless of subtitles
+    // 1 (When enabled): signal whenever a subtitle track is active
+    // 2 (When visible): signal when text subs are on screen or image subs
+    //   extend outside the L5 active area
+    // When restriction is on, subs are already inside the active area so
+    // image sub checks are skipped (text subs may still need signaling).
+    bool signalSubtitles = false;
+    int subsSignalMode = aml_dv_l5_subs_signal_mode();
+    if (subsSignalMode == 1)
     {
-      hasSubsOutsideActiveArea = m_overlays.HasTextOverlay(m_presentsource);
-      if (!hasSubsOutsideActiveArea && m_picture.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
+      // When enabled: signal if any subtitle overlay is in the buffer
+      signalSubtitles = m_overlays.HasOverlay(m_presentsource);
+    }
+    else if (subsSignalMode == 2)
+    {
+      // When visible: signal for text subs on screen
+      signalSubtitles = m_overlays.HasTextOverlay(m_presentsource);
+      // Also signal for image subs outside the active area (only when not restricted)
+      if (!signalSubtitles && !restrictSubsToActiveArea &&
+          m_picture.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
       {
         const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
         if (doviMeta.has_level5_metadata &&
             (doviMeta.level5_active_area_top_offset > 0 ||
              doviMeta.level5_active_area_bottom_offset > 0))
         {
-          hasSubsOutsideActiveArea = m_overlays.HasImageSubOutsideActiveArea(
+          signalSubtitles = m_overlays.HasImageSubOutsideActiveArea(
               m_presentsource,
               doviMeta.level5_active_area_top_offset,
               doviMeta.level5_active_area_bottom_offset);
         }
       }
     }
-    aml_dv_set_subtitles(hasSubsOutsideActiveArea);
+    aml_dv_set_subtitles(signalSubtitles);
 
     CalcOverlayActiveArea(src, dst, restrictSubsToActiveArea);
     m_overlays.SetVideoRect(src, dst, view);
