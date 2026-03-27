@@ -19017,8 +19017,8 @@ msgid "Restrict subtitles to DV active area"
 msgstr "Untertitel auf DV-Aktivbereich beschränken"
 
 msgctxt "#60191"
-msgid "Reposition text subtitles to fit within the Level 5 active content area during Display-Led DV playback. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles outside the active area. When combined with Level 5 suppression, only OSD triggers L5 drops since subtitles are already inside the active area."
-msgstr "Text-Untertitel während TV-Led-DV-Wiedergabe in den Level-5-Aktivbereich verschieben. Aktivieren, wenn das Display Letterbox-Balken basierend auf Level-5-Metadaten beschneidet. In Kombination mit Level-5-Unterdrückung löst nur das OSD L5-Drops aus, da Untertitel bereits im Aktivbereich liegen."
+msgid "Reposition subtitles to fit within the Level 5 active content area during Display-Led DV playback. Applies to both text and image-based (PGS) subtitles. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles outside the active area. When combined with Level 5 suppression, only OSD triggers L5 drops since subtitles are already inside the active area."
+msgstr "Untertitel während TV-Led-DV-Wiedergabe in den Level-5-Aktivbereich verschieben. Gilt für Text- und bildbasierte (PGS) Untertitel. Aktivieren, wenn das Display Letterbox-Balken basierend auf Level-5-Metadaten beschneidet. In Kombination mit Level-5-Unterdrückung löst nur das OSD L5-Drops aus, da Untertitel bereits im Aktivbereich liegen."
 
 msgctxt "#60192"
 msgid "Apply configured subtitle margin"

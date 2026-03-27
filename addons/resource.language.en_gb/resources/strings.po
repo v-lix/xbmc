@@ -25760,7 +25760,7 @@ msgstr ""
 #. "Dolby Vision Display Led Restrict Overlays"
 #: system/settings/settings.xml
 msgctxt "#60191"
-msgid "Reposition text subtitles to fit within the Level 5 active content area during Display-Led DV playback. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles outside the active area. When combined with Level 5 suppression, only OSD triggers L5 drops since subtitles are already inside the active area."
+msgid "Reposition subtitles to fit within the Level 5 active content area during Display-Led DV playback. Applies to both text and image-based (PGS) subtitles. Enable if your display crops letterbox bars based on Level 5 metadata, hiding subtitles outside the active area. When combined with Level 5 suppression, only OSD triggers L5 drops since subtitles are already inside the active area."
 msgstr ""
 
 #. "Dolby Vision Display Led Restrict Overlays - User Position"
