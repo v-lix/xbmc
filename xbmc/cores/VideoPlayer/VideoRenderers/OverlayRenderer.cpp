@@ -326,6 +326,40 @@ bool CRenderer::HasTextOverlay(int idx)
   return false;
 }
 
+bool CRenderer::HasImageSubOutsideActiveArea(int idx, int l5Top, int l5Bottom)
+{
+  std::unique_lock<CCriticalSection> lock(m_section);
+
+  if (m_rs.Height() <= 0)
+    return false;
+
+  float vidRatio = m_rs.Width() / m_rs.Height();
+  float activeTopFrac = static_cast<float>(l5Top) / m_rs.Height();
+  float activeBotFrac = 1.0f - static_cast<float>(l5Bottom) / m_rs.Height();
+
+  for (const auto& e : m_buffers[idx])
+  {
+    if (!e.overlay_dvd || !e.overlay_dvd->IsOverlayType(DVDOVERLAY_TYPE_IMAGE))
+      continue;
+
+    const auto& img = static_cast<CDVDOverlayImage&>(*e.overlay_dvd);
+    if (img.source_width <= 0 || img.source_height <= 0)
+      continue;
+
+    // Only check ALIGN_VIDEO subs (matching aspect ratio)
+    float subRatio = static_cast<float>(img.source_width) / img.source_height;
+    if (std::fabs(subRatio - vidRatio) >= 0.001f)
+      continue;
+
+    float subTopFrac = static_cast<float>(img.y) / img.source_height;
+    float subBotFrac = static_cast<float>(img.y + img.height) / img.source_height;
+
+    if (subTopFrac < activeTopFrac || subBotFrac > activeBotFrac)
+      return true;
+  }
+  return false;
+}
+
 void CRenderer::SetVideoRect(CRect &source, CRect &dest, CRect &view)
 {
   if (m_rv != view) // Screen resolution is changed

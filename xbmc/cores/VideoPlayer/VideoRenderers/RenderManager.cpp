@@ -754,14 +754,36 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
       m_pRenderer->Update();
 
     m_renderedOverlay = m_overlays.HasOverlay(m_presentsource);
-    bool useActiveArea = aml_dv_use_active_area();
-    // Only signal subtitle presence for L5 suppression if subs aren't already
-    // restricted to the active area via margins. When restricted, L5 can stay
-    // active since subs won't be outside the cropped region.
-    aml_dv_set_subtitles(!useActiveArea && m_overlays.HasTextOverlay(m_presentsource));
+    bool restrictSubsToActiveArea = aml_dv_use_active_area();
     CRect src, dst, view;
     m_pRenderer->GetVideoRect(src, dst, view);
-    CalcOverlayActiveArea(src, dst, useActiveArea);
+
+    // Signal subtitle presence for L5 handling. When restriction is on, subs are
+    // already inside the active area — no signal needed. When off, signal so the
+    // kernel can decide whether to act based on the user's L5 suppression settings.
+    // Text subs: signal when visible (position depends on user config).
+    // Image subs: only signal when they extend outside the L5 active area.
+    bool hasSubsOutsideActiveArea = false;
+    if (!restrictSubsToActiveArea)
+    {
+      hasSubsOutsideActiveArea = m_overlays.HasTextOverlay(m_presentsource);
+      if (!hasSubsOutsideActiveArea && m_picture.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
+      {
+        const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
+        if (doviMeta.has_level5_metadata &&
+            (doviMeta.level5_active_area_top_offset > 0 ||
+             doviMeta.level5_active_area_bottom_offset > 0))
+        {
+          hasSubsOutsideActiveArea = m_overlays.HasImageSubOutsideActiveArea(
+              m_presentsource,
+              doviMeta.level5_active_area_top_offset,
+              doviMeta.level5_active_area_bottom_offset);
+        }
+      }
+    }
+    aml_dv_set_subtitles(hasSubsOutsideActiveArea);
+
+    CalcOverlayActiveArea(src, dst, restrictSubsToActiveArea);
     m_overlays.SetVideoRect(src, dst, view);
     m_overlays.Render(m_presentsource);
 
