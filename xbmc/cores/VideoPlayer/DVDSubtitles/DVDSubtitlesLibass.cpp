@@ -303,23 +303,16 @@ ASS_Image* CDVDSubtitlesLibass::RenderImage(double pts,
   }
 
   int marginTop{0};
-  int marginBottom{0};
   int marginLeft{0};
-  if (opts.marginsMode == MarginsMode::INSIDE_ACTIVE_AREA)
-  {
-    marginTop = opts.activeAreaTopMargin;
-    marginBottom = opts.activeAreaBottomMargin;
-  }
-  else if (useFrameMargins)
+  if (useFrameMargins)
   {
     marginTop =
         static_cast<int>((opts.frameHeight - std::min(opts.videoHeight, opts.frameHeight)) / 2);
-    marginBottom = marginTop;
     marginLeft =
         static_cast<int>((opts.frameWidth - std::min(opts.videoWidth, opts.frameWidth)) / 2);
   }
 
-  ass_set_margins(m_renderer, marginTop, marginBottom, marginLeft, marginLeft);
+  ass_set_margins(m_renderer, marginTop, marginTop, marginLeft, marginLeft);
   ass_set_use_margins(m_renderer, 0);
 
   float fontScale{1.0f};
@@ -329,15 +322,6 @@ ASS_Image* CDVDSubtitlesLibass::RenderImage(double pts,
     // to show same font size even if the video do not cover in full the
     // window (e.g. cropped videos, zoom effect) and player add black bars.
     fontScale *= std::max(opts.frameHeight / opts.videoHeight, 1.0f);
-  }
-  else if (opts.marginsMode == MarginsMode::INSIDE_ACTIVE_AREA)
-  {
-    // Compensate for margins reducing the effective rendering area
-    float activeAreaHeight = opts.frameHeight -
-        static_cast<float>(opts.activeAreaTopMargin) -
-        static_cast<float>(opts.activeAreaBottomMargin);
-    if (activeAreaHeight > 0.0f)
-      fontScale *= opts.frameHeight / activeAreaHeight;
   }
 
   ass_set_font_scale(m_renderer, static_cast<double>(fontScale));
@@ -515,10 +499,22 @@ void CDVDSubtitlesLibass::ApplyStyle(const std::shared_ptr<struct style>& subSty
     }
     else if (opts.marginsMode == MarginsMode::INSIDE_ACTIVE_AREA)
     {
+      // Use style MarginV to push subs inside the L5 active area.
+      // MarginV pushes from bottom for VALIGN_SUB, from top for VALIGN_TOP.
+      // Convert L5 pixel offsets to PlayResY-scaled units.
+      int l5Margin = 0;
+      if (opts.frameHeight > 0)
+      {
+        bool isTop = (subStyle->alignment == FontAlign::TOP_LEFT ||
+                      subStyle->alignment == FontAlign::TOP_CENTER ||
+                      subStyle->alignment == FontAlign::TOP_RIGHT);
+        int offsetPx = isTop ? opts.activeAreaTopMargin : opts.activeAreaBottomMargin;
+        l5Margin = static_cast<int>(offsetPx * playResY / static_cast<double>(opts.frameHeight));
+      }
       if (opts.activeAreaApplyUserPos)
-        style->MarginV = static_cast<int>(subStyle->marginVertical * scaleDefault);
+        style->MarginV = l5Margin + static_cast<int>(subStyle->marginVertical * scaleDefault);
       else
-        style->MarginV = 0;
+        style->MarginV = l5Margin;
       style->MarginL = 0;
       style->MarginR = 0;
     }

@@ -74,7 +74,7 @@ enum class MarginsMode
   DEFAULT,
   // Apply margins to position text within the video area (cropped videos)
   INSIDE_VIDEO,
-  // Apply margins like INSIDE_VIDEO but without font scaling (L5 active area)
+  // Use style MarginV to push subs inside the L5 active area (no canvas change)
   INSIDE_ACTIVE_AREA,
   // Disable any kind of margin
   DISABLED
