@@ -124,6 +124,9 @@
 #include "storage/MediaManager.h"
 #include "threads/SingleLock.h"
 #include "threads/SystemClock.h"
+
+#include <cstdlib>
+#include <thread>
 #include "utils/AlarmClock.h"
 #include "utils/CPUInfo.h"
 #include "utils/CharsetConverter.h"
@@ -2084,6 +2087,21 @@ bool CApplication::Stop(int exitCode)
 #endif
 
   CLog::Log(LOGINFO, "Stopping the application...");
+
+  // Watchdog: if the shutdown sequence takes longer than the configured
+  // timeout, force-exit so systemd can proceed with the reboot/shutdown.
+  // Addons (or core subsystems) that deadlock during teardown would
+  // otherwise block forever since kodi never tells systemd to reboot.
+  const int shutdownTimeout =
+      CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_addonScriptStopTimeout;
+  std::thread shutdownWatchdog([shutdownTimeout]() {
+    std::this_thread::sleep_for(std::chrono::seconds(shutdownTimeout));
+    CLog::Log(LOGERROR,
+              "CApplication::Stop - shutdown watchdog triggered after {}s, forcing exit",
+              shutdownTimeout);
+    _exit(0);
+  });
+  shutdownWatchdog.detach();
 
   bool success = true;
 
