@@ -512,7 +512,14 @@ void CDVDSubtitlesLibass::ApplyStyle(const std::shared_ptr<struct style>& subSty
         l5Margin = static_cast<int>(offsetPx * playResY / static_cast<double>(opts.frameHeight));
       }
       if (opts.activeAreaApplyUserPos)
-        style->MarginV = l5Margin + static_cast<int>(subStyle->marginVertical * scaleDefault);
+      {
+        // Scale user margin relative to active area height, not full frame
+        double activeAreaHeight = static_cast<double>(opts.frameHeight) -
+            opts.activeAreaTopMargin - opts.activeAreaBottomMargin;
+        double areaScale = (opts.frameHeight > 0) ? activeAreaHeight / opts.frameHeight : 1.0;
+        style->MarginV = l5Margin +
+            static_cast<int>(subStyle->marginVertical * scaleDefault * areaScale);
+      }
       else
         style->MarginV = l5Margin;
       style->MarginL = 0;
