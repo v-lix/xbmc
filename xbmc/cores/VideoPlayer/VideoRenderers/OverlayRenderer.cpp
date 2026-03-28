@@ -280,15 +280,29 @@ void CRenderer::Render(COverlay* o)
   {
     float activeTop = m_rd.y1 + static_cast<float>(m_activeAreaTopOffset);
     float activeBottom = m_rd.y1 + m_rd.Height() - static_cast<float>(m_activeAreaBottomOffset);
+    float activeHeight = activeBottom - activeTop;
+    float rdHeight = m_rd.Height();
+
     bool centerBased = (o->m_pos == COverlay::POSITION_RELATIVE);
     float halfH = centerBased ? state.height * 0.5f : 0.0f;
     float subTop = state.y - halfH;
     float subBottom = state.y + (centerBased ? halfH : state.height);
 
-    if (subTop < activeTop)
-      state.y = activeTop + halfH;
-    if (subBottom > activeBottom)
-      state.y = activeBottom - (centerBased ? halfH : state.height);
+    // Infer the authoring margin from the sub's distance to the video display
+    // edge and scale it proportionally to the active area height. This preserves
+    // the original padding intent when clamping subs into the active area.
+    if (subBottom > activeBottom && rdHeight > 0.0f)
+    {
+      float bottomGap = (m_rd.y1 + rdHeight) - subBottom;
+      float padding = (bottomGap / rdHeight) * activeHeight;
+      state.y = activeBottom - padding - (centerBased ? halfH : state.height);
+    }
+    if (subTop < activeTop && rdHeight > 0.0f)
+    {
+      float topGap = subTop - m_rd.y1;
+      float padding = (topGap / rdHeight) * activeHeight;
+      state.y = activeTop + padding + halfH;
+    }
   }
 
   o->Render(state);
