@@ -62,6 +62,10 @@ static std::shared_ptr<CSettings> settings()
 // Cached DV mode — updated by aml_dv_on/aml_dv_off, avoids per-frame sysfs reads.
 static unsigned int s_dvModeCached = DOLBY_VISION_OUTPUT_MODE_BYPASS;
 
+// Tracks whether DV playback is active (between aml_dv_open/aml_dv_close).
+// Used by CreateNewWindow to avoid restoring IPT during playback-start mode switches.
+static bool s_dvPlaybackActive = false;
+
 static void aml_dv_reset_osd_max()
 {
   int max(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE));
@@ -964,6 +968,8 @@ unsigned int aml_dv_dolby_vision_mode()
 
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries)
 {
+  s_dvPlaybackActive = true;
+
   // Detect PM4K once at playback start for OSD visibility override.
   s_pm4kHome = CServiceBroker::GetGUI()->GetWindowManager().GetWindow(WINDOW_HOME);
   s_pm4kActive = s_pm4kHome && !s_pm4kHome->GetProperty("script.plex.is_active").asString().empty();
@@ -996,6 +1002,7 @@ void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries 
 
 void aml_dv_close()
 {
+  s_dvPlaybackActive = false;
   s_pm4kActive = false;
   s_pm4kHome = nullptr;
 
@@ -1009,6 +1016,11 @@ void aml_dv_close()
 
   if (aml_is_dv_enable())
     aml_dv_off();
+}
+
+bool aml_dv_playback_active()
+{
+  return s_dvPlaybackActive;
 }
 
 void aml_dv_set_osd_max(int max)
