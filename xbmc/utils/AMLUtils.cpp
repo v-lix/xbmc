@@ -908,6 +908,15 @@ void aml_dv_send_profile(int dvprofile)
 
 // aml_linux_force_422 moved before aml_dv_on()
 
+static int s_lastSubtitles = -1;
+static int s_lastOsd = -1;
+
+void aml_dv_reset_l5_signals()
+{
+  s_lastSubtitles = -1;
+  s_lastOsd = -1;
+}
+
 void aml_dv_off()
 {
   // change mode and disable.
@@ -950,6 +959,12 @@ void aml_dv_off()
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp_tm", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5", false);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5_osdst", false);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5_subt", false);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_subtitles", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_xbmc_osd", 0);
+  aml_dv_reset_l5_signals();
 
   // Do set_disp_mode_auto on kernel.
   if (modeChange)
@@ -1098,12 +1113,11 @@ void aml_dv_wait_for_pipeline()
 
 void aml_dv_set_subtitles(bool visible)
 {
-  static int s_last = -1;
   int val = visible ? 1 : 0;
-  if (val != s_last)
+  if (val != s_lastSubtitles)
   {
     CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_subtitles", val);
-    s_last = val;
+    s_lastSubtitles = val;
   }
 }
 
@@ -1121,7 +1135,6 @@ void aml_dv_set_xbmc_osd()
                  wm.IsWindowVisible(WINDOW_VIDEO_MENU) ||
                  CServiceBroker::GetDataCacheCore().GetAVChangeExtended();
 
-  static int s_lastOsd = -1;
   int val = osd_active ? 1 : 0;
   if (val != s_lastOsd)
   {

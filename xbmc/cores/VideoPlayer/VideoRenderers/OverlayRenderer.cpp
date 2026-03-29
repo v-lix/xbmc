@@ -97,6 +97,9 @@ void CRenderer::Reset()
 {
   m_subtitlePosition = 0;
   m_subtitlePosResInfo = -1;
+  m_activeAreaTopOffset = 0;
+  m_activeAreaBottomOffset = 0;
+  m_activeAreaApplyUserPos = false;
 }
 
 void CRenderer::Release(int idx)
