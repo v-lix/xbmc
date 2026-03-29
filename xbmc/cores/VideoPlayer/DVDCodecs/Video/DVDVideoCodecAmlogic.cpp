@@ -368,6 +368,9 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
                       __MODULE_NAME__, __FUNCTION__, static_cast<int>(cmv40Mode));
             m_bitstream->SetAppendCMv40(cmv40Mode);
           }
+          m_bitstream->SetCMv40DisplayParams(
+              settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE),
+              settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM));
           m_appendCMv40ModeApplied = cmv40Mode;
 
           if (dualPriorityHdr10Plus)

@@ -677,25 +677,23 @@ inline void AppendCMv40(DOVICMv40Mode cmv40Mode,
                         int32_t& nalSize,
                         std::vector<uint8_t>& nalu,
                         DoviRpuOpaque*& opaque,
-                        uint8_t& trim)
+                        uint8_t& trim,
+                        int dvType,
+                        int maxLumNits)
 {
   if (!header || !vdrDmData) return;
 
-  DOVIStreamMetadata dovi_stream_metadata;
-  dovi_stream_metadata = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
+  DOVIStreamMetadata dovi_stream_metadata =
+      CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
   int source_max_nits = max_pq_to_nits(static_cast<int>(dovi_stream_metadata.source_max_pq));
-  int max_lum_nits_value(CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
-      CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM));
-  bool is_displayML_higher_sourceMDL = (max_lum_nits_value >= source_max_nits);
-  int dv_type(CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
-      CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE));
+  bool is_displayML_higher_sourceMDL = (maxLumNits >= source_max_nits);
 
   const bool hasLevel254 = (vdrDmData->dm_data.level254 != nullptr);
   if (!((((cmv40Mode == DOVICMv40Mode::CMV40_ALWAYS) && !hasLevel254) ||
          ((cmv40Mode == DOVICMv40Mode::CMV40_AUTO) &&
           (IsCMv29NoL2(header, vdrDmData) || (!hasLevel254 && is_displayML_higher_sourceMDL))) ||
          ((cmv40Mode == DOVICMv40Mode::CMV40_NO_L2) && IsCMv29NoL2(header, vdrDmData))) &&
-        (dv_type == 0)))
+        (dvType == 0)))
     return;
 
   opaque = AppendCMv40ToRpuNalu(nalBuf, nalSize, nalu, trim);
@@ -1655,7 +1653,8 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
 
     if (m_append_cmv40 != DOVICMv40Mode::CMV40_NONE)
       AppendCMv40(m_append_cmv40, header, vdrDmData, nal_buf, nal_size,
-                  nalu, appendOpaque, m_cmv40_trim);
+                  nalu, appendOpaque, m_cmv40_trim,
+                  m_cmv40_dv_type, m_cmv40_max_lum_nits);
 
     DoviRpuOpaque* metadataOpaque = appendOpaque ? appendOpaque : opaque;
     PopulateDoviRpuInfo(metadataOpaque, m_first_frame, m_hints.dovi_el_type,

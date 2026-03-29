@@ -142,6 +142,10 @@ public:
                       if (m_append_cmv40 != value) InvalidateDoViCache();
                       m_append_cmv40 = value;
                     }
+  void              SetCMv40DisplayParams(int dvType, int maxLumNits) {
+                      m_cmv40_dv_type = dvType;
+                      m_cmv40_max_lum_nits = maxLumNits;
+                    }
   void              SetConvertHdr10Plus(bool value) { m_convert_Hdr10Plus = value; }
   void              SetPreferCovertHdr10Plus(bool value) { m_prefer_Hdr10Plus_conversion = value; }
   void              SetConvertHdr10PlusPeakBrightnessSource(enum PeakBrightnessSource value) { m_convert_Hdr10Plus_peak_brightness_source = value; };
@@ -230,6 +234,8 @@ protected:
   bool              m_first_frame;
   enum DOVICMv40Mode m_append_cmv40;
   uint8_t           m_cmv40_trim{1};
+  int               m_cmv40_dv_type{0};
+  int               m_cmv40_max_lum_nits{0};
   HDRStaticMetadataInfo m_hdrStaticMetadataInfo;
   std::vector<uint8_t> m_cached_dovi_rpu_in_nal;
   std::vector<uint8_t> m_cached_dovi_rpu_out_nal;
