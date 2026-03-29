@@ -19089,8 +19089,8 @@ msgid "Append CMv4.0 metadata"
 msgstr "CMv4.0-Metadaten anhängen"
 
 msgctxt "#60321"
-msgid "Append CMv4.0 extension blocks to Dolby Vision profile 7 and 8 RPU metadata during playback. CMv4.0 enables display-managed tonemapping which generally produces better picture quality than CMv2.9. Only applies to Display-Led (Standard) mode without Video Processor."
-msgstr "CMv4.0-Erweiterungsblöcke an Dolby Vision Profil 7 und 8 RPU-Metadaten während der Wiedergabe anhängen. CMv4.0 aktiviert Display-gesteuertes Tonemapping, das in der Regel eine bessere Bildqualität als CMv2.9 liefert. Gilt nur für Display-Led (Standard) ohne Video Processor."
+msgid "Append CMv4.0 extension blocks to Dolby Vision RPU metadata during playback. CMv4.0 enables display-managed tonemapping which generally produces better picture quality than CMv2.9."
+msgstr "CMv4.0-Erweiterungsblöcke an Dolby Vision RPU-Metadaten während der Wiedergabe anhängen. CMv4.0 aktiviert Display-gesteuertes Tonemapping, das in der Regel eine bessere Bildqualität als CMv2.9 liefert."
 
 msgctxt "#60322"
 msgid "Off"
