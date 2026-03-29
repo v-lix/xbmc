@@ -683,9 +683,12 @@ inline void AppendCMv40(DOVICMv40Mode cmv40Mode,
 {
   if (!header || !vdrDmData) return;
 
-  DOVIStreamMetadata dovi_stream_metadata =
-      CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata();
-  int source_max_nits = max_pq_to_nits(static_cast<int>(dovi_stream_metadata.source_max_pq));
+  // Read source_max_pq directly from the parsed RPU rather than DataCacheCore.
+  // PopulateDoviRpuInfo hasn't run yet on the first frame, so DataCacheCore
+  // would still have 0 → max_pq_to_nits(0) = 96 → every display passes the
+  // luminance check, causing CMv4.0 to always be appended regardless of the
+  // actual source luminance. This is a bug also present in avdvplus R9.
+  int source_max_nits = max_pq_to_nits(static_cast<int>(vdrDmData->source_max_pq));
   bool is_displayML_higher_sourceMDL = (maxLumNits >= source_max_nits);
 
   const bool hasLevel254 = (vdrDmData->dm_data.level254 != nullptr);
