@@ -1091,11 +1091,20 @@ void aml_dv_start()
 {
   std::lock_guard<std::mutex> lock(s_dvStartMutex);
 
-  // Clean up stale DV kernel state (e.g. from a previous crash where
-  // aml_dv_off() never ran).  This ensures the display returns to SDR
-  // before we (re-)initialize DV according to the user's settings.
+  // If DV is already enabled in IPT mode, another thread (e.g. CreateNewWindow)
+  // already restored the pipeline — skip the redundant off→on cycle which would
+  // race with the concurrent HDMI mode switch.
   if (aml_is_dv_enable())
+  {
+    unsigned int mode = aml_dv_dolby_vision_mode();
+    if (mode == DOLBY_VISION_OUTPUT_MODE_IPT || mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
+      return;
+
+    // Clean up stale DV kernel state (e.g. from a previous crash where
+    // aml_dv_off() never ran).  This ensures the display returns to SDR
+    // before we (re-)initialize DV according to the user's settings.
     aml_dv_off();
+  }
 
   if (aml_dv_mode() == DV_MODE_ON) {
     aml_dv_reset_osd_max();
