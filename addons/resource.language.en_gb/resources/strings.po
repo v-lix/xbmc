@@ -25859,6 +25859,32 @@ msgctxt "#60211"
 msgid "Set Brightness-2 adjustment (compensation) when using Min PQ 20."
 msgstr ""
 
+#. CMv4.0 append setting
+#: system/settings/settings.xml
+msgctxt "#60320"
+msgid "Append CMv4.0 metadata"
+msgstr ""
+
+msgctxt "#60321"
+msgid "Append CMv4.0 extension blocks to Dolby Vision profile 7 and 8 RPU metadata during playback. CMv4.0 enables display-managed tonemapping which generally produces better picture quality than CMv2.9. Only applies to Display-Led (Standard) mode without Video Processor."
+msgstr ""
+
+msgctxt "#60322"
+msgid "Off"
+msgstr ""
+
+msgctxt "#60323"
+msgid "CMv2.9 without L2 trims"
+msgstr ""
+
+msgctxt "#60324"
+msgid "Always"
+msgstr ""
+
+msgctxt "#60325"
+msgid "Auto"
+msgstr ""
+
 #. "Dolby Vision Display LL Dolby VSVDB Limit"
 #: system/settings/settings.xml
 msgctxt "#60500"

@@ -8,6 +8,8 @@
 
 #include "BitstreamIoWriter.h"
 
+#include <cstring>
+
 void BitstreamIoWriter::ensure_capacity(size_t bits_needed) {
     size_t bytes_needed = (bit_position + bits_needed + 7) / 8;
     if (buffer.size() < bytes_needed) {
@@ -33,6 +35,18 @@ void BitstreamIoWriter::write(bool v) {
     }
     
     bit_position++;
+}
+
+void BitstreamIoWriter::write_bytes(const uint8_t* data, size_t count) {
+    ensure_capacity(count * 8);
+    if (is_aligned()) {
+        size_t byte_pos = bit_position / 8;
+        std::memcpy(buffer.data() + byte_pos, data, count);
+        bit_position += count * 8;
+    } else {
+        for (size_t i = 0; i < count; i++)
+            write_n<uint8_t>(data[i], 8);
+    }
 }
 
 template<typename T>

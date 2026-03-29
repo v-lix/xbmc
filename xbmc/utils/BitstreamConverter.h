@@ -12,6 +12,7 @@
 
 #include <optional>
 #include <stdint.h>
+#include <vector>
 
 #include "ServiceBroker.h"
 #include "cores/DataCacheCore.h"
@@ -96,6 +97,14 @@ enum DOVIMode : int
   MODE_TO81
 };
 
+enum DOVICMv40Mode : int
+{
+  CMV40_NONE = 0,
+  CMV40_NO_L2,
+  CMV40_ALWAYS,
+  CMV40_AUTO
+};
+
 class CBitstreamParser
 {
 public:
@@ -125,7 +134,14 @@ public:
   int               GetExtraSize() const;
   void              ResetStartDecode(void);
   bool              CanStartDecode() const;
-  void              SetConvertDovi(enum DOVIMode value) { m_convert_dovi = value; }
+  void              SetConvertDovi(enum DOVIMode value) {
+                      if (m_convert_dovi != value) InvalidateDoViCache();
+                      m_convert_dovi = value;
+                    }
+  void              SetAppendCMv40(enum DOVICMv40Mode value) {
+                      if (m_append_cmv40 != value) InvalidateDoViCache();
+                      m_append_cmv40 = value;
+                    }
   void              SetConvertHdr10Plus(bool value) { m_convert_Hdr10Plus = value; }
   void              SetPreferCovertHdr10Plus(bool value) { m_prefer_Hdr10Plus_conversion = value; }
   void              SetConvertHdr10PlusPeakBrightnessSource(enum PeakBrightnessSource value) { m_convert_Hdr10Plus_peak_brightness_source = value; };
@@ -137,6 +153,11 @@ public:
   static bool       h264_sequence_header(const uint8_t *data, const uint32_t size, h264_sequence *sequence);
 
 protected:
+  void InvalidateDoViCache() {
+    m_cached_dovi_rpu_in_nal.clear();
+    m_cached_dovi_rpu_out_nal.clear();
+  }
+
   static int        avc_parse_nal_units(AVIOContext *pb, const uint8_t *buf_in, int size);
   static int        avc_parse_nal_units_buf(const uint8_t *buf_in, uint8_t **buf, int *size);
   int               isom_write_avcc(AVIOContext *pb, const uint8_t *data, int len);
@@ -207,12 +228,16 @@ protected:
   bool              m_dual_priority_Hdr10Plus;
   enum PeakBrightnessSource m_convert_Hdr10Plus_peak_brightness_source;
   bool              m_first_frame;
+  enum DOVICMv40Mode m_append_cmv40;
+  uint8_t           m_cmv40_trim{1};
   HDRStaticMetadataInfo m_hdrStaticMetadataInfo;
+  std::vector<uint8_t> m_cached_dovi_rpu_in_nal;
+  std::vector<uint8_t> m_cached_dovi_rpu_out_nal;
+  DOVIFrameMetadata m_cached_dovi_frame_metadata{};
 };
 
 void aml_dv_send_md_levels();
 void aml_dv_send_hdr10_data();
 void aml_dv_send_el_type();
 void aml_dv_send_profile(int dvprofile);
-void aml_dv_hdr10plus_conversion(bool hdr10plus_conversion);
 void aml_kodi_set_cd_cs(int cd_cs_type);

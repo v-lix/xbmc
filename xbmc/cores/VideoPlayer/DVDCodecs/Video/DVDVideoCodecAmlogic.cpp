@@ -20,6 +20,7 @@
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
+#include "settings/lib/Setting.h"
 #include "threads/Thread.h"
 
 #define __MODULE_NAME__ "DVDVideoCodecAmlogic"
@@ -73,11 +74,55 @@ CDVDVideoCodecAmlogic::CDVDVideoCodecAmlogic(CProcessInfo &processInfo)
   , m_has_keyframe(false)
   , m_bitparser(NULL)
 {
+  if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
+  {
+    if (const auto settings = settingsComponent->GetSettings())
+    {
+      settings->RegisterCallback(this, {CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND});
+      m_settingsCallbackRegistered = true;
+    }
+  }
+  UpdateAppendCMv40SettingCache();
 }
 
 CDVDVideoCodecAmlogic::~CDVDVideoCodecAmlogic()
 {
+  if (m_settingsCallbackRegistered)
+  {
+    if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
+    {
+      if (const auto settings = settingsComponent->GetSettings())
+        settings->UnregisterCallback(this);
+    }
+  }
   Close();
+}
+
+void CDVDVideoCodecAmlogic::UpdateAppendCMv40SettingCache()
+{
+  if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
+  {
+    if (const auto settings = settingsComponent->GetSettings())
+      m_appendCMv40ModeSetting.store(
+          settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND));
+  }
+}
+
+void CDVDVideoCodecAmlogic::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
+{
+  if (setting->GetId() == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND)
+    UpdateAppendCMv40SettingCache();
+}
+
+void CDVDVideoCodecAmlogic::ApplyDynamicDoViSettings()
+{
+  if (!m_bitstream) return;
+  const auto mode = static_cast<DOVICMv40Mode>(m_appendCMv40ModeSetting.load());
+  if (mode == m_appendCMv40ModeApplied) return;
+
+  m_bitstream->SetAppendCMv40(mode);
+  m_appendCMv40ModeApplied = mode;
+  CLog::Log(LOGINFO, "{}::{} - CMv4.0 append mode changed to {}", __MODULE_NAME__, __FUNCTION__, static_cast<int>(mode));
 }
 
 std::unique_ptr<CDVDVideoCodec> CDVDVideoCodecAmlogic::Create(CProcessInfo& processInfo)
@@ -314,8 +359,17 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
         
         bool dualPriorityHdr10Plus = (settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_DUAL_PRIORITY) == 1);
         
-        if (m_hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION) 
+        if (m_hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
         {
+          auto cmv40Mode = static_cast<DOVICMv40Mode>(m_appendCMv40ModeSetting.load());
+          if (cmv40Mode != DOVICMv40Mode::CMV40_NONE)
+          {
+            CLog::Log(LOGINFO, "{}::{} - DV HEVC bitstream - CMv4.0 append mode: {}",
+                      __MODULE_NAME__, __FUNCTION__, static_cast<int>(cmv40Mode));
+            m_bitstream->SetAppendCMv40(cmv40Mode);
+          }
+          m_appendCMv40ModeApplied = cmv40Mode;
+
           if (dualPriorityHdr10Plus)
           {
             CLog::Log(LOGINFO, "{}::{} - DV HEVC bitstream - if stream also contains HDR10+, native HDR10+ has priority.",
@@ -454,6 +508,8 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
 {
   // Handle Input, add demuxer packet to input queue, we must accept it or
   // it will be discarded as VideoPlayerVideo has no concept of "try again".
+
+  ApplyDynamicDoViSettings();
 
   uint8_t *pData(packet.pData);
   uint32_t iSize(packet.iSize);
