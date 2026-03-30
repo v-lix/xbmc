@@ -1677,6 +1677,16 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
                         m_hints.dovi, pts, m_dataCacheCore,
                         &m_cached_dovi_frame_metadata);
 
+    if (appendOpaque)
+    {
+      DOVIStreamMetadata meta = m_dataCacheCore.GetVideoDoViStreamMetadata();
+      if (!meta.meta_version.empty() && meta.meta_version[0] != 'V')
+      {
+        meta.meta_version = "V" + meta.meta_version;
+        m_dataCacheCore.SetVideoDoViStreamMetadata(meta);
+      }
+    }
+
     dovi_rpu_free_header(header);
     dovi_rpu_free_vdr_dm_data(vdrDmData);
     dovi_rpu_free(opaque);
