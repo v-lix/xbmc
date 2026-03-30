@@ -366,9 +366,45 @@ inline void PopulateDoviRpuInfo(DoviRpuOpaque* opaque,
       *outDoViFrameMetadata = doviFrameMetadata;
   }
 
+  // Update meta_version on every cache miss — CMv4.0 append decisions
+  // vary per scene based on L2 presence. Source PQ, L6, L5 are stream-level
+  // properties set on first frame only.
+  if (vdrDmData)
+  {
+    std::string metaVersion;
+    if (vdrDmData->dm_data.level254)
+    {
+      const unsigned int noL8 = vdrDmData->dm_data.level8.len;
+      if (noL8 > 0)
+        metaVersion = fmt::format("CMv4.0 {}-{} {}-L8",
+                                  vdrDmData->dm_data.level254->dm_version_index,
+                                  vdrDmData->dm_data.level254->dm_mode, noL8);
+      else
+        metaVersion = fmt::format("CMv4.0 {}-{}",
+                                  vdrDmData->dm_data.level254->dm_version_index,
+                                  vdrDmData->dm_data.level254->dm_mode);
+    }
+    else if (vdrDmData->dm_data.level1)
+    {
+      const unsigned int noL2 = vdrDmData->dm_data.level2.len;
+      if (noL2 > 0)
+        metaVersion = fmt::format("CMv2.9 {}-L2", noL2);
+      else
+        metaVersion = "CMv2.9";
+    }
+
+    DOVIStreamMetadata currentMeta = dataCacheCore.GetVideoDoViStreamMetadata();
+    if (currentMeta.meta_version != metaVersion)
+    {
+      currentMeta.meta_version = metaVersion;
+      dataCacheCore.SetVideoDoViStreamMetadata(currentMeta);
+    }
+  }
+
   if (firstFrame)
   {
-    DOVIStreamMetadata doviStreamMetadata;
+    DOVIStreamMetadata doviStreamMetadata =
+        dataCacheCore.GetVideoDoViStreamMetadata();
 
     if (vdrDmData)
     {
@@ -388,28 +424,6 @@ inline void PopulateDoviRpuInfo(DoviRpuOpaque* opaque,
           vdrDmData->dm_data.level6->max_frame_average_light_level;
     }
 
-    std::string metaVersion;
-    if (vdrDmData && vdrDmData->dm_data.level254)
-    {
-      const unsigned int noL8 = vdrDmData->dm_data.level8.len;
-      if (noL8 > 0)
-        metaVersion = fmt::format("CMv4.0 {}-{} {}-L8",
-                                  vdrDmData->dm_data.level254->dm_version_index,
-                                  vdrDmData->dm_data.level254->dm_mode, noL8);
-      else
-        metaVersion = fmt::format("CMv4.0 {}-{}",
-                                  vdrDmData->dm_data.level254->dm_version_index,
-                                  vdrDmData->dm_data.level254->dm_mode);
-    }
-    else if (vdrDmData && vdrDmData->dm_data.level1)
-    {
-      const unsigned int noL2 = vdrDmData->dm_data.level2.len;
-      if (noL2 > 0)
-        metaVersion = fmt::format("CMv2.9 {}-L2", noL2);
-      else
-        metaVersion = "CMv2.9";
-    }
-
     if (vdrDmData && vdrDmData->dm_data.level5)
     {
       doviStreamMetadata.has_level5_metadata = true;
@@ -423,7 +437,6 @@ inline void PopulateDoviRpuInfo(DoviRpuOpaque* opaque,
           vdrDmData->dm_data.level5->active_area_bottom_offset;
     }
 
-    doviStreamMetadata.meta_version = metaVersion;
     dataCacheCore.SetVideoDoViStreamMetadata(doviStreamMetadata);
     aml_dv_send_md_levels();
 
