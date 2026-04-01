@@ -101,6 +101,22 @@ bool CRenderManager::Configure(const VideoPicture& picture, float fps, unsigned 
     {
       return true;
     }
+
+    // If only fps changed, update it without full reconfigure to avoid
+    // destroying/recreating the renderer mid-playback. The display mode
+    // switch (if needed) is handled by UpdateResolution() in FrameMove().
+    if (m_pRenderer != nullptr && m_fps != fps &&
+        m_picture.IsSameParams(picture) && m_orientation == orientation &&
+        m_NumberBuffers == buffers && !m_pRenderer->ConfigChanged(picture))
+    {
+      CLog::Log(LOGDEBUG,
+                "CRenderManager::Configure - fps change only ({:4.2f} -> {:4.2f}), "
+                "updating without full reconfigure",
+                m_fps, fps);
+      m_fps = fps;
+      m_bTriggerUpdateResolution = true;
+      return true;
+    }
   }
 
   CLog::Log(LOGDEBUG,
