@@ -132,7 +132,13 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
   {
     unsigned int dvMode = aml_dv_dolby_vision_mode();
     if (dvMode != DOLBY_VISION_OUTPUT_MODE_IPT && dvMode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
+    {
       aml_dv_start();
+      // Re-write the display mode to trigger VPP reconfiguration for the
+      // new DV output mode, matching what CWinSystemAmlogic::CreateNewWindow
+      // does via aml_dv_display_trigger() in the full mode-switch path.
+      aml_dv_display_trigger();
+    }
   }
 
   // check if mode switch is needed
