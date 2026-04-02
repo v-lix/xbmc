@@ -117,6 +117,24 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
     __FUNCTION__,
     res.iWidth, res.iHeight, res.iScreenWidth, res.iScreenHeight, res.fRefreshRate, res.dwFlags);
 
+  // DV_MODE_ON: aml_dv_close() defers IPT restoration to the async
+  // Player.OnStop announcement handler to avoid unnecessary DV cycles during
+  // live-TV channel changes.  But that handler's off→on cycle (through Bypass
+  // with display_auto_now) corrupts the HDMI TX color-space state, causing
+  // persistent color distortion in the GUI.
+  // Synchronously restore DV to IPT here, before any HDMI work or early
+  // return.  The announcement handler's own mode check will then skip the
+  // redundant call.  The playback-active flag prevents this from firing
+  // during playback-start mode switches where aml_dv_open() has already set
+  // the correct output mode.
+  aml_dv_wait_for_pipeline();
+  if (aml_dv_mode() == DV_MODE_ON && aml_is_dv_enable() && !aml_dv_playback_active())
+  {
+    unsigned int dvMode = aml_dv_dolby_vision_mode();
+    if (dvMode != DOLBY_VISION_OUTPUT_MODE_IPT && dvMode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
+      aml_dv_start();
+  }
+
   // check if mode switch is needed
   if (current_resolution.iWidth == res.iWidth && current_resolution.iHeight == res.iHeight &&
       current_resolution.iScreenWidth == res.iScreenWidth && current_resolution.iScreenHeight == res.iScreenHeight &&
@@ -149,26 +167,6 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
   m_hdrType = hdrType;
   m_stereo_mode = stereo_mode;
   m_bFullScreen = fullScreen;
-
-  // DV_MODE_ON: aml_dv_close() defers IPT restoration to the async
-  // Player.OnStop announcement handler to avoid unnecessary DV cycles during
-  // live-TV channel changes.  But that handler runs at LOWEST thread priority,
-  // so the mode switch below often executes first — writing HDMI mode and
-  // triggering display re-evaluation while DV is still in its playback output
-  // mode (e.g. SDR10).  This corrupts the HDMI TX color-space state, causing
-  // persistent color distortion in the GUI.
-  // Synchronously restore DV to IPT here, before any HDMI work.  The
-  // announcement handler's own mode check will then skip the redundant call.
-  // Same-resolution channel changes never reach here (early return above).
-  // Only act after aml_dv_close() (playback ended) — not during playback-start
-  // mode switches where aml_dv_open() has already set the correct output mode.
-  aml_dv_wait_for_pipeline();
-  if (aml_dv_mode() == DV_MODE_ON && aml_is_dv_enable() && !aml_dv_playback_active())
-  {
-    unsigned int dvMode = aml_dv_dolby_vision_mode();
-    if (dvMode != DOLBY_VISION_OUTPUT_MODE_IPT && dvMode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
-      aml_dv_start();
-  }
 
   if (!CWinSystemAmlogic::CreateNewWindow(name, fullScreen, res))
   {
