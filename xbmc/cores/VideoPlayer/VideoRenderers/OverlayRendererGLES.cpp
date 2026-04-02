@@ -156,9 +156,28 @@ COverlayTextureGLES::COverlayTextureGLES(const CDVDOverlayImage& o, CRect& rSour
 
   if (o.palette.empty())
   {
-    m_pma = false;
-    const uint32_t* rgba = reinterpret_cast<const uint32_t*>(o.pixels.data());
-    LoadTexture(GL_TEXTURE_2D, o.width, o.height, o.linesize, &m_u, &m_v, false, rgba);
+    m_pma = !!USE_PREMULTIPLIED_ALPHA;
+    if (m_pma)
+    {
+      // Premultiply alpha so bilinear/mipmap filtering preserves correct edge colors
+      const size_t count = static_cast<size_t>(o.width) * o.height;
+      std::vector<uint32_t> pma(count);
+      const uint32_t* src = reinterpret_cast<const uint32_t*>(o.pixels.data());
+      for (size_t i = 0; i < count; i++)
+      {
+        uint32_t a = (src[i] >> PIXEL_ASHIFT) & 0xff;
+        uint32_t r = (((src[i] >> PIXEL_RSHIFT) & 0xff) * a / 255) << PIXEL_RSHIFT;
+        uint32_t g = (((src[i] >> PIXEL_GSHIFT) & 0xff) * a / 255) << PIXEL_GSHIFT;
+        uint32_t b = (((src[i] >> PIXEL_BSHIFT) & 0xff) * a / 255) << PIXEL_BSHIFT;
+        pma[i] = (a << PIXEL_ASHIFT) | r | g | b;
+      }
+      LoadTexture(GL_TEXTURE_2D, o.width, o.height, o.width * 4, &m_u, &m_v, false, pma.data());
+    }
+    else
+    {
+      const uint32_t* rgba = reinterpret_cast<const uint32_t*>(o.pixels.data());
+      LoadTexture(GL_TEXTURE_2D, o.width, o.height, o.linesize, &m_u, &m_v, false, rgba);
+    }
   }
   else
   {
@@ -429,9 +448,18 @@ void COverlayTextureGLES::Render(SRenderState& state)
 
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                  m_isBitmapOverlay ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+  GLenum filter = GL_LINEAR;
+  if (m_isBitmapOverlay)
+  {
+    int zoom = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+        CSettings::SETTING_SUBTITLES_BITMAPZOOM);
+    if (zoom < 100)
+      filter = GL_LINEAR_MIPMAP_LINEAR;
+    else if (zoom == 100)
+      filter = GL_NEAREST;
+  }
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter == GL_NEAREST ? GL_NEAREST : GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
 
   CRect rd;
   if (m_pos == POSITION_RELATIVE)
