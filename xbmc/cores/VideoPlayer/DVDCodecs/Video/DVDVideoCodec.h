@@ -244,6 +244,12 @@ public:
   virtual void SetCodecControl(int flags) {}
 
   /**
+   * Abort a blocking AddData call (e.g. when a flush is pending).
+   * Called from a non-codec thread; implementation must be thread-safe.
+   */
+  virtual void Abort() {}
+
+  /**
    * Re-open the decoder.
    * Decoder request to re-open
    */

@@ -2352,8 +2352,14 @@ void CAMLCodec::CloseAmlVideo()
   m_amlVideoFile = NULL;
 }
 
+void CAMLCodec::Abort()
+{
+  m_abort = true;
+}
+
 void CAMLCodec::Reset()
 {
+  m_abort = false;
   CLog::Log(LOGDEBUG, "CAMLCodec::Reset");
 
   if (!m_opened)
@@ -2506,6 +2512,12 @@ bool CAMLCodec::AddData(uint8_t *pData, size_t iSize, double dts, double pts)
   int loop = 0;
   while (am_private->am_pkt.isvalid && loop < 100)
   {
+    if (m_abort)
+    {
+      CLog::Log(LOGDEBUG, "CAMLCodec::{}: write loop aborted by flush", __FUNCTION__);
+      return false;
+    }
+
     // abort on any errors.
     if (write_av_packet(am_private, &am_private->am_pkt) != PLAYER_SUCCESS)
       break;

@@ -680,6 +680,12 @@ void CDVDVideoCodecAmlogic::Reset(void)
     m_bitstream->ResetStartDecode();
 }
 
+void CDVDVideoCodecAmlogic::Abort()
+{
+  if (m_Codec)
+    m_Codec->Abort();
+}
+
 CDVDVideoCodec::VCReturn CDVDVideoCodecAmlogic::GetPicture(VideoPicture* pVideoPicture)
 {
   if (!m_Codec)
