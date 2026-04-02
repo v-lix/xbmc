@@ -917,7 +917,7 @@ void aml_dv_reset_l5_signals()
   s_lastOsd = -1;
 }
 
-void aml_dv_off()
+void aml_dv_off(bool skip_hdmi_update)
 {
   // change mode and disable.
   CSysfsPath dolby_vision_mode{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
@@ -966,8 +966,12 @@ void aml_dv_off()
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_xbmc_osd", 0);
   aml_dv_reset_l5_signals();
 
-  // Do set_disp_mode_auto on kernel.
-  if (modeChange)
+  // Trigger HDMI TX re-evaluation so kernel applies the new (non-DV) output
+  // mode.  Skipped when the caller will immediately re-enable DV (e.g.
+  // aml_dv_start restoring IPT for DV_MODE_ON) — the subsequent aml_dv_on
+  // handles the HDMI update, and sending an intermediate SDR signal here
+  // corrupts the HDMI TX color-space state on some displays.
+  if (modeChange && !skip_hdmi_update)
   {
     aml_dv_display_auto_now();
     const RESOLUTION_INFO res_info = CDisplaySettings::GetInstance().GetResolutionInfo(CDisplaySettings::GetInstance().GetCurrentResolution());
@@ -1091,19 +1095,18 @@ void aml_dv_start()
 {
   std::lock_guard<std::mutex> lock(s_dvStartMutex);
 
-  // If DV is already enabled in IPT mode, another thread (e.g. CreateNewWindow)
-  // already restored the pipeline — skip the redundant off→on cycle which would
-  // race with the concurrent HDMI mode switch.
   if (aml_is_dv_enable())
   {
     unsigned int mode = aml_dv_dolby_vision_mode();
     if (mode == DOLBY_VISION_OUTPUT_MODE_IPT || mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
       return;
 
-    // Clean up stale DV kernel state (e.g. from a previous crash where
-    // aml_dv_off() never ran).  This ensures the display returns to SDR
-    // before we (re-)initialize DV according to the user's settings.
-    aml_dv_off();
+    // The kernel needs the full Bypass toggle + disable cycle to set
+    // mode_changed and CP_FLAG_CHANGE_ALL for proper register updates.
+    // For DV_MODE_ON, skip the display_auto_now in aml_dv_off — it sends
+    // an intermediate SDR signal that corrupts HDMI TX color-space on
+    // some displays.  aml_dv_on(IPT) below handles its own HDMI update.
+    aml_dv_off(/*skip_hdmi_update=*/aml_dv_mode() == DV_MODE_ON);
   }
 
   if (aml_dv_mode() == DV_MODE_ON) {

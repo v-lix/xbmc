@@ -119,7 +119,7 @@ void aml_dv_set_vs10_mode(unsigned int mode, StreamHdrType hdrType);
 void aml_dv_wait_video_off(int timeout);
 int aml_blackout_policy(int new_blackout);
 unsigned int aml_dv_on(unsigned int mode);
-void aml_dv_off();
+void aml_dv_off(bool skip_hdmi_update = false);
 void aml_get_dv_cap();
 struct xbmc_dv_cap
 {
