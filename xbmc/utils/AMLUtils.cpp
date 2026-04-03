@@ -977,6 +977,22 @@ void aml_dv_off(bool skip_hdmi_update)
     const RESOLUTION_INFO res_info = CDisplaySettings::GetInstance().GetResolutionInfo(CDisplaySettings::GetInstance().GetCurrentResolution());
     write_resolution_ini(res_info);
   }
+
+  // Re-write the display mode to force VPP reconfiguration after DV is
+  // disabled.  display_auto_now only triggers HDMI TX re-evaluation via
+  // amhdmitx0/attr — the VPP pipeline (DAT_CONV, DOLBY_CTRL, HDMI_FMT_CTRL
+  // registers) also needs resetting, which the display/mode re-write triggers.
+  // Without this, stale VPP state (e.g. 12-bit dither passthrough) persists
+  // into SDR output, causing color corruption.
+  // Skipped with skip_hdmi_update (DV_MODE_ON) — the display mode re-write
+  // may cascade into HDMI TX changes; the subsequent aml_dv_on + display
+  // trigger in CreateNewWindow handles VPP reset for that path.
+  if (modeChange && !skip_hdmi_update)
+  {
+    CSysfsPath display_mode{"/sys/class/display/mode"};
+    if (display_mode.Exists())
+      display_mode.Set(display_mode.Get<std::string>().value());
+  }
 }
 
 unsigned int aml_dv_dolby_vision_mode()
