@@ -191,6 +191,12 @@ public:
   OverrideStyles GetOverrideStyles();
 
   /*!
+   * \brief Check if ASS / SSA style override is enabled
+   * \return True if native ASS / SSA styles should be overridden
+   */
+  bool IsOverrideAss();
+
+  /*!
    * \brief Get the subtitle vertical margin
    * \return The vertical margin in %
    */

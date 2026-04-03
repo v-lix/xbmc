@@ -179,6 +179,7 @@ public:
   static constexpr auto SETTING_SUBTITLES_CHARSET = "subtitles.charset";
   static constexpr auto SETTING_SUBTITLES_OVERRIDEFONTS = "subtitles.overridefonts";
   static constexpr auto SETTING_SUBTITLES_OVERRIDESTYLES = "subtitles.overridestyles";
+  static constexpr auto SETTING_SUBTITLES_OVERRIDEASS = "subtitles.overrideass";
   static constexpr auto SETTING_SUBTITLES_LANGUAGES = "subtitles.languages";
   static constexpr auto SETTING_SUBTITLES_STORAGEMODE = "subtitles.storagemode";
   static constexpr auto SETTING_SUBTITLES_CUSTOMPATH = "subtitles.custompath";

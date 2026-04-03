@@ -501,17 +501,20 @@ void CRenderer::CreateSubtitlesStyle()
   else
     m_overlayStyle->alignment = SUBTITLES::STYLE::FontAlign::SUB_CENTER;
 
-  m_overlayStyle->assOverrideFont = settings->IsOverrideFonts();
+  if (settings->IsOverrideAss())
+  {
+    m_overlayStyle->assOverrideFont = settings->IsOverrideFonts();
 
-  SUBTITLES::OverrideStyles overrideStyles = settings->GetOverrideStyles();
-  if (overrideStyles == SUBTITLES::OverrideStyles::POSITIONS)
-    m_overlayStyle->assOverrideStyles = SUBTITLES::STYLE::OverrideStyles::POSITIONS;
-  else if (overrideStyles == SUBTITLES::OverrideStyles::STYLES)
-    m_overlayStyle->assOverrideStyles = SUBTITLES::STYLE::OverrideStyles::STYLES;
-  else if (overrideStyles == SUBTITLES::OverrideStyles::STYLES_POSITIONS)
-    m_overlayStyle->assOverrideStyles = SUBTITLES::STYLE::OverrideStyles::STYLES_POSITIONS;
-  else
-    m_overlayStyle->assOverrideStyles = SUBTITLES::STYLE::OverrideStyles::DISABLED;
+    SUBTITLES::OverrideStyles overrideStyles = settings->GetOverrideStyles();
+    if (overrideStyles == SUBTITLES::OverrideStyles::POSITIONS)
+      m_overlayStyle->assOverrideStyles = SUBTITLES::STYLE::OverrideStyles::POSITIONS;
+    else if (overrideStyles == SUBTITLES::OverrideStyles::STYLES)
+      m_overlayStyle->assOverrideStyles = SUBTITLES::STYLE::OverrideStyles::STYLES;
+    else if (overrideStyles == SUBTITLES::OverrideStyles::STYLES_POSITIONS)
+      m_overlayStyle->assOverrideStyles = SUBTITLES::STYLE::OverrideStyles::STYLES_POSITIONS;
+    else
+      m_overlayStyle->assOverrideStyles = SUBTITLES::STYLE::OverrideStyles::DISABLED;
+  }
 
   // Changing vertical margin while in playback causes side effects when you
   // rewind the video, displaying the previous text position (test Libass 15.2)

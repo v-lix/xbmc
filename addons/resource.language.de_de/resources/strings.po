@@ -14947,8 +14947,8 @@ msgid "Set the font character set to be used for subtitles."
 msgstr "Auswahl des Zeichensatzes für Untertitel."
 
 msgctxt "#36190"
-msgid "Override subtitles fonts in subtitle formats such as ASS / SSA."
-msgstr "Untertitelschriftarten für Formate wie ASS/SSA überschreiben."
+msgid "Override subtitles fonts in subtitle formats such as ASS / SSA. For native ASS / SSA files, this only takes effect when \"Override ASS / SSA styles\" is enabled."
+msgstr "Untertitelschriftarten für Formate wie ASS/SSA überschreiben. Für native ASS-/SSA-Dateien wirkt diese Einstellung nur, wenn „ASS-/SSA-Stile überschreiben" aktiviert ist."
 
 msgctxt "#36191"
 msgid "Set a custom directory for your subtitles. This can be a file share."
@@ -17688,7 +17688,7 @@ msgstr "Untertitelstile überschreiben"
 
 msgctxt "#39155"
 msgid "Some subtitle formats such as SSA / ASS / WebVTT can include metadata like font style, colors, size, alignments, positions, etc. you can override the styles with your customizations (please note that side effects may occur in some cases)."
-msgstr "Einige Untertitelformate, wie SSA/ASS/ WebTVTT, können Metadaten enthalten (z. B. Schriftstile, Farben, Größe, Ausrichtungen, Positionen). Diese Daten können mit benutzerdefinierten Werten überschrieben werden. Bitte beachten, dass einige Konstellationen Nebeneffekte haben können."
+msgstr "Einige Untertitelformate, wie SSA/ASS/WebVTT, können Metadaten enthalten (z. B. Schriftstile, Farben, Größe, Ausrichtungen, Positionen). Diese Daten können mit benutzerdefinierten Werten überschrieben werden. Bitte beachten, dass einige Konstellationen Nebeneffekte haben können. Für native ASS-/SSA-Dateien wirkt diese Einstellung nur, wenn „ASS-/SSA-Stile überschreiben“ aktiviert ist."
 
 msgctxt "#39156"
 msgid "Positions"
@@ -17875,12 +17875,12 @@ msgid "HDR10+"
 msgstr "HDR10+"
 
 msgctxt "#39202"
-msgid "Line spacing"
-msgstr "Zeilenabstand"
+msgid "Override ASS / SSA styles"
+msgstr "ASS-/SSA-Stile überschreiben"
 
 msgctxt "#39203"
-msgid "Adjust the space between lines of text. Setting a value too low may cause boxes to overlap when the \"Background type\" setting is used."
-msgstr "Abstand zwischen den Textzeilen anpassen. Wenn ein zu kleiner Wert gesetzt und die Einstellung „Hintergrundtyp“ verwendet wird, kann es zu Überlappung der Textbereiche kommen."
+msgid "When enabled, your subtitle style preferences (font, colors, size, etc.) will override the native styling embedded in ASS / SSA subtitle files. When disabled, ASS / SSA subtitles are rendered with their original styles."
+msgstr "Wenn aktiviert, werden die Untertitel-Stileinstellungen (Schriftart, Farben, Größe usw.) auf native ASS-/SSA-Untertiteldateien angewendet und deren eingebettete Stile überschrieben. Wenn deaktiviert, werden ASS-/SSA-Untertitel mit ihren Original-Stilen dargestellt."
 
 msgctxt "#39204"
 msgid "Set CC subtitles only for the hearing impaired"

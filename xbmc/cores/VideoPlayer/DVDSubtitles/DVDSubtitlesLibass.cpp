@@ -166,6 +166,13 @@ bool CDVDSubtitlesLibass::DecodeHeader(char* data, int size)
   m_track = ass_new_track(m_library);
 
   ass_process_codec_private(m_track, data, size);
+
+#if LIBASS_VERSION >= 0x01704000
+  // Automatically prune events that ended more than 10s ago.
+  // This keeps memory bounded for long playback with many subtitle events.
+  ass_configure_prune(m_track, 10000);
+#endif
+
   return true;
 }
 
@@ -628,11 +635,17 @@ void CDVDSubtitlesLibass::ConfigureAssOverride(const std::shared_ptr<struct styl
     {
       stylesFlags = ASS_OVERRIDE_BIT_COLORS | ASS_OVERRIDE_BIT_ATTRIBUTES |
                     ASS_OVERRIDE_BIT_BORDER | ASS_OVERRIDE_BIT_MARGINS;
+#if LIBASS_VERSION >= 0x01704000
+      stylesFlags |= ASS_OVERRIDE_BIT_BLUR;
+#endif
     }
     else if (subStyle->assOverrideStyles == OverrideStyles::STYLES_POSITIONS)
     {
       stylesFlags = ASS_OVERRIDE_BIT_COLORS | ASS_OVERRIDE_BIT_ATTRIBUTES |
                     ASS_OVERRIDE_BIT_BORDER | ASS_OVERRIDE_BIT_MARGINS | ASS_OVERRIDE_BIT_ALIGNMENT;
+#if LIBASS_VERSION >= 0x01704000
+      stylesFlags |= ASS_OVERRIDE_BIT_BLUR;
+#endif
     }
     else if (subStyle->assOverrideStyles == OverrideStyles::POSITIONS)
     {

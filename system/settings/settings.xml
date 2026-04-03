@@ -857,6 +857,14 @@
           </dependencies>
           <control type="list" format="string" />
         </setting>
+        <setting id="subtitles.overrideass" type="boolean" label="39202" help="39203">
+          <level>1</level>
+          <default>false</default>
+          <dependencies>
+            <dependency type="enable" on="property" operator="!is" name="isplaying" />
+          </dependencies>
+          <control type="toggle" />
+        </setting>
         <setting id="subtitles.stereoscopicdepth" type="integer" label="36545" help="36546">
           <level>2</level>
           <default>0</default>

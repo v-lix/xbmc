@@ -35,6 +35,7 @@ CSubtitlesSettings::CSubtitlesSettings(const std::shared_ptr<CSettings>& setting
        CSettings::SETTING_SUBTITLES_SHADOWOPACITY,  CSettings::SETTING_SUBTITLES_SHADOWSIZE,
        CSettings::SETTING_SUBTITLES_MARGINVERTICAL, CSettings::SETTING_SUBTITLES_CHARSET,
        CSettings::SETTING_SUBTITLES_OVERRIDEFONTS,  CSettings::SETTING_SUBTITLES_OVERRIDESTYLES,
+       CSettings::SETTING_SUBTITLES_OVERRIDEASS,
        CSettings::SETTING_SUBTITLES_LANGUAGES,      CSettings::SETTING_SUBTITLES_STORAGEMODE,
        CSettings::SETTING_SUBTITLES_CUSTOMPATH,     CSettings::SETTING_SUBTITLES_PAUSEONSEARCH,
        CSettings::SETTING_SUBTITLES_DOWNLOADFIRST,  CSettings::SETTING_SUBTITLES_TV,
@@ -159,6 +160,11 @@ OverrideStyles CSubtitlesSettings::GetOverrideStyles()
 {
   return static_cast<OverrideStyles>(
       m_settings->GetInt(CSettings::SETTING_SUBTITLES_OVERRIDESTYLES));
+}
+
+bool CSubtitlesSettings::IsOverrideAss()
+{
+  return m_settings->GetBool(CSettings::SETTING_SUBTITLES_OVERRIDEASS);
 }
 
 float CSubtitlesSettings::GetVerticalMarginPerc()

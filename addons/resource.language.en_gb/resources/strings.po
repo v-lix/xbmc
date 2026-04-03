@@ -19891,7 +19891,7 @@ msgstr ""
 #. Description of setting with label #21368 "Override subtitles fonts"
 #: system/settings/settings.xml
 msgctxt "#36190"
-msgid "Override subtitles fonts in subtitle formats such as ASS / SSA."
+msgid "Override subtitles fonts in subtitle formats such as ASS / SSA. For native ASS / SSA files, this only takes effect when \"Override ASS / SSA styles\" is enabled."
 msgstr ""
 
 #. Description of setting with label #21366 "Custom subtitle folder"
@@ -23828,7 +23828,7 @@ msgstr ""
 #. Description of setting with label #39154 "Override subtitles styles"
 #: system/settings/settings.xml
 msgctxt "#39155"
-msgid "Some subtitle formats such as SSA / ASS / WebVTT can include metadata like font style, colors, size, alignments, positions, etc. you can override the styles with your customizations (please note that side effects may occur in some cases)."
+msgid "Some subtitle formats such as SSA / ASS / WebVTT can include metadata like font style, colors, size, alignments, positions, etc. you can override the styles with your customizations (please note that side effects may occur in some cases). For native ASS / SSA files, this only takes effect when \"Override ASS / SSA styles\" is enabled."
 msgstr ""
 
 #. Item list value of setting with label #39154 "Override subtitles styles"
@@ -24104,6 +24104,18 @@ msgstr ""
 #: system/settings/settings.xml
 msgctxt "#39201"
 msgid "HDR10+"
+msgstr ""
+
+#. Label for setting to override native ASS / SSA subtitle styles
+#: system/settings/settings.xml
+msgctxt "#39202"
+msgid "Override ASS / SSA styles"
+msgstr ""
+
+#. Help text for setting with label #39202 "Override ASS / SSA styles"
+#: system/settings/settings.xml
+msgctxt "#39203"
+msgid "When enabled, your subtitle style preferences (font, colors, size, etc.) will override the native styling embedded in ASS / SSA subtitle files. When disabled, ASS / SSA subtitles are rendered with their original styles."
 msgstr ""
 
 #. Label for Bluetooth audio codec selection setting
