@@ -1276,6 +1276,7 @@ const infomap player_process[] = {{"videodecoder", PLAYER_PROCESS_VIDEODECODER},
                                   {"video.dovi.l5.right.offset", PLAYER_PROCESS_VIDEO_DOVI_L5_RIGHT_OFFSET },
                                   {"video.dovi.l5.top.offset", PLAYER_PROCESS_VIDEO_DOVI_L5_TOP_OFFSET },
                                   {"video.dovi.l5.bottom.offset", PLAYER_PROCESS_VIDEO_DOVI_L5_BOTTOM_OFFSET },
+                                  {"video.dovi.l5.detected", PLAYER_PROCESS_VIDEO_DOVI_L5_DETECTED },
 
                                   {"video.dovi.source.min.pq", PLAYER_PROCESS_VIDEO_DOVI_SOURCE_MIN_PQ },
                                   {"video.dovi.source.max.pq", PLAYER_PROCESS_VIDEO_DOVI_SOURCE_MAX_PQ },

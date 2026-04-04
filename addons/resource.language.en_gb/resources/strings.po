@@ -25823,6 +25823,18 @@ msgctxt "#60193"
 msgid "Apply the configured vertical subtitle margin within the active area. Also honors manual subtitle positioning if set. When off, subtitles are placed directly at the active area boundary."
 msgstr ""
 
+#. "Dolby Vision Detect Active Area"
+#: system/settings/settings.xml
+msgctxt "#60194"
+msgid "Detect active area"
+msgstr ""
+
+#. "Dolby Vision Detect Active Area Help"
+#: system/settings/settings.xml
+msgctxt "#60195"
+msgid "Detect black borders in the decoded video frame and generate Level 5 active area metadata when the source L5 is absent or all-zero. Periodically samples a narrow strip of luma data (~75 KB every 24 frames) to find letterbox/pillarbox borders and snaps the result to common aspect ratios. Negligible performance impact (<1 ms once per second). On seek or resume, subtitle display is briefly delayed (~1-2 s) until detection stabilizes to prevent subtitle position jumping."
+msgstr ""
+
 #. "Dolby Vision Display LL Dolby VSVDB Limit"
 #: system/settings/settings.xml
 msgctxt "#60200"

@@ -717,14 +717,50 @@ void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, bool useActiv
 {
   // DV L5 active area: use per-frame L5 offsets to position subtitles inside
   // the active content area. Tracks IMAX/aspect ratio changes in real time.
-  if ((m_picture.hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION) || !useActiveArea)
+  //
+  // Detection populates L5 values (kernel injection + PPI), but subtitle
+  // confinement requires the separate "Restrict subtitles" setting (useActiveArea).
+  if (!useActiveArea)
   {
     m_overlays.SetActiveAreaOffsets(0, 0, false);
     return;
   }
 
+  bool detectEnabled = aml_dv_detect_active_area_enabled();
+
+  if (m_picture.hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION && !detectEnabled)
+  {
+    m_overlays.SetActiveAreaOffsets(0, 0, false);
+    return;
+  }
+
+  uint16_t topOffset = 0, bottomOffset = 0;
+
+  // Try source L5 metadata first
   const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
-  if (!doviMeta.has_level5_metadata)
+  if (doviMeta.has_level5_metadata &&
+      (doviMeta.level5_active_area_top_offset > 0 ||
+       doviMeta.level5_active_area_bottom_offset > 0))
+  {
+    // Source has non-zero L5 — use it directly
+    topOffset = doviMeta.level5_active_area_top_offset;
+    bottomOffset = doviMeta.level5_active_area_bottom_offset;
+  }
+  else if (detectEnabled)
+  {
+    // Source L5 is zero or absent — use kernel-detected values
+    if (!aml_dv_detect_active_area_stable())
+    {
+      // Detection still stabilizing — suppress active area to avoid jumps.
+      // Subtitles will be delayed until detection settles (~1-2 s).
+      m_overlays.SetActiveAreaOffsets(0, 0, false);
+      return;
+    }
+    uint16_t detLeft, detRight;
+    aml_dv_detect_active_area_get(topOffset, bottomOffset, detLeft, detRight);
+  }
+
+  if (topOffset == 0 && bottomOffset == 0)
   {
     m_overlays.SetActiveAreaOffsets(0, 0, false);
     return;
@@ -734,8 +770,8 @@ void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, bool useActiv
       CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_USER_POS);
   float scaleY = static_cast<float>(dst.Height()) / src.Height();
   m_overlays.SetActiveAreaOffsets(
-      static_cast<int>(doviMeta.level5_active_area_top_offset * scaleY),
-      static_cast<int>(doviMeta.level5_active_area_bottom_offset * scaleY),
+      static_cast<int>(topOffset * scaleY),
+      static_cast<int>(bottomOffset * scaleY),
       applyUserPos);
 }
 
@@ -797,14 +833,21 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
           m_picture.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
       {
         const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
-        if (doviMeta.has_level5_metadata &&
-            (doviMeta.level5_active_area_top_offset > 0 ||
-             doviMeta.level5_active_area_bottom_offset > 0))
+        uint16_t sigTop = doviMeta.has_level5_metadata ? doviMeta.level5_active_area_top_offset : 0;
+        uint16_t sigBottom = doviMeta.has_level5_metadata ? doviMeta.level5_active_area_bottom_offset : 0;
+
+        // When source L5 is zero, use detected values if available
+        if (sigTop == 0 && sigBottom == 0 && aml_dv_detect_active_area_enabled() &&
+            aml_dv_detect_active_area_stable())
+        {
+          uint16_t detLeft, detRight;
+          aml_dv_detect_active_area_get(sigTop, sigBottom, detLeft, detRight);
+        }
+
+        if (sigTop > 0 || sigBottom > 0)
         {
           signalSubtitles = m_overlays.HasImageSubOutsideActiveArea(
-              m_presentsource,
-              doviMeta.level5_active_area_top_offset,
-              doviMeta.level5_active_area_bottom_offset);
+              m_presentsource, sigTop, sigBottom);
         }
       }
     }

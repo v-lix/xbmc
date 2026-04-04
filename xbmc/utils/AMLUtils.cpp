@@ -44,6 +44,14 @@
 #include "HDR10PlusConvert.h"
 
 #include "platform/linux/SysfsPath.h"
+#include "threads/Thread.h"
+#include "filesystem/File.h"
+
+extern "C" {
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <libavutil/imgutils.h>
+}
 
 #include "linux/fb.h"
 #include <sys/ioctl.h>
@@ -560,6 +568,11 @@ unsigned int aml_dv_on(unsigned int mode)
   int dv_l5_subs_signal_mode = dv_source_level_5 ? settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS) : 0;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5_subt", dv_l5_subs_signal_mode > 0);
 
+  bool dv_detect_active_area(dv_level5_enabled && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA));
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detect_active_area", dv_detect_active_area);
+  if (dv_detect_active_area)
+    aml_dv_detect_active_area_start();
+
   unsigned int xbmc_dv_vsvdb_source_lum_limit_num = 0;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_source_lum_limit_num", xbmc_dv_vsvdb_source_lum_limit_num);
 
@@ -919,6 +932,8 @@ void aml_dv_reset_l5_signals()
 
 void aml_dv_off(bool skip_hdmi_update)
 {
+  aml_dv_detect_active_area_stop();
+
   // change mode and disable.
   CSysfsPath dolby_vision_mode{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
   unsigned int existing_mode = dolby_vision_mode.Get<unsigned int>().value();
@@ -1186,6 +1201,423 @@ int aml_dv_l5_subs_signal_mode()
       !settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5))
     return 0;
   return settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS);
+}
+
+bool aml_dv_detect_active_area_enabled()
+{
+  return s_dvModeCached == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL &&
+         settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5) &&
+         settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA);
+}
+
+/* Cached detected values — written by background detection thread,
+ * read by CalcOverlayActiveArea on the render thread. */
+static std::atomic<bool> s_detectStable{false};
+static std::atomic<uint16_t> s_detectedTop{0};
+static std::atomic<uint16_t> s_detectedBottom{0};
+static std::atomic<uint16_t> s_detectedLeft{0};
+static std::atomic<uint16_t> s_detectedRight{0};
+
+bool aml_dv_detect_active_area_stable()
+{
+  return s_detectStable.load();
+}
+
+void aml_dv_detect_active_area_get(uint16_t& top, uint16_t& bottom, uint16_t& left, uint16_t& right)
+{
+  top = s_detectedTop.load();
+  bottom = s_detectedBottom.load();
+  left = s_detectedLeft.load();
+  right = s_detectedRight.load();
+}
+
+/* Common aspect ratios × 1000 for snapping */
+static const uint32_t s_commonAR[] = {
+  1333, 1667, 1778, 1850, 1896, 2000, 2200, 2350, 2390, 2400, 2550, 2760
+};
+
+/* AVIO callbacks for reading through Kodi's VFS (handles nfs://, smb://, etc.) */
+static int detect_avio_read(void *opaque, uint8_t *buf, int size)
+{
+  auto* file = static_cast<XFILE::CFile*>(opaque);
+  int ret = file->Read(buf, size);
+  return (ret == 0) ? AVERROR_EOF : ret;
+}
+
+static int64_t detect_avio_seek(void *opaque, int64_t pos, int whence)
+{
+  auto* file = static_cast<XFILE::CFile*>(opaque);
+  if (whence == AVSEEK_SIZE)
+    return file->GetLength();
+  return file->Seek(pos, whence & ~AVSEEK_FORCE);
+}
+
+static void DetectActiveAreaFromFile(const std::string& filePath)
+{
+  AVFormatContext* fmtCtx = nullptr;
+  AVCodecContext* codecCtx = nullptr;
+  AVFrame* frame = nullptr;
+  AVPacket pkt;
+  AVIOContext* avioCtx = nullptr;
+  XFILE::CFile file;
+  int videoIdx = -1;
+  uint16_t detTop = 0, detBottom = 0, detLeft = 0, detRight = 0;
+
+  /* Open through Kodi VFS — supports nfs://, smb://, local paths, etc. */
+  if (!file.Open(filePath, XFILE::READ_NO_CACHE))
+  {
+    CLog::Log(LOGWARNING, "DetectActiveArea: failed to open {}", filePath);
+    return;
+  }
+
+  const int bufSize = 32768;
+  auto* avioBuf = static_cast<uint8_t*>(av_malloc(bufSize));
+  if (!avioBuf)
+    return;
+
+  avioCtx = avio_alloc_context(avioBuf, bufSize, 0, &file,
+                               detect_avio_read, nullptr, detect_avio_seek);
+  if (!avioCtx)
+  {
+    av_free(avioBuf);
+    return;
+  }
+
+  fmtCtx = avformat_alloc_context();
+  if (!fmtCtx)
+  {
+    avio_context_free(&avioCtx);
+    return;
+  }
+  fmtCtx->pb = avioCtx;
+
+  if (avformat_open_input(&fmtCtx, filePath.c_str(), nullptr, nullptr) < 0)
+  {
+    CLog::Log(LOGWARNING, "DetectActiveArea: failed to open input {}", filePath);
+    goto cleanup;
+  }
+
+  if (avformat_find_stream_info(fmtCtx, nullptr) < 0)
+    goto cleanup;
+
+  for (unsigned i = 0; i < fmtCtx->nb_streams; i++)
+  {
+    if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
+    {
+      videoIdx = i;
+      break;
+    }
+  }
+  if (videoIdx < 0)
+    goto cleanup;
+
+  {
+    const AVCodec* codec = avcodec_find_decoder(fmtCtx->streams[videoIdx]->codecpar->codec_id);
+    if (!codec)
+      goto cleanup;
+
+    codecCtx = avcodec_alloc_context3(codec);
+    if (!codecCtx)
+      goto cleanup;
+
+    avcodec_parameters_to_context(codecCtx, fmtCtx->streams[videoIdx]->codecpar);
+    /* Use 2 threads for software decode — fast enough, doesn't starve playback */
+    codecCtx->thread_count = 2;
+
+    if (avcodec_open2(codecCtx, codec, nullptr) < 0)
+      goto cleanup;
+  }
+
+  frame = av_frame_alloc();
+  if (!frame)
+    goto cleanup;
+
+  av_init_packet(&pkt);
+
+  /* Sample at 3 spread positions (10%, 30%, 50%) for robustness against
+   * fades, title cards, or dark scenes at any single position.
+   * Use consensus (mode) across samples. Subtitles are suppressed during
+   * detection so the extra seeks cost nothing UX-wise. */
+  {
+    const int seekPercents[] = {10, 30, 50};
+    const int numSeeks = 3;
+    uint16_t samples_top[3] = {}, samples_bottom[3] = {};
+    uint16_t samples_left[3] = {}, samples_right[3] = {};
+    int validSamples = 0;
+    int lastWidth = 0, lastHeight = 0;
+
+    for (int s = 0; s < numSeeks; s++)
+    {
+      if (fmtCtx->duration > 0)
+      {
+        avcodec_flush_buffers(codecCtx);
+        av_seek_frame(fmtCtx, -1,
+                      fmtCtx->duration * seekPercents[s] / 100,
+                      AVSEEK_FLAG_BACKWARD);
+      }
+      else if (s > 0)
+        break; /* unseekable — one sample only */
+
+      bool gotFrame = false;
+      for (int attempts = 0; attempts < 100 && !gotFrame; attempts++)
+      {
+        if (av_read_frame(fmtCtx, &pkt) < 0)
+          break;
+        if (pkt.stream_index != videoIdx)
+        {
+          av_packet_unref(&pkt);
+          continue;
+        }
+        if (avcodec_send_packet(codecCtx, &pkt) == 0)
+          gotFrame = (avcodec_receive_frame(codecCtx, frame) == 0);
+        av_packet_unref(&pkt);
+      }
+
+      if (!gotFrame || !frame->data[0] || frame->width < 64 || frame->height < 64)
+        continue;
+
+      lastWidth = frame->width;
+      lastHeight = frame->height;
+      const int stride = frame->linesize[0];
+      const uint8_t* yData = frame->data[0];
+      const bool isP010 = (frame->format == AV_PIX_FMT_P010LE ||
+                           frame->format == AV_PIX_FMT_P010BE);
+      const bool is10bit = isP010 ||
+                           frame->format == AV_PIX_FMT_YUV420P10LE ||
+                           frame->format == AV_PIX_FMT_YUV420P10BE;
+      const int shift = isP010 ? 8 : (is10bit ? 2 : 0);
+      const uint32_t threshold = 32;
+      const int sampleW = std::min(64, lastWidth / 2);
+      const int sampleStartX = lastWidth / 2 - sampleW / 2;
+
+      auto getY = [&](int row, int col) -> uint32_t {
+        if (is10bit)
+          return reinterpret_cast<const uint16_t*>(yData + row * stride)[col] >> shift;
+        return yData[row * stride + col];
+      };
+
+      /* Skip all-black frames (fades, title cards) */
+      uint32_t midY = getY(lastHeight / 2, lastWidth / 2);
+      CLog::Log(LOGDEBUG, "DetectActiveArea: sample at {}%%: {}x{} fmt={} shift={} "
+                "row0={} mid={} last={}",
+                seekPercents[s], lastWidth, lastHeight, frame->format, shift,
+                getY(0, lastWidth / 2), midY, getY(lastHeight - 1, lastWidth / 2));
+      if (midY <= threshold)
+      {
+        CLog::Log(LOGDEBUG, "DetectActiveArea: skipping all-black frame at {}%%", seekPercents[s]);
+        continue;
+      }
+
+      uint16_t sTop = 0, sBottom = 0, sLeft = 0, sRight = 0;
+
+      for (int row = 0; row < lastHeight / 2; row++)
+      {
+        uint32_t sum = 0;
+        for (int i = 0; i < sampleW; i++) sum += getY(row, sampleStartX + i);
+        if (sum / sampleW > threshold) { sTop = static_cast<uint16_t>(row); break; }
+      }
+      for (int row = lastHeight - 1; row >= lastHeight / 2; row--)
+      {
+        uint32_t sum = 0;
+        for (int i = 0; i < sampleW; i++) sum += getY(row, sampleStartX + i);
+        if (sum / sampleW > threshold) { sBottom = static_cast<uint16_t>(lastHeight - 1 - row); break; }
+      }
+      {
+        const int sampleH = std::min(64, lastHeight / 2);
+        const int sampleStartY = lastHeight / 2 - sampleH / 2;
+        for (int col = 0; col < lastWidth / 2; col++)
+        {
+          uint32_t sum = 0;
+          for (int i = 0; i < sampleH; i++) sum += getY(sampleStartY + i, col);
+          if (sum / sampleH > threshold) { sLeft = static_cast<uint16_t>(col); break; }
+        }
+        for (int col = lastWidth - 1; col >= lastWidth / 2; col--)
+        {
+          uint32_t sum = 0;
+          for (int i = 0; i < sampleH; i++) sum += getY(sampleStartY + i, col);
+          if (sum / sampleH > threshold) { sRight = static_cast<uint16_t>(lastWidth - 1 - col); break; }
+        }
+      }
+
+      samples_top[validSamples] = sTop;
+      samples_bottom[validSamples] = sBottom;
+      samples_left[validSamples] = sLeft;
+      samples_right[validSamples] = sRight;
+      validSamples++;
+
+      CLog::Log(LOGDEBUG, "DetectActiveArea: sample {}: T={} B={} L={} R={}",
+                validSamples, sTop, sBottom, sLeft, sRight);
+    }
+
+    if (validSamples == 0)
+      goto cleanup;
+
+    /* Consensus: if samples agree within tolerance, use mode/median.
+     * If they disagree (likely IMAX hybrid with varying AR), bail —
+     * a static L5 would be wrong for some scenes. */
+    auto samplesAgree = [](uint16_t* v, int n, int tolerance) -> bool {
+      for (int i = 1; i < n; i++)
+        if (std::abs((int)v[i] - (int)v[0]) > tolerance)
+          return false;
+      return true;
+    };
+
+    const int agreeTolerance = 5; /* pixels */
+    if (validSamples >= 2 &&
+        (!samplesAgree(samples_top, validSamples, agreeTolerance) ||
+         !samplesAgree(samples_bottom, validSamples, agreeTolerance)))
+    {
+      CLog::Log(LOGINFO, "DetectActiveArea: samples disagree (IMAX hybrid?) — skipping L5 injection");
+      goto cleanup;
+    }
+
+    auto pickBest = [](uint16_t* v, int n) -> uint16_t {
+      if (n >= 3 && v[0] == v[1]) return v[0];
+      if (n >= 3 && v[0] == v[2]) return v[0];
+      if (n >= 3 && v[1] == v[2]) return v[1];
+      if (n >= 2 && v[0] == v[1]) return v[0];
+      std::sort(v, v + n);
+      return v[n / 2];
+    };
+
+    detTop = pickBest(samples_top, validSamples);
+    detBottom = pickBest(samples_bottom, validSamples);
+    detLeft = pickBest(samples_left, validSamples);
+    detRight = pickBest(samples_right, validSamples);
+
+    /* Validate and snap to common AR */
+    if (detTop || detBottom || detLeft || detRight)
+    {
+      const uint32_t activeW = lastWidth - detLeft - detRight;
+      const uint32_t activeH = lastHeight - detTop - detBottom;
+
+      if (activeW > 0 && activeH > 0)
+      {
+        const uint32_t arX1000 = (activeW * 1000) / activeH;
+        const uint32_t frameAR = (lastWidth * 1000) / lastHeight;
+
+        if (arX1000 >= 1200 && arX1000 <= 2900)
+        {
+          uint32_t bestAR = arX1000, bestDist = UINT32_MAX;
+          for (auto ar : s_commonAR)
+          {
+            uint32_t dist = (arX1000 > ar) ? (arX1000 - ar) : (ar - arX1000);
+            if (dist < bestDist) { bestDist = dist; bestAR = ar; }
+          }
+          if (bestDist * 100 > arX1000 * 5)
+            bestAR = arX1000;
+
+          if (bestAR >= frameAR)
+          {
+            uint32_t snapH = (lastWidth * 1000) / bestAR;
+            if (snapH > (uint32_t)lastHeight) snapH = lastHeight;
+            uint16_t tb = static_cast<uint16_t>((lastHeight - snapH) / 2);
+            detTop = tb; detBottom = tb; detLeft = 0; detRight = 0;
+          }
+          else
+          {
+            uint32_t snapW = (lastHeight * bestAR) / 1000;
+            if (snapW > (uint32_t)lastWidth) snapW = lastWidth;
+            uint16_t lr = static_cast<uint16_t>((lastWidth - snapW) / 2);
+            detLeft = lr; detRight = lr; detTop = 0; detBottom = 0;
+          }
+
+          CLog::Log(LOGINFO, "DetectActiveArea: {}x{} → T={} B={} L={} R={} "
+                    "(AR={}.{:03d} snap={}.{:03d}, {} samples)",
+                    lastWidth, lastHeight, detTop, detBottom, detLeft, detRight,
+                    arX1000 / 1000, arX1000 % 1000, bestAR / 1000, bestAR % 1000,
+                    validSamples);
+        }
+        else
+          detTop = detBottom = detLeft = detRight = 0;
+      }
+    }
+  }
+
+  /* Check if source already provides non-zero L5 — by now the RPU will have
+   * been parsed and DataCacheCore populated. Don't override valid source L5. */
+  {
+    auto srcMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
+    if (srcMeta.has_level5_metadata &&
+        (srcMeta.level5_active_area_top_offset || srcMeta.level5_active_area_bottom_offset ||
+         srcMeta.level5_active_area_left_offset || srcMeta.level5_active_area_right_offset))
+    {
+      CLog::Log(LOGDEBUG, "DetectActiveArea: source has L5 (T={} B={}) — skipping injection",
+                srcMeta.level5_active_area_top_offset, srcMeta.level5_active_area_bottom_offset);
+      s_detectStable.store(true);
+      goto cleanup;
+    }
+  }
+
+  /* Publish results */
+  s_detectedTop.store(detTop);
+  s_detectedBottom.store(detBottom);
+  s_detectedLeft.store(detLeft);
+  s_detectedRight.store(detRight);
+
+  /* Write to kernel for L5 injection */
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_top", detTop);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_bottom", detBottom);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_left", detLeft);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_right", detRight);
+
+  s_detectStable.store(true);
+
+  if (detTop || detBottom || detLeft || detRight)
+    CLog::Log(LOGINFO, "DetectActiveArea: kernel L5 updated");
+  else
+    CLog::Log(LOGDEBUG, "DetectActiveArea: no borders found");
+
+cleanup:
+  if (frame)
+    av_frame_free(&frame);
+  if (codecCtx)
+    avcodec_free_context(&codecCtx);
+  if (fmtCtx)
+    avformat_close_input(&fmtCtx);
+  if (avioCtx)
+    avio_context_free(&avioCtx);
+}
+
+static std::thread s_detectThread;
+
+void aml_dv_detect_active_area_start()
+{
+  /* Reset state */
+  s_detectStable.store(false);
+  s_detectedTop.store(0);
+  s_detectedBottom.store(0);
+  s_detectedLeft.store(0);
+  s_detectedRight.store(0);
+
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_top", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_bottom", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_left", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_right", 0);
+
+  std::string filePath = g_application.CurrentFile();
+  if (filePath.empty())
+    return;
+
+  /* Join previous detection thread if still running */
+  if (s_detectThread.joinable())
+    s_detectThread.join();
+
+  s_detectThread = std::thread([filePath]() {
+    DetectActiveAreaFromFile(filePath);
+  });
+}
+
+void aml_dv_detect_active_area_stop()
+{
+  s_detectStable.store(false);
+  if (s_detectThread.joinable())
+    s_detectThread.join();
+
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_top", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_bottom", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_left", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_right", 0);
 }
 
 enum DV_MODE aml_dv_mode()

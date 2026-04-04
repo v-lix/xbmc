@@ -19052,6 +19052,14 @@ msgctxt "#60193"
 msgid "Apply the configured vertical subtitle margin within the active area. Also honors manual subtitle positioning if set. When off, subtitles are placed directly at the active area boundary."
 msgstr "Den konfigurierten vertikalen Untertitelrand innerhalb des Aktivbereichs anwenden. Berücksichtigt auch manuelle Untertitelpositionierung, falls gesetzt. Bei Aus werden Untertitel direkt an der Aktivbereich-Grenze platziert."
 
+msgctxt "#60194"
+msgid "Detect active area"
+msgstr "Aktivbereich erkennen"
+
+msgctxt "#60195"
+msgid "Detect black borders in the decoded video frame and generate Level 5 active area metadata when the source L5 is absent or all-zero. Periodically samples a narrow strip of luma data (~75 KB every 24 frames) to find letterbox/pillarbox borders and snaps the result to common aspect ratios. Negligible performance impact (<1 ms once per second). On seek or resume, subtitle display is briefly delayed (~1-2 s) until detection stabilizes to prevent subtitle position jumping."
+msgstr "Erkennt schwarze Ränder im dekodierten Videobild und erzeugt Level-5-Aktivbereich-Metadaten, wenn die Quelle keine liefert (L5-Offsets sind Null). Tastet periodisch einen schmalen Streifen der Luminanzdaten ab (~75 KB alle 24 Frames), um Letterbox-/Pillarbox-Ränder zu finden, und rastet das Ergebnis auf gängige Seitenverhältnisse ein. Vernachlässigbarer Leistungseinfluss (<1 ms einmal pro Sekunde). Bei Seek oder Fortsetzen wird die Untertitelanzeige kurz verzögert (~1-2 s), bis die Erkennung stabil ist, um Springen der Untertitelposition zu vermeiden."
+
 msgctxt "#60200"
 msgid "Set Limit VSVDB luminance"
 msgstr "VSVDB-Helligkeit begrenzen"

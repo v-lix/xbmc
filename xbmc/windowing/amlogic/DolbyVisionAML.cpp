@@ -571,6 +571,7 @@ static void set_dv_settings_visible(bool show)
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_ACTIVE_AREA, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_USER_POS, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR8, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR10, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10, show);
@@ -628,6 +629,7 @@ bool CDolbyVisionAML::Setup()
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS);
+  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
   settingsManager->RegisterCallback(this, settingSet);
@@ -765,7 +767,8 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5 ||
            settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5 ||
            settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST ||
-           settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS)
+           settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS ||
+           settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA)
   {
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
   }

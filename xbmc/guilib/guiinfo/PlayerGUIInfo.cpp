@@ -27,6 +27,7 @@
 #include "guilib/guiinfo/GUIInfoHelper.h"
 #include "guilib/guiinfo/GUIInfoLabels.h"
 #include "utils/StringUtils.h"
+#include "utils/AMLUtils.h"
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
 #include "utils/log.h"
@@ -671,20 +672,44 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
       return true;
 
     case PLAYER_PROCESS_VIDEO_DOVI_HAS_L5:
-      value =std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata().has_level5_metadata);
-      return true;
     case PLAYER_PROCESS_VIDEO_DOVI_L5_LEFT_OFFSET:
-      value = std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata().level5_active_area_left_offset);
-      return true;
     case PLAYER_PROCESS_VIDEO_DOVI_L5_RIGHT_OFFSET:
-      value = std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata().level5_active_area_right_offset);
-      return true;
     case PLAYER_PROCESS_VIDEO_DOVI_L5_TOP_OFFSET:
-      value = std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata().level5_active_area_top_offset);
-      return true;
     case PLAYER_PROCESS_VIDEO_DOVI_L5_BOTTOM_OFFSET:
-      value = std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata().level5_active_area_bottom_offset);
+    case PLAYER_PROCESS_VIDEO_DOVI_L5_DETECTED:
+    {
+      /* Prefer source L5 when it has non-zero offsets. Only fall back to
+       * detected values when source is absent or all-zero — avoids
+       * overriding valid source L5 with FFmpeg border scan results. */
+      auto meta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
+      bool sourceHasL5 = meta.has_level5_metadata &&
+          (meta.level5_active_area_top_offset || meta.level5_active_area_bottom_offset ||
+           meta.level5_active_area_left_offset || meta.level5_active_area_right_offset);
+      bool detected = !sourceHasL5 && aml_dv_detect_active_area_stable();
+      uint16_t dTop = 0, dBottom = 0, dLeft = 0, dRight = 0;
+      if (detected)
+        aml_dv_detect_active_area_get(dTop, dBottom, dLeft, dRight);
+      bool hasL5 = meta.has_level5_metadata || detected;
+      bool useDetected = detected && (dTop || dBottom || dLeft || dRight);
+
+      switch (info.m_info)
+      {
+        case PLAYER_PROCESS_VIDEO_DOVI_HAS_L5:
+          value = std::to_string(hasL5); break;
+        case PLAYER_PROCESS_VIDEO_DOVI_L5_LEFT_OFFSET:
+          value = std::to_string(useDetected ? dLeft : meta.level5_active_area_left_offset); break;
+        case PLAYER_PROCESS_VIDEO_DOVI_L5_RIGHT_OFFSET:
+          value = std::to_string(useDetected ? dRight : meta.level5_active_area_right_offset); break;
+        case PLAYER_PROCESS_VIDEO_DOVI_L5_TOP_OFFSET:
+          value = std::to_string(useDetected ? dTop : meta.level5_active_area_top_offset); break;
+        case PLAYER_PROCESS_VIDEO_DOVI_L5_BOTTOM_OFFSET:
+          value = std::to_string(useDetected ? dBottom : meta.level5_active_area_bottom_offset); break;
+        case PLAYER_PROCESS_VIDEO_DOVI_L5_DETECTED:
+          value = std::to_string(useDetected); break;
+        default: break;
+      }
       return true;
+    }
 
     case PLAYER_PROCESS_VIDEO_DOVI_SOURCE_MIN_PQ:
       value = std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata().source_min_pq);
