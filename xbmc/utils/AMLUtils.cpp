@@ -1595,6 +1595,12 @@ cleanup:
 }
 
 static std::thread s_detectThread;
+static std::string s_detectFilePath;
+
+void aml_dv_detect_set_file(const std::string& path)
+{
+  s_detectFilePath = path;
+}
 
 void aml_dv_detect_active_area_start()
 {
@@ -1610,9 +1616,16 @@ void aml_dv_detect_active_area_start()
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_left", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_right", 0);
 
-  std::string filePath = g_application.CurrentFile();
+  /* Use stored path from VideoPlayer::OpenFile — g_application.CurrentFile()
+   * is not yet set when aml_dv_on runs from the codec thread. */
+  std::string filePath = s_detectFilePath;
   if (filePath.empty())
+    filePath = g_application.CurrentFile(); /* fallback */
+  if (filePath.empty())
+  {
+    CLog::Log(LOGWARNING, "DetectActiveArea: no file path available");
     return;
+  }
 
   /* Join previous detection thread if still running */
   if (s_detectThread.joinable())

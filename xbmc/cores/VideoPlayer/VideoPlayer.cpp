@@ -28,6 +28,7 @@
 #include "LangInfo.h"
 #include "ServiceBroker.h"
 #include "URL.h"
+#include "utils/AMLUtils.h"
 #include "Util.h"
 #include "VideoPlayerAudio.h"
 #include "VideoPlayerRadioRDS.h"
@@ -717,6 +718,7 @@ bool CVideoPlayer::OpenFile(const CFileItem& file, const CPlayerOptions &options
     params.m_options = options;
     params.m_item.SetMimeTypeForInternetFile();
     m_messenger.Put(std::make_shared<CDVDMsgOpenFile>(params), 1);
+    aml_dv_detect_set_file(file.GetDynPath());
 
     return true;
   }
@@ -724,6 +726,7 @@ bool CVideoPlayer::OpenFile(const CFileItem& file, const CPlayerOptions &options
   m_item = file;
   m_playerOptions = options;
   m_processInfo->SetFullscreen(options.fullscreen);
+  aml_dv_detect_set_file(file.GetDynPath());
 
   m_processInfo->SetPlayTimes(0,0,0,0);
   m_bAbortRequest = false;

@@ -155,6 +155,7 @@ int aml_dv_l5_subs_signal_mode();
 bool aml_dv_detect_active_area_enabled();
 bool aml_dv_detect_active_area_stable();
 void aml_dv_detect_active_area_get(uint16_t& top, uint16_t& bottom, uint16_t& left, uint16_t& right);
+void aml_dv_detect_set_file(const std::string& path);
 void aml_dv_detect_active_area_start();
 void aml_dv_detect_active_area_stop();
 enum DV_MODE aml_dv_mode();
