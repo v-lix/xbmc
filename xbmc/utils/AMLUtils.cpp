@@ -1463,12 +1463,25 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     };
 
     const int agreeTolerance = 5; /* pixels */
+
+    /* Top/bottom disagree → likely IMAX hybrid, bail entirely */
     if (validSamples >= 2 &&
         (!samplesAgree(samples_top, validSamples, agreeTolerance) ||
          !samplesAgree(samples_bottom, validSamples, agreeTolerance)))
     {
-      CLog::Log(LOGINFO, "DetectActiveArea: samples disagree (IMAX hybrid?) — skipping L5 injection");
+      CLog::Log(LOGINFO, "DetectActiveArea: T/B samples disagree (IMAX hybrid?) — skipping");
       goto cleanup;
+    }
+
+    /* Left/right disagree → unreliable (dark content near edges).
+     * Zero them out so they don't corrupt the AR computation. */
+    if (validSamples >= 2 &&
+        (!samplesAgree(samples_left, validSamples, agreeTolerance) ||
+         !samplesAgree(samples_right, validSamples, agreeTolerance)))
+    {
+      CLog::Log(LOGDEBUG, "DetectActiveArea: L/R samples disagree — ignoring horizontal borders");
+      for (int j = 0; j < validSamples; j++)
+        samples_left[j] = samples_right[j] = 0;
     }
 
     auto pickBest = [](uint16_t* v, int n) -> uint16_t {
