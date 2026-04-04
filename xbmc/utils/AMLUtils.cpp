@@ -570,6 +570,8 @@ unsigned int aml_dv_on(unsigned int mode)
 
   bool dv_detect_active_area(dv_level5_enabled && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA));
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detect_active_area", dv_detect_active_area);
+  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_on - L5 detect: l5_enabled={} detect_setting={} → detect={}",
+            dv_level5_enabled, dv_detect_active_area, dv_detect_active_area);
   if (dv_detect_active_area)
     aml_dv_detect_active_area_start();
 
@@ -1621,6 +1623,10 @@ void aml_dv_detect_active_area_start()
   std::string filePath = s_detectFilePath;
   if (filePath.empty())
     filePath = g_application.CurrentFile(); /* fallback */
+  CLog::Log(LOGDEBUG, "DetectActiveArea: start — stored='{}' fallback='{}' → '{}'",
+            s_detectFilePath.empty() ? "(empty)" : "(set)",
+            g_application.CurrentFile().empty() ? "(empty)" : "(set)",
+            filePath.empty() ? "(empty)" : CURL::GetRedacted(filePath));
   if (filePath.empty())
   {
     CLog::Log(LOGWARNING, "DetectActiveArea: no file path available");
@@ -1628,8 +1634,10 @@ void aml_dv_detect_active_area_start()
   }
 
   /* Join previous detection thread if still running */
-  if (s_detectThread.joinable())
+  bool wasJoinable = s_detectThread.joinable();
+  if (wasJoinable)
     s_detectThread.join();
+  CLog::Log(LOGDEBUG, "DetectActiveArea: thread join={}, spawning", wasJoinable);
 
   s_detectThread = std::thread([filePath]() {
     DetectActiveAreaFromFile(filePath);
