@@ -734,33 +734,43 @@ void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, bool useActiv
     return;
   }
 
-  uint16_t topOffset = 0, bottomOffset = 0;
+  // Display letterbox: for pre-cropped frames (e.g. 3840x1608 on 2160p),
+  // the frame has no borders but the scaler adds black bars. Always known
+  // immediately from frame vs display dimensions — used as minimum baseline.
+  float guiHeight = CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight();
+  int displayLB = (dst.Height() > 0 && dst.Height() < guiHeight)
+      ? static_cast<int>((guiHeight - dst.Height()) / 2.0f)
+      : 0;
 
-  // Try source L5 metadata first
+  // L5 or detection offsets (in display coordinates) — can increase the
+  // baseline but never shrink it below the display letterbox.
+  int l5Top = 0, l5Bottom = 0;
+
   const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
   if (doviMeta.has_level5_metadata &&
       (doviMeta.level5_active_area_top_offset > 0 ||
        doviMeta.level5_active_area_bottom_offset > 0))
   {
-    // Source has non-zero L5 — use it directly
-    topOffset = doviMeta.level5_active_area_top_offset;
-    bottomOffset = doviMeta.level5_active_area_bottom_offset;
+    float scaleY = static_cast<float>(dst.Height()) / src.Height();
+    l5Top = static_cast<int>(doviMeta.level5_active_area_top_offset * scaleY);
+    l5Bottom = static_cast<int>(doviMeta.level5_active_area_bottom_offset * scaleY);
   }
-  else if (detectEnabled)
+  else if (detectEnabled && aml_dv_detect_active_area_stable())
   {
-    // Source L5 is zero or absent — use kernel-detected values
-    if (!aml_dv_detect_active_area_stable())
+    uint16_t detTop, detBottom, detLeft, detRight;
+    aml_dv_detect_active_area_get(detTop, detBottom, detLeft, detRight);
+    if (detTop || detBottom)
     {
-      // Detection still stabilizing — suppress active area to avoid jumps.
-      // Subtitles will be delayed until detection settles (~1-2 s).
-      m_overlays.SetActiveAreaOffsets(0, 0, false);
-      return;
+      float scaleY = static_cast<float>(dst.Height()) / src.Height();
+      l5Top = static_cast<int>(detTop * scaleY);
+      l5Bottom = static_cast<int>(detBottom * scaleY);
     }
-    uint16_t detLeft, detRight;
-    aml_dv_detect_active_area_get(topOffset, bottomOffset, detLeft, detRight);
   }
 
-  if (topOffset == 0 && bottomOffset == 0)
+  int finalTop = std::max(l5Top, displayLB);
+  int finalBottom = std::max(l5Bottom, displayLB);
+
+  if (finalTop == 0 && finalBottom == 0)
   {
     m_overlays.SetActiveAreaOffsets(0, 0, false);
     return;
@@ -768,11 +778,7 @@ void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, bool useActiv
 
   bool applyUserPos = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
       CSettings::SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_USER_POS);
-  float scaleY = static_cast<float>(dst.Height()) / src.Height();
-  m_overlays.SetActiveAreaOffsets(
-      static_cast<int>(topOffset * scaleY),
-      static_cast<int>(bottomOffset * scaleY),
-      applyUserPos);
+  m_overlays.SetActiveAreaOffsets(finalTop, finalBottom, applyUserPos);
 }
 
 void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
