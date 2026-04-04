@@ -1452,37 +1452,11 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     if (validSamples == 0)
       goto cleanup;
 
-    /* Consensus: if samples agree within tolerance, use mode/median.
-     * If they disagree (likely IMAX hybrid with varying AR), bail —
-     * a static L5 would be wrong for some scenes. */
-    auto samplesAgree = [](uint16_t* v, int n, int tolerance) -> bool {
-      for (int i = 1; i < n; i++)
-        if (std::abs((int)v[i] - (int)v[0]) > tolerance)
-          return false;
-      return true;
-    };
-
+    /* Consensus via mode: pick the value that at least 2 samples agree on.
+     * Handles outlier frames (4:3 news inserts, vignettes, dark scenes)
+     * as long as the majority of samples show the real AR.
+     * Only bail if no majority exists for T/B (true IMAX hybrid). */
     const int agreeTolerance = 5; /* pixels */
-
-    /* Top/bottom disagree → likely IMAX hybrid, bail entirely */
-    if (validSamples >= 2 &&
-        (!samplesAgree(samples_top, validSamples, agreeTolerance) ||
-         !samplesAgree(samples_bottom, validSamples, agreeTolerance)))
-    {
-      CLog::Log(LOGINFO, "DetectActiveArea: T/B samples disagree (IMAX hybrid?) — skipping");
-      goto cleanup;
-    }
-
-    /* Left/right disagree → unreliable (dark content near edges).
-     * Zero them out so they don't corrupt the AR computation. */
-    if (validSamples >= 2 &&
-        (!samplesAgree(samples_left, validSamples, agreeTolerance) ||
-         !samplesAgree(samples_right, validSamples, agreeTolerance)))
-    {
-      CLog::Log(LOGDEBUG, "DetectActiveArea: L/R samples disagree — ignoring horizontal borders");
-      for (int j = 0; j < validSamples; j++)
-        samples_left[j] = samples_right[j] = 0;
-    }
 
     auto pickBest = [](uint16_t* v, int n) -> uint16_t {
       if (n >= 3 && v[0] == v[1]) return v[0];
@@ -1493,10 +1467,38 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       return v[n / 2];
     };
 
+    /* Check if the picked value has majority support (2+ within tolerance) */
+    auto hasMajority = [&agreeTolerance](uint16_t* v, int n, uint16_t picked) -> bool {
+      int support = 0;
+      for (int i = 0; i < n; i++)
+        if (std::abs((int)v[i] - (int)picked) <= agreeTolerance)
+          support++;
+      return support >= 2 || n < 2;
+    };
+
     detTop = pickBest(samples_top, validSamples);
     detBottom = pickBest(samples_bottom, validSamples);
+
+    /* T/B: require majority. If no majority, likely true IMAX hybrid — bail */
+    if (validSamples >= 3 &&
+        (!hasMajority(samples_top, validSamples, detTop) ||
+         !hasMajority(samples_bottom, validSamples, detBottom)))
+    {
+      CLog::Log(LOGINFO, "DetectActiveArea: no T/B majority (IMAX hybrid?) — skipping");
+      goto cleanup;
+    }
+
     detLeft = pickBest(samples_left, validSamples);
     detRight = pickBest(samples_right, validSamples);
+
+    /* L/R: if no majority, zero them — unreliable due to dark edges */
+    if (validSamples >= 2 &&
+        (!hasMajority(samples_left, validSamples, detLeft) ||
+         !hasMajority(samples_right, validSamples, detRight)))
+    {
+      CLog::Log(LOGDEBUG, "DetectActiveArea: L/R no majority — ignoring horizontal borders");
+      detLeft = detRight = 0;
+    }
 
     /* Validate and snap to common AR */
     if (detTop || detBottom || detLeft || detRight)
