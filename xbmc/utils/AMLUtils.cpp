@@ -1398,13 +1398,13 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
 
       /* Skip all-black frames (fades, title cards) */
       uint32_t midY = getY(lastHeight / 2, lastWidth / 2);
-      CLog::Log(LOGDEBUG, "DetectActiveArea: sample at {}%%: {}x{} fmt={} shift={} "
+      CLog::Log(LOGDEBUG, "DetectActiveArea: sample at {}%: {}x{} fmt={} shift={} "
                 "row0={} mid={} last={}",
                 seekPercents[s], lastWidth, lastHeight, frame->format, shift,
                 getY(0, lastWidth / 2), midY, getY(lastHeight - 1, lastWidth / 2));
       if (midY <= threshold)
       {
-        CLog::Log(LOGDEBUG, "DetectActiveArea: skipping all-black frame at {}%%", seekPercents[s]);
+        CLog::Log(LOGDEBUG, "DetectActiveArea: skipping all-black frame at {}%", seekPercents[s]);
         continue;
       }
 
