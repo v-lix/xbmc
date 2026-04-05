@@ -1526,14 +1526,14 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
 
           if (bestAR >= frameAR)
           {
-            uint32_t snapH = (lastWidth * 1000) / bestAR;
+            uint32_t snapH = (lastWidth * 1000 + bestAR / 2) / bestAR;
             if (snapH > (uint32_t)lastHeight) snapH = lastHeight;
             uint16_t tb = static_cast<uint16_t>((lastHeight - snapH) / 2);
             detTop = tb; detBottom = tb; detLeft = 0; detRight = 0;
           }
           else
           {
-            uint32_t snapW = (lastHeight * bestAR) / 1000;
+            uint32_t snapW = (lastHeight * bestAR + 500) / 1000;
             if (snapW > (uint32_t)lastWidth) snapW = lastWidth;
             uint16_t lr = static_cast<uint16_t>((lastWidth - snapW) / 2);
             detLeft = lr; detRight = lr; detTop = 0; detBottom = 0;
