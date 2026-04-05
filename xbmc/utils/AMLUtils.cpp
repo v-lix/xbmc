@@ -1336,50 +1336,96 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
 
   av_init_packet(&pkt);
 
-  /* Sample at 3 spread positions (10%, 30%, 50%) for robustness against
-   * fades, title cards, or dark scenes at any single position.
-   * Use consensus (mode) across samples. Subtitles are suppressed during
-   * detection so the extra seeks cost nothing UX-wise. */
+  /* Sample at 3 spread positions for robustness against fades, title cards,
+   * or dark scenes. If a frame's center isn't bright enough for reliable
+   * border detection, retry at +5% offsets (up to 2 retries per position).
+   * Subtitles are suppressed during detection so extra seeks are free UX-wise. */
   {
     const int seekPercents[] = {10, 30, 50};
     const int numSeeks = 3;
+    const int maxRetries = 2;
+    const uint32_t threshold = 32;
+    const uint32_t minMidLuma = threshold * 2; /* center must be well above border level */
     uint16_t samples_top[3] = {}, samples_bottom[3] = {};
     uint16_t samples_left[3] = {}, samples_right[3] = {};
     int validSamples = 0;
     int lastWidth = 0, lastHeight = 0;
 
-    for (int s = 0; s < numSeeks; s++)
+    for (int s = 0; s < numSeeks && validSamples < numSeeks; s++)
     {
-      if (fmtCtx->duration > 0)
-      {
-        avcodec_flush_buffers(codecCtx);
-        av_seek_frame(fmtCtx, -1,
-                      fmtCtx->duration * seekPercents[s] / 100,
-                      AVSEEK_FLAG_BACKWARD);
-      }
-      else if (s > 0)
-        break; /* unseekable — one sample only */
+      bool usable = false;
 
-      bool gotFrame = false;
-      for (int attempts = 0; attempts < 100 && !gotFrame; attempts++)
+      for (int retry = 0; retry <= maxRetries && !usable; retry++)
       {
-        if (av_read_frame(fmtCtx, &pkt) < 0)
-          break;
-        if (pkt.stream_index != videoIdx)
+        int seekPct = seekPercents[s] + retry * 5;
+        if (seekPct > 90) break;
+
+        if (fmtCtx->duration > 0)
         {
+          avcodec_flush_buffers(codecCtx);
+          av_seek_frame(fmtCtx, -1,
+                        fmtCtx->duration * seekPct / 100,
+                        AVSEEK_FLAG_BACKWARD);
+        }
+        else if (s > 0 || retry > 0)
+          break; /* unseekable — one attempt only */
+
+        bool gotFrame = false;
+        for (int attempts = 0; attempts < 100 && !gotFrame; attempts++)
+        {
+          if (av_read_frame(fmtCtx, &pkt) < 0)
+            break;
+          if (pkt.stream_index != videoIdx)
+          {
+            av_packet_unref(&pkt);
+            continue;
+          }
+          if (avcodec_send_packet(codecCtx, &pkt) == 0)
+            gotFrame = (avcodec_receive_frame(codecCtx, frame) == 0);
           av_packet_unref(&pkt);
+        }
+
+        if (!gotFrame || !frame->data[0] || frame->width < 64 || frame->height < 64)
+          continue;
+
+        lastWidth = frame->width;
+        lastHeight = frame->height;
+        const int stride = frame->linesize[0];
+        const uint8_t* yData = frame->data[0];
+        const bool isP010 = (frame->format == AV_PIX_FMT_P010LE ||
+                             frame->format == AV_PIX_FMT_P010BE);
+        const bool is10bit = isP010 ||
+                             frame->format == AV_PIX_FMT_YUV420P10LE ||
+                             frame->format == AV_PIX_FMT_YUV420P10BE;
+        const int shift = isP010 ? 8 : (is10bit ? 2 : 0);
+        const int sampleW = std::min(64, lastWidth / 2);
+        const int sampleStartX = lastWidth / 2 - sampleW / 2;
+
+        auto getY = [&](int row, int col) -> uint32_t {
+          if (is10bit)
+            return reinterpret_cast<const uint16_t*>(yData + row * stride)[col] >> shift;
+          return yData[row * stride + col];
+        };
+
+        uint32_t midY = getY(lastHeight / 2, lastWidth / 2);
+        CLog::Log(LOGDEBUG, "DetectActiveArea: sample at {}%: {}x{} fmt={} shift={} "
+                  "row0={} mid={} last={}",
+                  seekPct, lastWidth, lastHeight, frame->format, shift,
+                  getY(0, lastWidth / 2), midY, getY(lastHeight - 1, lastWidth / 2));
+
+        if (midY <= minMidLuma)
+        {
+          CLog::Log(LOGDEBUG, "DetectActiveArea: frame too dark at {}% (mid={}), retrying",
+                    seekPct, midY);
           continue;
         }
-        if (avcodec_send_packet(codecCtx, &pkt) == 0)
-          gotFrame = (avcodec_receive_frame(codecCtx, frame) == 0);
-        av_packet_unref(&pkt);
+        usable = true;
       }
 
-      if (!gotFrame || !frame->data[0] || frame->width < 64 || frame->height < 64)
+      if (!usable)
         continue;
 
-      lastWidth = frame->width;
-      lastHeight = frame->height;
+      /* Re-derive frame accessors from the decoded frame (still valid) */
       const int stride = frame->linesize[0];
       const uint8_t* yData = frame->data[0];
       const bool isP010 = (frame->format == AV_PIX_FMT_P010LE ||
@@ -1388,7 +1434,6 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
                            frame->format == AV_PIX_FMT_YUV420P10LE ||
                            frame->format == AV_PIX_FMT_YUV420P10BE;
       const int shift = isP010 ? 8 : (is10bit ? 2 : 0);
-      const uint32_t threshold = 32;
       const int sampleW = std::min(64, lastWidth / 2);
       const int sampleStartX = lastWidth / 2 - sampleW / 2;
 
@@ -1397,18 +1442,6 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
           return reinterpret_cast<const uint16_t*>(yData + row * stride)[col] >> shift;
         return yData[row * stride + col];
       };
-
-      /* Skip all-black frames (fades, title cards) */
-      uint32_t midY = getY(lastHeight / 2, lastWidth / 2);
-      CLog::Log(LOGDEBUG, "DetectActiveArea: sample at {}%: {}x{} fmt={} shift={} "
-                "row0={} mid={} last={}",
-                seekPercents[s], lastWidth, lastHeight, frame->format, shift,
-                getY(0, lastWidth / 2), midY, getY(lastHeight - 1, lastWidth / 2));
-      if (midY <= threshold)
-      {
-        CLog::Log(LOGDEBUG, "DetectActiveArea: skipping all-black frame at {}%", seekPercents[s]);
-        continue;
-      }
 
       uint16_t sTop = 0, sBottom = 0, sLeft = 0, sRight = 0;
 
