@@ -1366,6 +1366,29 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     uint16_t samples_left[5] = {}, samples_right[5] = {};
     int validSamples = 0;
     int lastWidth = 0, lastHeight = 0;
+    const int agreeTolerance = 5; /* pixels */
+
+    auto pickBest = [](uint16_t* v, int n) -> uint16_t {
+      uint16_t best = v[0];
+      int bestCount = 0;
+      for (int i = 0; i < n; i++) {
+        int count = 0;
+        for (int j = 0; j < n; j++)
+          if (v[j] == v[i]) count++;
+        if (count > bestCount) { bestCount = count; best = v[i]; }
+      }
+      if (bestCount >= 2) return best;
+      std::sort(v, v + n);
+      return v[n / 2];
+    };
+
+    auto countSupport = [&agreeTolerance](uint16_t* v, int n, uint16_t picked) -> int {
+      int support = 0;
+      for (int i = 0; i < n; i++)
+        if (std::abs((int)v[i] - (int)picked) <= agreeTolerance)
+          support++;
+      return support;
+    };
 
     for (int s = 0; s < numSeeks && validSamples < numSeeks; s++)
     {
@@ -1510,40 +1533,23 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
 
       CLog::Log(LOGDEBUG, "DetectActiveArea: sample {}: T={} B={} L={} R={}",
                 validSamples, sTop, sBottom, sLeft, sRight);
+
+      /* Early exit: if T and B already have consensus, skip remaining samples */
+      if (validSamples >= 3)
+      {
+        uint16_t earlyT = pickBest(samples_top, validSamples);
+        uint16_t earlyB = pickBest(samples_bottom, validSamples);
+        if (countSupport(samples_top, validSamples, earlyT) >= 3 &&
+            countSupport(samples_bottom, validSamples, earlyB) >= 3)
+        {
+          CLog::Log(LOGDEBUG, "DetectActiveArea: early consensus at {} samples", validSamples);
+          break;
+        }
+      }
     }
 
     if (validSamples == 0)
       goto cleanup;
-
-    /* Consensus via mode: pick the value that at least 2 samples agree on.
-     * Handles outlier frames (4:3 news inserts, vignettes, dark scenes)
-     * as long as the majority of samples show the real AR.
-     * Only bail if no majority exists for T/B (true IMAX hybrid). */
-    const int agreeTolerance = 5; /* pixels */
-
-    /* Pick the value with the most occurrences, fallback to median */
-    auto pickBest = [](uint16_t* v, int n) -> uint16_t {
-      uint16_t best = v[0];
-      int bestCount = 0;
-      for (int i = 0; i < n; i++) {
-        int count = 0;
-        for (int j = 0; j < n; j++)
-          if (v[j] == v[i]) count++;
-        if (count > bestCount) { bestCount = count; best = v[i]; }
-      }
-      if (bestCount >= 2) return best;
-      std::sort(v, v + n);
-      return v[n / 2];
-    };
-
-    /* Check if the picked value has sufficient support within tolerance */
-    auto countSupport = [&agreeTolerance](uint16_t* v, int n, uint16_t picked) -> int {
-      int support = 0;
-      for (int i = 0; i < n; i++)
-        if (std::abs((int)v[i] - (int)picked) <= agreeTolerance)
-          support++;
-      return support;
-    };
 
     detTop = pickBest(samples_top, validSamples);
     detBottom = pickBest(samples_bottom, validSamples);
