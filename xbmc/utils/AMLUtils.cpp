@@ -1386,8 +1386,12 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
         else if (s > 0 || retry > 0)
           break; /* unseekable — one attempt only */
 
+        /* Decode one frame. Count only video packets toward the limit —
+         * multi-stream remuxes (DV P7 with 12+ streams) can have very few
+         * video packets per 100 total. Also drain the decoder properly:
+         * it may need several packets before producing a frame. */
         bool gotFrame = false;
-        for (int attempts = 0; attempts < 100 && !gotFrame; attempts++)
+        for (int vidPkts = 0; vidPkts < 50 && !gotFrame; )
         {
           if (av_read_frame(fmtCtx, &pkt) < 0)
             break;
@@ -1396,9 +1400,14 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
             av_packet_unref(&pkt);
             continue;
           }
-          if (avcodec_send_packet(codecCtx, &pkt) == 0)
-            gotFrame = (avcodec_receive_frame(codecCtx, frame) == 0);
+          vidPkts++;
+          avcodec_send_packet(codecCtx, &pkt);
           av_packet_unref(&pkt);
+          while (avcodec_receive_frame(codecCtx, frame) == 0)
+          {
+            gotFrame = true;
+            break;
+          }
         }
 
         if (!gotFrame || !frame->data[0] || frame->width < 64 || frame->height < 64)
