@@ -1364,9 +1364,9 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
   {
     const int seekPercents[] = {10, 25, 40, 55, 70};
     const int numSeeks = 5;
-    const int maxRetries = 2;
+    const int maxRetries = 3;
     const uint32_t threshold = 32;
-    const uint32_t minMidLuma = threshold * 2; /* center must be well above border level */
+    const uint32_t minContrast = 20; /* center-vs-border contrast needed for reliable detection */
     uint16_t samples_top[5] = {}, samples_bottom[5] = {};
     uint16_t samples_left[5] = {}, samples_right[5] = {};
     int validSamples = 0;
@@ -1460,16 +1460,21 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
           return yData[row * stride + col];
         };
 
+        uint32_t row0Y = getY(0, lastWidth / 2);
         uint32_t midY = getY(lastHeight / 2, lastWidth / 2);
-        CLog::Log(LOGDEBUG, "DetectActiveArea: sample at {}%: {}x{} fmt={} shift={} "
-                  "row0={} mid={} last={}",
-                  seekPct, lastWidth, lastHeight, frame->format, shift,
-                  getY(0, lastWidth / 2), midY, getY(lastHeight - 1, lastWidth / 2));
+        uint32_t lastY = getY(lastHeight - 1, lastWidth / 2);
+        uint32_t borderY = std::min(row0Y, lastY);
+        uint32_t contrast = (midY > borderY) ? (midY - borderY) : 0;
 
-        if (midY <= minMidLuma)
+        CLog::Log(LOGDEBUG, "DetectActiveArea: sample at {}%: {}x{} fmt={} shift={} "
+                  "row0={} mid={} last={} contrast={}",
+                  seekPct, lastWidth, lastHeight, frame->format, shift,
+                  row0Y, midY, lastY, contrast);
+
+        if (contrast < minContrast)
         {
-          CLog::Log(LOGDEBUG, "DetectActiveArea: frame too dark at {}% (mid={}), retrying",
-                    seekPct, midY);
+          CLog::Log(LOGDEBUG, "DetectActiveArea: insufficient contrast at {}% ({}), retrying",
+                    seekPct, contrast);
           continue;
         }
         usable = true;
