@@ -1300,7 +1300,10 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
   }
 
   if (avformat_find_stream_info(fmtCtx, nullptr) < 0)
+  {
+    CLog::Log(LOGWARNING, "DetectActiveArea: failed to find stream info");
     goto cleanup;
+  }
 
   for (unsigned i = 0; i < fmtCtx->nb_streams; i++)
   {
@@ -1311,12 +1314,19 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     }
   }
   if (videoIdx < 0)
+  {
+    CLog::Log(LOGWARNING, "DetectActiveArea: no video stream found");
     goto cleanup;
+  }
 
   {
     const AVCodec* codec = avcodec_find_decoder(fmtCtx->streams[videoIdx]->codecpar->codec_id);
     if (!codec)
+    {
+      CLog::Log(LOGWARNING, "DetectActiveArea: no decoder for codec id {}",
+                fmtCtx->streams[videoIdx]->codecpar->codec_id);
       goto cleanup;
+    }
 
     codecCtx = avcodec_alloc_context3(codec);
     if (!codecCtx)
@@ -1327,8 +1337,14 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     codecCtx->thread_count = 2;
 
     if (avcodec_open2(codecCtx, codec, nullptr) < 0)
+    {
+      CLog::Log(LOGWARNING, "DetectActiveArea: failed to open codec");
       goto cleanup;
+    }
   }
+
+  CLog::Log(LOGDEBUG, "DetectActiveArea: opened {}x{} codec id {} for scanning",
+            codecCtx->width, codecCtx->height, codecCtx->codec_id);
 
   frame = av_frame_alloc();
   if (!frame)
