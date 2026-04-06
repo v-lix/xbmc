@@ -1235,7 +1235,7 @@ void aml_dv_detect_active_area_get(uint16_t& top, uint16_t& bottom, uint16_t& le
 
 /* Common aspect ratios × 1000 for snapping */
 static const uint32_t s_commonAR[] = {
-  1333, 1667, 1778, 1850, 1896, 2000, 2200, 2350, 2390, 2400, 2550, 2760
+  1333, 1370, 1667, 1778, 1850, 1896, 2000, 2200, 2350, 2390, 2400, 2550, 2760
 };
 
 /* AVIO callbacks for reading through Kodi's VFS (handles nfs://, smb://, etc.) */
@@ -1341,13 +1341,13 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
    * border detection, retry at +5% offsets (up to 2 retries per position).
    * Subtitles are suppressed during detection so extra seeks are free UX-wise. */
   {
-    const int seekPercents[] = {10, 30, 50};
-    const int numSeeks = 3;
+    const int seekPercents[] = {10, 25, 40, 55, 70};
+    const int numSeeks = 5;
     const int maxRetries = 2;
     const uint32_t threshold = 32;
     const uint32_t minMidLuma = threshold * 2; /* center must be well above border level */
-    uint16_t samples_top[3] = {}, samples_bottom[3] = {};
-    uint16_t samples_left[3] = {}, samples_right[3] = {};
+    uint16_t samples_top[5] = {}, samples_bottom[5] = {};
+    uint16_t samples_left[5] = {}, samples_right[5] = {};
     int validSamples = 0;
     int lastWidth = 0, lastHeight = 0;
 
@@ -1457,6 +1457,9 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
         for (int i = 0; i < sampleW; i++) sum += getY(row, sampleStartX + i);
         if (sum / sampleW > threshold) { sBottom = static_cast<uint16_t>(lastHeight - 1 - row); break; }
       }
+      /* Skip L/R scan when frame is already wider than 16:9 — pillarbox
+       * is impossible on a 16:9 display, and dark edges cause false positives. */
+      if (lastWidth * 1000 / lastHeight < 1778)
       {
         const int sampleH = std::min(64, lastHeight / 2);
         const int sampleStartY = lastHeight / 2 - sampleH / 2;
@@ -1493,45 +1496,55 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
      * Only bail if no majority exists for T/B (true IMAX hybrid). */
     const int agreeTolerance = 5; /* pixels */
 
+    /* Pick the value with the most occurrences, fallback to median */
     auto pickBest = [](uint16_t* v, int n) -> uint16_t {
-      if (n >= 3 && v[0] == v[1]) return v[0];
-      if (n >= 3 && v[0] == v[2]) return v[0];
-      if (n >= 3 && v[1] == v[2]) return v[1];
-      if (n >= 2 && v[0] == v[1]) return v[0];
+      uint16_t best = v[0];
+      int bestCount = 0;
+      for (int i = 0; i < n; i++) {
+        int count = 0;
+        for (int j = 0; j < n; j++)
+          if (v[j] == v[i]) count++;
+        if (count > bestCount) { bestCount = count; best = v[i]; }
+      }
+      if (bestCount >= 2) return best;
       std::sort(v, v + n);
       return v[n / 2];
     };
 
-    /* Check if the picked value has majority support (2+ within tolerance) */
-    auto hasMajority = [&agreeTolerance](uint16_t* v, int n, uint16_t picked) -> bool {
+    /* Check if the picked value has sufficient support within tolerance */
+    auto countSupport = [&agreeTolerance](uint16_t* v, int n, uint16_t picked) -> int {
       int support = 0;
       for (int i = 0; i < n; i++)
         if (std::abs((int)v[i] - (int)picked) <= agreeTolerance)
           support++;
-      return support >= 2 || n < 2;
+      return support;
     };
 
     detTop = pickBest(samples_top, validSamples);
     detBottom = pickBest(samples_bottom, validSamples);
 
-    /* T/B: require majority. If no majority, likely true IMAX hybrid — bail */
+    /* T/B: require 3+ agreeing (majority of 5). If not, likely IMAX hybrid — bail */
     if (validSamples >= 3 &&
-        (!hasMajority(samples_top, validSamples, detTop) ||
-         !hasMajority(samples_bottom, validSamples, detBottom)))
+        (countSupport(samples_top, validSamples, detTop) < 3 ||
+         countSupport(samples_bottom, validSamples, detBottom) < 3))
     {
-      CLog::Log(LOGINFO, "DetectActiveArea: no T/B majority (IMAX hybrid?) — skipping");
+      CLog::Log(LOGINFO, "DetectActiveArea: no T/B consensus ({}/{} support) — skipping",
+                countSupport(samples_top, validSamples, detTop),
+                countSupport(samples_bottom, validSamples, detBottom));
       goto cleanup;
     }
 
     detLeft = pickBest(samples_left, validSamples);
     detRight = pickBest(samples_right, validSamples);
 
-    /* L/R: if no majority, zero them — unreliable due to dark edges */
-    if (validSamples >= 2 &&
-        (!hasMajority(samples_left, validSamples, detLeft) ||
-         !hasMajority(samples_right, validSamples, detRight)))
+    /* L/R: require 4+ agreeing — stricter than T/B because dark content
+     * edges frequently cause false L/R borders. */
+    if (countSupport(samples_left, validSamples, detLeft) < 4 ||
+        countSupport(samples_right, validSamples, detRight) < 4)
     {
-      CLog::Log(LOGDEBUG, "DetectActiveArea: L/R no majority — ignoring horizontal borders");
+      CLog::Log(LOGDEBUG, "DetectActiveArea: L/R insufficient consensus ({}/{} support) — ignoring",
+                countSupport(samples_left, validSamples, detLeft),
+                countSupport(samples_right, validSamples, detRight));
       detLeft = detRight = 0;
     }
 
