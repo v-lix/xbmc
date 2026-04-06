@@ -1573,23 +1573,41 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     detTop = pickBest(samples_top, validSamples);
     detBottom = pickBest(samples_bottom, validSamples);
 
-    /* T/B consensus: require 3+ agreeing (majority of 5).
+    /* T/B consensus: require majority of valid samples.
      * If one side has consensus but the other doesn't, use the consistent
      * side for both — letterbox borders are symmetric by definition.
+     * If T and B independently pick the same value with 2+ support each,
+     * accept it — the corroboration is strong evidence even without
+     * individual majority (common on dark DV content).
      * If neither has consensus, likely IMAX hybrid — bail. */
     {
+      int required = (validSamples + 1) / 2; /* majority */
+      if (required < 2) required = 2;
       int topSupport = countSupport(samples_top, validSamples, detTop);
       int botSupport = countSupport(samples_bottom, validSamples, detBottom);
-      bool topOk = topSupport >= 3;
-      bool botOk = botSupport >= 3;
+      bool topOk = topSupport >= required;
+      bool botOk = botSupport >= required;
 
-      if (!topOk && !botOk && validSamples >= 3)
+      /* Corroboration: T and B independently agree → accept with 2+ each */
+      bool corroborated = !topOk && !botOk &&
+                          topSupport >= 2 && botSupport >= 2 &&
+                          std::abs((int)detTop - (int)detBottom) <= agreeTolerance;
+
+      if (corroborated)
       {
-        CLog::Log(LOGINFO, "DetectActiveArea: no T/B consensus ({}/{} support) — skipping",
-                  topSupport, botSupport);
+        /* Use the side with more support, or B if equal */
+        uint16_t agreed = (topSupport >= botSupport) ? detTop : detBottom;
+        CLog::Log(LOGDEBUG, "DetectActiveArea: T/B corroborated at {} (T={}/{} B={}/{} support)",
+                  agreed, detTop, topSupport, detBottom, botSupport);
+        detTop = detBottom = agreed;
+      }
+      else if (!topOk && !botOk && validSamples >= 3)
+      {
+        CLog::Log(LOGINFO, "DetectActiveArea: no T/B consensus (T={}/{} B={}/{} of {} needed) — skipping",
+                  detTop, topSupport, detBottom, botSupport, required);
         goto cleanup;
       }
-      if (topOk && !botOk)
+      else if (topOk && !botOk)
       {
         CLog::Log(LOGDEBUG, "DetectActiveArea: B inconsistent ({} support), using T={} for both",
                   botSupport, detTop);
