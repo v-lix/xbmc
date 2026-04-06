@@ -1335,6 +1335,11 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     avcodec_parameters_to_context(codecCtx, fmtCtx->streams[videoIdx]->codecpar);
     /* Use 2 threads for software decode — fast enough, doesn't starve playback */
     codecCtx->thread_count = 2;
+    /* Only decode keyframes — we need one frame per seek position, not a
+     * full GOP. Dramatically reduces decode time for P7 FEL content where
+     * the decoder otherwise processes entire reference frame chains. */
+    codecCtx->skip_frame = AVDISCARD_NONKEY;
+    codecCtx->skip_loop_filter = AVDISCARD_ALL;
 
     if (avcodec_open2(codecCtx, codec, nullptr) < 0)
     {
