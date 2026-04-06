@@ -25832,7 +25832,7 @@ msgstr ""
 #. "Dolby Vision Detect Active Area Help"
 #: system/settings/settings.xml
 msgctxt "#60195"
-msgid "Detect black borders in the decoded video frame and generate Level 5 active area metadata when the source L5 is absent or all-zero. Periodically samples a narrow strip of luma data (~75 KB every 24 frames) to find letterbox/pillarbox borders and snaps the result to common aspect ratios. Negligible performance impact (<1 ms once per second). On seek or resume, subtitle display is briefly delayed (~1-2 s) until detection stabilizes to prevent subtitle position jumping."
+msgid "Detect black borders at playback start when the source provides no Level 5 active area metadata. Samples up to 5 frames at 10/25/40/55/70% of the file in a background thread, skipping frames that are too dark for reliable detection and retrying at nearby positions. Exits early once consensus is reached. Results are snapped to common aspect ratios (4:3 through 2.76:1) and require consensus across multiple samples. Also restricts subtitles to the video content area for pre-cropped frames displayed with display-generated black bars. Runs once at playback start with negligible performance impact. DV Profile 7 (FEL) content may take longer due to complex stream structure."
 msgstr ""
 
 #. "Dolby Vision Display LL Dolby VSVDB Limit"
