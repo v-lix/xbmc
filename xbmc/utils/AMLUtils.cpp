@@ -1548,15 +1548,34 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     detTop = pickBest(samples_top, validSamples);
     detBottom = pickBest(samples_bottom, validSamples);
 
-    /* T/B: require 3+ agreeing (majority of 5). If not, likely IMAX hybrid — bail */
-    if (validSamples >= 3 &&
-        (countSupport(samples_top, validSamples, detTop) < 3 ||
-         countSupport(samples_bottom, validSamples, detBottom) < 3))
+    /* T/B consensus: require 3+ agreeing (majority of 5).
+     * If one side has consensus but the other doesn't, use the consistent
+     * side for both — letterbox borders are symmetric by definition.
+     * If neither has consensus, likely IMAX hybrid — bail. */
     {
-      CLog::Log(LOGINFO, "DetectActiveArea: no T/B consensus ({}/{} support) — skipping",
-                countSupport(samples_top, validSamples, detTop),
-                countSupport(samples_bottom, validSamples, detBottom));
-      goto cleanup;
+      int topSupport = countSupport(samples_top, validSamples, detTop);
+      int botSupport = countSupport(samples_bottom, validSamples, detBottom);
+      bool topOk = topSupport >= 3;
+      bool botOk = botSupport >= 3;
+
+      if (!topOk && !botOk && validSamples >= 3)
+      {
+        CLog::Log(LOGINFO, "DetectActiveArea: no T/B consensus ({}/{} support) — skipping",
+                  topSupport, botSupport);
+        goto cleanup;
+      }
+      if (topOk && !botOk)
+      {
+        CLog::Log(LOGDEBUG, "DetectActiveArea: B inconsistent ({} support), using T={} for both",
+                  botSupport, detTop);
+        detBottom = detTop;
+      }
+      else if (botOk && !topOk)
+      {
+        CLog::Log(LOGDEBUG, "DetectActiveArea: T inconsistent ({} support), using B={} for both",
+                  topSupport, detBottom);
+        detTop = detBottom;
+      }
     }
 
     detLeft = pickBest(samples_left, validSamples);
