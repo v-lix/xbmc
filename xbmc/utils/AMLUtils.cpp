@@ -1606,14 +1606,16 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     detLeft = pickBest(samples_left, validSamples);
     detRight = pickBest(samples_right, validSamples);
 
-    /* L/R: require 4+ agreeing — stricter than T/B because dark content
-     * edges frequently cause false L/R borders. */
+    /* L/R: require 4+ agreeing AND symmetric (real pillarbox is always symmetric).
+     * Dark content edges frequently cause asymmetric false L/R borders. */
     if (countSupport(samples_left, validSamples, detLeft) < 4 ||
-        countSupport(samples_right, validSamples, detRight) < 4)
+        countSupport(samples_right, validSamples, detRight) < 4 ||
+        (detLeft && detRight && std::abs((int)detLeft - (int)detRight) > (int)std::max(detLeft, detRight) / 10))
     {
-      CLog::Log(LOGDEBUG, "DetectActiveArea: L/R insufficient consensus ({}/{} support) — ignoring",
+      CLog::Log(LOGDEBUG, "DetectActiveArea: L/R rejected (support {}/{}, L={} R={}) — ignoring",
                 countSupport(samples_left, validSamples, detLeft),
-                countSupport(samples_right, validSamples, detRight));
+                countSupport(samples_right, validSamples, detRight),
+                detLeft, detRight);
       detLeft = detRight = 0;
     }
 
