@@ -1365,8 +1365,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     const int seekPercents[] = {10, 25, 40, 55, 70};
     const int numSeeks = 5;
     const int maxRetries = 3;
-    const uint32_t threshold = 32;
-    const uint32_t minContrast = 20; /* center-vs-border contrast needed for reliable detection */
+    const uint32_t minContrast = 10; /* minimum border-vs-content difference for detection */
     uint16_t samples_top[5] = {}, samples_bottom[5] = {};
     uint16_t samples_left[5] = {}, samples_right[5] = {};
     int validSamples = 0;
@@ -1501,19 +1500,29 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
         return yData[row * stride + col];
       };
 
+      /* Adaptive scan threshold: midpoint between border and content levels.
+       * Handles dark DV content (Foundation: border=16, content=28 → threshold=22)
+       * where a fixed threshold of 32 would miss the transition entirely. */
+      uint32_t borderAvg = 0, contentAvg = 0;
+      for (int i = 0; i < sampleW; i++) borderAvg += getY(0, sampleStartX + i);
+      for (int i = 0; i < sampleW; i++) contentAvg += getY(lastHeight / 2, sampleStartX + i);
+      borderAvg /= sampleW;
+      contentAvg /= sampleW;
+      uint32_t scanThreshold = (borderAvg + contentAvg) / 2;
+
       uint16_t sTop = 0, sBottom = 0, sLeft = 0, sRight = 0;
 
       for (int row = 0; row < lastHeight / 2; row++)
       {
         uint32_t sum = 0;
         for (int i = 0; i < sampleW; i++) sum += getY(row, sampleStartX + i);
-        if (sum / sampleW > threshold) { sTop = static_cast<uint16_t>(row); break; }
+        if (sum / sampleW > scanThreshold) { sTop = static_cast<uint16_t>(row); break; }
       }
       for (int row = lastHeight - 1; row >= lastHeight / 2; row--)
       {
         uint32_t sum = 0;
         for (int i = 0; i < sampleW; i++) sum += getY(row, sampleStartX + i);
-        if (sum / sampleW > threshold) { sBottom = static_cast<uint16_t>(lastHeight - 1 - row); break; }
+        if (sum / sampleW > scanThreshold) { sBottom = static_cast<uint16_t>(lastHeight - 1 - row); break; }
       }
       /* Skip L/R scan when frame is already wider than 16:9 — pillarbox
        * is impossible on a 16:9 display, and dark edges cause false positives. */
@@ -1525,13 +1534,13 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
         {
           uint32_t sum = 0;
           for (int i = 0; i < sampleH; i++) sum += getY(sampleStartY + i, col);
-          if (sum / sampleH > threshold) { sLeft = static_cast<uint16_t>(col); break; }
+          if (sum / sampleH > scanThreshold) { sLeft = static_cast<uint16_t>(col); break; }
         }
         for (int col = lastWidth - 1; col >= lastWidth / 2; col--)
         {
           uint32_t sum = 0;
           for (int i = 0; i < sampleH; i++) sum += getY(sampleStartY + i, col);
-          if (sum / sampleH > threshold) { sRight = static_cast<uint16_t>(lastWidth - 1 - col); break; }
+          if (sum / sampleH > scanThreshold) { sRight = static_cast<uint16_t>(lastWidth - 1 - col); break; }
         }
       }
 
