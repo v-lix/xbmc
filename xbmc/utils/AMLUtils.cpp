@@ -1215,6 +1215,7 @@ bool aml_dv_detect_active_area_enabled()
 /* Cached detected values — written by background detection thread,
  * read by CalcOverlayActiveArea on the render thread. */
 static std::atomic<bool> s_detectStable{false};
+static std::atomic<int> s_detectState{DV_DETECT_FAILED};
 static std::atomic<uint16_t> s_detectedTop{0};
 static std::atomic<uint16_t> s_detectedBottom{0};
 static std::atomic<uint16_t> s_detectedLeft{0};
@@ -1223,6 +1224,11 @@ static std::atomic<uint16_t> s_detectedRight{0};
 bool aml_dv_detect_active_area_stable()
 {
   return s_detectStable.load();
+}
+
+int aml_dv_detect_active_area_state()
+{
+  return s_detectState.load();
 }
 
 void aml_dv_detect_active_area_get(uint16_t& top, uint16_t& bottom, uint16_t& left, uint16_t& right)
@@ -1370,9 +1376,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       CLog::Log(LOGINFO, "DetectActiveArea: pre-cropped {}x{} (implied T/B={} L/R={}) — "
                 "no bars to scan, subtitle restriction uses display letterbox",
                 codecCtx->width, codecCtx->height, tbGap, lrGap);
-      /* Don't set s_detectStable — there's no detection result to report.
-       * GUI info will show no L5 (honest), and CalcOverlayActiveArea uses
-       * displayLB for subtitle restriction regardless of stable status. */
+      s_detectState.store(DV_DETECT_SKIP_NON16X9);
       goto cleanup;
     }
   }
@@ -1618,6 +1622,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
         CLog::Log(LOGINFO, "DetectActiveArea: insufficient coverage ({}/{} positions usable, "
                   "need {}) — skipping to avoid uncertain detection",
                   validSamples, numSeeks, minUsable);
+        s_detectState.store(DV_DETECT_SKIPPED);
         goto cleanup;
       }
     }
@@ -1657,6 +1662,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       {
         CLog::Log(LOGINFO, "DetectActiveArea: no T/B consensus (T={}/{} B={}/{} of {} needed) — skipping",
                   detTop, topSupport, detBottom, botSupport, required);
+        s_detectState.store(DV_DETECT_SKIPPED);
         goto cleanup;
       }
       else if (topOk && !botOk)
@@ -1694,6 +1700,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
             CLog::Log(LOGINFO, "DetectActiveArea: variable AR (sample {} T={} B={}, "
                       "consensus T={} B={}) — skipping to avoid IMAX crop",
                       i + 1, samples_top[i], samples_bottom[i], detTop, detBottom);
+            s_detectState.store(DV_DETECT_SKIP_IMAX);
             goto cleanup;
           }
         }
@@ -1781,6 +1788,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     {
       CLog::Log(LOGDEBUG, "DetectActiveArea: source has L5 (T={} B={}) — skipping injection",
                 srcMeta.level5_active_area_top_offset, srcMeta.level5_active_area_bottom_offset);
+      s_detectState.store(DV_DETECT_SKIPPED);
       s_detectStable.store(true);
       goto cleanup;
     }
@@ -1798,6 +1806,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_left", detLeft);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_right", detRight);
 
+  s_detectState.store(DV_DETECT_OK);
   s_detectStable.store(true);
 
   if (detTop || detBottom || detLeft || detRight)
@@ -1828,6 +1837,7 @@ void aml_dv_detect_active_area_start()
 {
   /* Reset state */
   s_detectStable.store(false);
+  s_detectState.store(DV_DETECT_FAILED);
   s_detectedTop.store(0);
   s_detectedBottom.store(0);
   s_detectedLeft.store(0);
@@ -1867,6 +1877,7 @@ void aml_dv_detect_active_area_start()
 void aml_dv_detect_active_area_stop()
 {
   s_detectStable.store(false);
+  s_detectState.store(DV_DETECT_FAILED);
   if (s_detectThread.joinable())
     s_detectThread.join();
 

@@ -155,6 +155,10 @@ int aml_dv_l5_subs_signal_mode();
 bool aml_dv_detect_active_area_enabled();
 bool aml_dv_detect_active_area_stable();
 void aml_dv_detect_active_area_get(uint16_t& top, uint16_t& bottom, uint16_t& left, uint16_t& right);
+enum DvDetectState { DV_DETECT_FAILED = 0, DV_DETECT_SKIP_NON16X9 = 1,
+                     DV_DETECT_SKIP_IMAX = 2, DV_DETECT_OK = 3,
+                     DV_DETECT_SKIPPED = 4 };
+int aml_dv_detect_active_area_state();
 void aml_dv_detect_set_file(const std::string& path);
 void aml_dv_detect_active_area_start();
 void aml_dv_detect_active_area_stop();

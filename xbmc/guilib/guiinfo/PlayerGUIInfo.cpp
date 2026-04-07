@@ -714,6 +714,10 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
       return true;
     }
 
+    case PLAYER_PROCESS_VIDEO_DOVI_L5_DETECT_STATE:
+      value = std::to_string(aml_dv_detect_active_area_state());
+      return true;
+
     case PLAYER_PROCESS_VIDEO_DOVI_SOURCE_MIN_PQ:
       value = std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViStreamMetadata().source_min_pq);
       return true;
