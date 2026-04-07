@@ -587,10 +587,10 @@ DoviRpuOpaque* ParseAndValidateCmv40Nalu(const std::vector<uint8_t>& nalu)
   return nullptr;
 }
 
-DoviRpuOpaque* AppendCMv40ToRpuNalu(uint8_t* nalBuf,
-                                    int32_t nalSize,
-                                    std::vector<uint8_t>& out,
-                                    uint8_t& trim)
+DoviRpuOpaque* AppendCMv40ToRpuNalu(const uint8_t* nalBuf,
+                                         int32_t nalSize,
+                                         std::vector<uint8_t>& out,
+                                         uint8_t& trim)
 {
   if (!nalBuf || (nalSize <= 2)) return nullptr;
 
@@ -633,6 +633,7 @@ DoviRpuOpaque* AppendCMv40ToRpuNalu(uint8_t* nalBuf,
 
   return nullptr;
 }
+
 
 inline void ConvertDoVi(DOVIMode convertMode,
                         bool firstFrame,
@@ -710,6 +711,12 @@ inline void AppendCMv40(DOVICMv40Mode cmv40Mode,
           (IsCMv29NoL2(header, vdrDmData) || (!hasLevel254 && is_displayML_higher_sourceMDL))) ||
          ((cmv40Mode == DOVICMv40Mode::CMV40_NO_L2) && IsCMv29NoL2(header, vdrDmData))) &&
         (dvType == 0)))
+    return;
+
+  // CMv2.9 with 4+ L2 trim blocks produces RPU payloads where the last byte is
+  // 0x00, making the trim search ambiguous (all 8 values validate).  The wrong
+  // trim crashes the Amlogic DV firmware.  Skip append for this content.
+  if (vdrDmData->dm_data.level2.len >= 4)
     return;
 
   opaque = AppendCMv40ToRpuNalu(nalBuf, nalSize, nalu, trim);

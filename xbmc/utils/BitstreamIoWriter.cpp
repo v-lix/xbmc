@@ -111,6 +111,7 @@ size_t BitstreamIoWriter::as_slice_size() const {
 }
 
 std::vector<uint8_t> BitstreamIoWriter::into_inner() {
+    buffer.resize((bit_position + 7) / 8);
     return std::move(buffer);
 }
 
