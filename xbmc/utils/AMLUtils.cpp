@@ -1607,6 +1607,21 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       goto cleanup;
     }
 
+    /* Require enough usable samples for confident detection. If too many
+     * positions failed (dark DV content), the unanalysed portions may
+     * contain fullscreen scenes we can't see — e.g. Foundation's dark
+     * intro is fullscreen but too dark for contrast-based analysis. */
+    {
+      const int minUsable = (numSeeks * 2 + 2) / 3; /* ~67%: 5 of 7 */
+      if (validSamples < minUsable)
+      {
+        CLog::Log(LOGINFO, "DetectActiveArea: insufficient coverage ({}/{} positions usable, "
+                  "need {}) — skipping to avoid uncertain detection",
+                  validSamples, numSeeks, minUsable);
+        goto cleanup;
+      }
+    }
+
     detTop = pickBest(samples_top, validSamples);
     detBottom = pickBest(samples_bottom, validSamples);
 
