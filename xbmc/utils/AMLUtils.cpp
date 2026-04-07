@@ -1684,11 +1684,16 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       {
         for (int i = 0; i < validSamples; i++)
         {
-          if (samples_top[i] <= agreeTolerance && samples_bottom[i] <= agreeTolerance)
+          /* Check if either side has no bar — on a real scope frame, row 0
+           * is always bar level (Y≈16), so T is always well above 0.
+           * T=0 means row 0 is content (fullscreen).  B can still show a
+           * large false value from dark content below the scan threshold,
+           * so require only one side to indicate no bar. */
+          if (samples_top[i] <= agreeTolerance || samples_bottom[i] <= agreeTolerance)
           {
-            CLog::Log(LOGINFO, "DetectActiveArea: variable AR (sample {} has no bars, "
+            CLog::Log(LOGINFO, "DetectActiveArea: variable AR (sample {} T={} B={}, "
                       "consensus T={} B={}) — skipping to avoid IMAX crop",
-                      i + 1, detTop, detBottom);
+                      i + 1, samples_top[i], samples_bottom[i], detTop, detBottom);
             goto cleanup;
           }
         }
