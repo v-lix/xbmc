@@ -1357,17 +1357,37 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
 
   av_init_packet(&pkt);
 
-  /* Sample at 3 spread positions for robustness against fades, title cards,
-   * or dark scenes. If a frame's center isn't bright enough for reliable
-   * border detection, retry at +5% offsets (up to 2 retries per position).
-   * Subtitles are suppressed during detection so extra seeks are free UX-wise. */
+  /* Pre-cropped content: if encoded resolution is significantly non-16:9,
+   * there are no bars to detect — the resolution IS the active area.
+   * Subtitle restriction uses displayLB (frame vs display difference). */
   {
-    const int seekPercents[] = {10, 25, 40, 55, 70};
-    const int numSeeks = 5;
-    const int maxRetries = 3;
+    uint32_t refH = (uint32_t)codecCtx->width * 9 / 16;
+    uint32_t refW = (uint32_t)codecCtx->height * 16 / 9;
+    int tbGap = ((int)refH > codecCtx->height) ? ((int)refH - codecCtx->height) / 2 : 0;
+    int lrGap = ((int)refW > codecCtx->width) ? ((int)refW - codecCtx->width) / 2 : 0;
+    if (tbGap > 20 || lrGap > 20)
+    {
+      CLog::Log(LOGINFO, "DetectActiveArea: pre-cropped {}x{} (implied T/B={} L/R={}) — "
+                "no bars to scan, subtitle restriction uses display letterbox",
+                codecCtx->width, codecCtx->height, tbGap, lrGap);
+      /* Don't set s_detectStable — there's no detection result to report.
+       * GUI info will show no L5 (honest), and CalcOverlayActiveArea uses
+       * displayLB for subtitle restriction regardless of stable status. */
+      goto cleanup;
+    }
+  }
+
+  /* Sample at 7 spread positions for robustness against fades, title cards,
+   * or dark scenes. If a frame doesn't have enough contrast for reliable
+   * border detection, retry at +1% offsets to stay in the same scene.
+   * All samples are collected (no early exit) to detect variable AR content. */
+  {
+    const int seekPercents[] = {5, 15, 30, 45, 60, 75, 88};
+    const int numSeeks = 7;
+    const int maxRetries = 8;
     const uint32_t minContrast = 10; /* minimum border-vs-content difference for detection */
-    uint16_t samples_top[5] = {}, samples_bottom[5] = {};
-    uint16_t samples_left[5] = {}, samples_right[5] = {};
+    uint16_t samples_top[7] = {}, samples_bottom[7] = {};
+    uint16_t samples_left[7] = {}, samples_right[7] = {};
     int validSamples = 0;
     int lastWidth = 0, lastHeight = 0;
     const int agreeTolerance = 5; /* pixels */
@@ -1400,7 +1420,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
 
       for (int retry = 0; retry <= maxRetries && !usable; retry++)
       {
-        int seekPct = seekPercents[s] + retry * 5;
+        int seekPct = seekPercents[s] + retry;
         if (seekPct > 90) break;
 
         if (fmtCtx->duration > 0)
@@ -1463,12 +1483,20 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
         uint32_t midY = getY(lastHeight / 2, lastWidth / 2);
         uint32_t lastY = getY(lastHeight - 1, lastWidth / 2);
         uint32_t borderY = std::min(row0Y, lastY);
-        uint32_t contrast = (midY > borderY) ? (midY - borderY) : 0;
+        uint32_t vContrast = (midY > borderY) ? (midY - borderY) : 0;
+
+        /* Horizontal contrast: for pillarbox content (e.g. 4:3 in 16:9),
+         * vertical contrast may be low but L/R edge-vs-center differs. */
+        uint32_t col0Y = getY(lastHeight / 2, 0);
+        uint32_t colLastY = getY(lastHeight / 2, lastWidth - 1);
+        uint32_t colBorderY = std::min(col0Y, colLastY);
+        uint32_t hContrast = (midY > colBorderY) ? (midY - colBorderY) : 0;
+        uint32_t contrast = std::max(vContrast, hContrast);
 
         CLog::Log(LOGDEBUG, "DetectActiveArea: sample at {}%: {}x{} fmt={} shift={} "
-                  "row0={} mid={} last={} contrast={}",
+                  "row0={} mid={} last={} contrast={} (v={} h={})",
                   seekPct, lastWidth, lastHeight, frame->format, shift,
-                  row0Y, midY, lastY, contrast);
+                  row0Y, midY, lastY, contrast, vContrast, hContrast);
 
         if (contrast < minContrast)
         {
@@ -1530,17 +1558,30 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       {
         const int sampleH = std::min(64, lastHeight / 2);
         const int sampleStartY = lastHeight / 2 - sampleH / 2;
+
+        /* Separate L/R threshold from column-based sampling — the row-based
+         * scanThreshold is calibrated for letterbox (horizontal border brightness)
+         * and can be completely wrong for pillarbox. Justice League: row-based
+         * threshold ≈30 missed 480px bars because bar/content were both dark
+         * horizontally but had clear vertical contrast at the L/R edges. */
+        uint32_t lrBorderAvg = 0, lrContentAvg = 0;
+        for (int i = 0; i < sampleH; i++) lrBorderAvg += getY(sampleStartY + i, 0);
+        for (int i = 0; i < sampleH; i++) lrContentAvg += getY(sampleStartY + i, lastWidth / 2);
+        lrBorderAvg /= sampleH;
+        lrContentAvg /= sampleH;
+        uint32_t lrThreshold = (lrBorderAvg + lrContentAvg) / 2;
+
         for (int col = 0; col < lastWidth / 2; col++)
         {
           uint32_t sum = 0;
           for (int i = 0; i < sampleH; i++) sum += getY(sampleStartY + i, col);
-          if (sum / sampleH > scanThreshold) { sLeft = static_cast<uint16_t>(col); break; }
+          if (sum / sampleH > lrThreshold) { sLeft = static_cast<uint16_t>(col); break; }
         }
         for (int col = lastWidth - 1; col >= lastWidth / 2; col--)
         {
           uint32_t sum = 0;
           for (int i = 0; i < sampleH; i++) sum += getY(sampleStartY + i, col);
-          if (sum / sampleH > scanThreshold) { sRight = static_cast<uint16_t>(lastWidth - 1 - col); break; }
+          if (sum / sampleH > lrThreshold) { sRight = static_cast<uint16_t>(lastWidth - 1 - col); break; }
         }
       }
 
@@ -1553,22 +1594,18 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       CLog::Log(LOGDEBUG, "DetectActiveArea: sample {}: T={} B={} L={} R={}",
                 validSamples, sTop, sBottom, sLeft, sRight);
 
-      /* Early exit: if T and B already have consensus, skip remaining samples */
-      if (validSamples >= 3)
-      {
-        uint16_t earlyT = pickBest(samples_top, validSamples);
-        uint16_t earlyB = pickBest(samples_bottom, validSamples);
-        if (countSupport(samples_top, validSamples, earlyT) >= 3 &&
-            countSupport(samples_bottom, validSamples, earlyB) >= 3)
-        {
-          CLog::Log(LOGDEBUG, "DetectActiveArea: early consensus at {} samples", validSamples);
-          break;
-        }
-      }
+      /* No early exit — always collect all available samples.
+       * Variable AR content (IMAX + scope) needs every sample to detect
+       * the full-frame outlier that prevents a false scope crop. */
     }
 
     if (validSamples == 0)
+    {
+      CLog::Log(LOGWARNING, "DetectActiveArea: no usable frames decoded from {}x{} "
+                "(all {} positions had insufficient contrast or decode failures)",
+                codecCtx->width, codecCtx->height, numSeeks);
       goto cleanup;
+    }
 
     detTop = pickBest(samples_top, validSamples);
     detBottom = pickBest(samples_bottom, validSamples);
@@ -1621,20 +1658,48 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       }
     }
 
+    /* Variable AR check: if consensus found significant bars but any sample
+     * had no bars at all, the movie likely has IMAX/open-matte scenes mixed
+     * with scope. Reject to avoid cropping full-frame scenes.
+     * Threshold: 2.5% of frame height (~54px on 2160p). */
+    if (detTop > 0 || detBottom > 0)
+    {
+      uint16_t minSignificant = static_cast<uint16_t>(lastHeight / 40);
+      if (detTop >= minSignificant || detBottom >= minSignificant)
+      {
+        for (int i = 0; i < validSamples; i++)
+        {
+          if (samples_top[i] <= agreeTolerance && samples_bottom[i] <= agreeTolerance)
+          {
+            CLog::Log(LOGINFO, "DetectActiveArea: variable AR (sample {} has no bars, "
+                      "consensus T={} B={}) — skipping to avoid IMAX crop",
+                      i + 1, detTop, detBottom);
+            goto cleanup;
+          }
+        }
+      }
+    }
+
     detLeft = pickBest(samples_left, validSamples);
     detRight = pickBest(samples_right, validSamples);
 
-    /* L/R: require 4+ agreeing AND symmetric (real pillarbox is always symmetric).
-     * Dark content edges frequently cause asymmetric false L/R borders. */
-    if (countSupport(samples_left, validSamples, detLeft) < 4 ||
-        countSupport(samples_right, validSamples, detRight) < 4 ||
-        (detLeft && detRight && std::abs((int)detLeft - (int)detRight) > (int)std::max(detLeft, detRight) / 10))
+    /* L/R: require majority support AND symmetric.
+     * Symmetry is the primary false-positive guard for pillarbox — real
+     * pillarbox is always symmetric, dark-edge artifacts are not. */
     {
-      CLog::Log(LOGDEBUG, "DetectActiveArea: L/R rejected (support {}/{}, L={} R={}) — ignoring",
-                countSupport(samples_left, validSamples, detLeft),
-                countSupport(samples_right, validSamples, detRight),
-                detLeft, detRight);
-      detLeft = detRight = 0;
+      int lrRequired = (validSamples + 1) / 2;
+      if (lrRequired < 2) lrRequired = 2;
+      int leftSupport = countSupport(samples_left, validSamples, detLeft);
+      int rightSupport = countSupport(samples_right, validSamples, detRight);
+      if (leftSupport < lrRequired || rightSupport < lrRequired ||
+          (detLeft && detRight &&
+           std::abs((int)detLeft - (int)detRight) > (int)std::max(detLeft, detRight) / 10))
+      {
+        CLog::Log(LOGDEBUG, "DetectActiveArea: L/R rejected (support {}/{} of {} needed, "
+                  "L={} R={}) — ignoring",
+                  leftSupport, rightSupport, lrRequired, detLeft, detRight);
+        detLeft = detRight = 0;
+      }
     }
 
     /* Validate and snap to common AR */
