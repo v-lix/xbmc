@@ -1612,7 +1612,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
      * contain fullscreen scenes we can't see — e.g. Foundation's dark
      * intro is fullscreen but too dark for contrast-based analysis. */
     {
-      const int minUsable = (numSeeks * 2 + 2) / 3; /* ~67%: 5 of 7 */
+      const int minUsable = numSeeks - 1; /* at most 1 failed position */
       if (validSamples < minUsable)
       {
         CLog::Log(LOGINFO, "DetectActiveArea: insufficient coverage ({}/{} positions usable, "
