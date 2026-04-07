@@ -1382,7 +1382,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
    * border detection, retry at +1% offsets to stay in the same scene.
    * All samples are collected (no early exit) to detect variable AR content. */
   {
-    const int seekPercents[] = {5, 15, 30, 45, 60, 75, 88};
+    const int seekPercents[] = {0, 15, 30, 45, 60, 75, 88};
     const int numSeeks = 7;
     const int maxRetries = 8;
     const uint32_t minContrast = 10; /* minimum border-vs-content difference for detection */
