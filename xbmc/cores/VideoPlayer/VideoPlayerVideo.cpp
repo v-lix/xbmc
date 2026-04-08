@@ -349,7 +349,7 @@ void CVideoPlayerVideo::Process()
   int iDropDirective;
   bool onlyPrioMsgs = false;
 
-  std::string vfmt;
+  m_vfmt.clear();
   int vfmtCheckCount = 0;
 
   m_videoStats.Start();
@@ -644,10 +644,10 @@ void CVideoPlayerVideo::Process()
         {
           CSysfsPath frame_format{"/sys/class/deinterlace/di0/frame_format"};
           if (frame_format.Exists())
-            vfmt = frame_format.Get<std::string>().value();
-          if (vfmt.size() > 4)
-            m_processInfo.SetVideoInterlaced(vfmt.compare("progressive"));
-          CLog::Log(LOGDEBUG, "CVideoPlayerVideo - CDVDMsg::DEMUXER_PACKET - checking interlace vfmt: {}", vfmt);
+            m_vfmt = frame_format.Get<std::string>().value();
+          if (m_vfmt.size() > 4)
+            m_processInfo.SetVideoInterlaced(m_vfmt.compare("progressive"));
+          CLog::Log(LOGDEBUG, "CVideoPlayerVideo - CDVDMsg::DEMUXER_PACKET - checking interlace vfmt: {}", m_vfmt);
         }
       }
       else
@@ -728,7 +728,12 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
   {
     bool hasTimestamp = true;
 
-    if (m_processInfo.GetVideoInterlaced() &&
+    // Detect progressive content misidentified as interlaced: if picture
+    // duration consistently equals double what the fps implies, halve fps.
+    // Skip when the hardware deinterlace module has confirmed interlaced
+    // content (vfmt) — MBAFF streams legitimately mix field and frame
+    // output, and the full-frame duration would falsely trigger this.
+    if (m_processInfo.GetVideoInterlaced() && m_vfmt != "interlace" &&
         MathUtils::FloatEquals(static_cast<float>(m_picture.iDuration), static_cast<float>(2 * DVD_TIME_BASE) / m_processInfo.GetVideoFps(), 700.0f))
     {
       if (++m_retryProgressive > 3)
