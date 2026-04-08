@@ -62,6 +62,7 @@ public:
     double pts = 0;
     bool hasDownmix = false;
     double centerMixLevel = 1;
+    double surroundMixLevel = 1;
   };
 
 public:

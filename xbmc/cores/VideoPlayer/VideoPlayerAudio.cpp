@@ -844,6 +844,8 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
     double clev = audioframe.hasDownmix ? audioframe.centerMixLevel : M_SQRT1_2;
     double curDB = 20 * log10(clev);
     audioframe.centerMixLevel = pow(10, (curDB + m_processInfo.GetVideoSettings().m_CenterMixLevel) / 20);
+    if (!audioframe.hasDownmix)
+      audioframe.surroundMixLevel = M_SQRT1_2;
     audioframe.hasDownmix = true;
   }
 

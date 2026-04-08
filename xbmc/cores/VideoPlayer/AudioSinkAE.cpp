@@ -146,6 +146,7 @@ unsigned int CAudioSinkAE::AddPackets(const DVDAudioFrame &audioframe)
     {
       ext.hasDownmix = true;
       ext.centerMixLevel = audioframe.centerMixLevel;
+      ext.surroundMixLevel = audioframe.surroundMixLevel;
     }
     unsigned int copied = m_pAudioStream->AddData(audioframe.data, offset, frames, &ext);
     offset += copied;

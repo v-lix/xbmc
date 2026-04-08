@@ -43,6 +43,7 @@ typedef struct stDVDAudioFrame
   int profile;
   bool hasDownmix;
   double centerMixLevel;
+  double surroundMixLevel;
 
   // LAV discontinuity signaling (used when LAV sync is enabled)
   bool hasDiscontinuity{false};

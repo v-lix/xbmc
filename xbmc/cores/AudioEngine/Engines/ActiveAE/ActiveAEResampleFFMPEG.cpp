@@ -37,6 +37,7 @@ bool CActiveAEResampleFFMPEG::Init(SampleConfig dstConfig,
                                    bool upmix,
                                    bool normalize,
                                    double centerMix,
+                                   double surroundMix,
                                    CAEChannelInfo* remapLayout,
                                    AEQuality quality,
                                    bool force_resample,
@@ -258,6 +259,8 @@ bool CActiveAEResampleFFMPEG::Init(SampleConfig dstConfig,
   }
   else
     av_opt_set_double(m_pContext, "center_mix_level", centerMix, 0);
+
+  av_opt_set_double(m_pContext, "surround_mix_level", surroundMix, 0);
 
   if(swr_init(m_pContext) < 0)
   {

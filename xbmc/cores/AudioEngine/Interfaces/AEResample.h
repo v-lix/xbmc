@@ -25,6 +25,7 @@ public:
                     bool upmix,
                     bool normalize,
                     double centerMix,
+                    double surroundMix,
                     CAEChannelInfo* remapLayout,
                     AEQuality quality,
                     bool force_resample,

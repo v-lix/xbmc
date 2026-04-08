@@ -76,6 +76,7 @@ CSampleBuffer* CActiveAEBufferPool::GetFreeBuffer()
     m_freeSamples.pop_front();
     buf->refCount = 1;
     buf->centerMixLevel = M_SQRT1_2;
+    buf->surroundMixLevel = M_SQRT1_2;
   }
   return buf;
 }
@@ -191,8 +192,8 @@ void CActiveAEBufferPoolResample::ChangeResampler()
               srcConfig.sample_rate, dstConfig.sample_rate);
 
   m_resampler->Init(dstConfig, srcConfig, m_stereoUpmix, m_normalize, m_centerMixLevel,
-                    m_remap ? &m_format.m_channelLayout : nullptr, m_resampleQuality,
-                    m_forceResampler, m_mixSubLevel);
+                    m_surroundMixLevel, m_remap ? &m_format.m_channelLayout : nullptr,
+                    m_resampleQuality, m_forceResampler, m_mixSubLevel);
 
   m_changeResampler = false;
 }
@@ -246,9 +247,11 @@ bool CActiveAEBufferPoolResample::ResampleBuffers(int64_t timestamp)
       if (hasInput && !skipInput && !m_changeResampler)
       {
         in = m_inputSamples.front();
-        if (in->centerMixLevel != m_centerMixLevel)
+        if (in->centerMixLevel != m_centerMixLevel ||
+            in->surroundMixLevel != m_surroundMixLevel)
         {
           m_centerMixLevel = in->centerMixLevel;
+          m_surroundMixLevel = in->surroundMixLevel;
           m_changeResampler = true;
           in = nullptr;
         }

@@ -3465,7 +3465,7 @@ bool CActiveAE::ResampleSound(CActiveAESound *sound)
   std::unique_ptr<IAEResample> resampler =
       CAEResampleFactory::Create(AERESAMPLEFACTORY_QUICK_RESAMPLE);
 
-  resampler->Init(dst_config, orig_config, false, true, M_SQRT1_2,
+  resampler->Init(dst_config, orig_config, false, true, M_SQRT1_2, M_SQRT1_2,
                   outChannels.Count() > 0 ? &outChannels : nullptr, m_settings.resampleQuality,
                   false, 0.0f);
 

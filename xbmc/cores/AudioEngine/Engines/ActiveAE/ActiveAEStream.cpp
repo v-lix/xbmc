@@ -143,7 +143,7 @@ void CActiveAEStream::InitRemapper()
     srcConfig.bits_per_sample = CAEUtil::DataFormatToUsedBits(m_format.m_dataFormat);
     srcConfig.dither_bits = CAEUtil::DataFormatToDitherBits(m_format.m_dataFormat);
 
-    m_remapper->Init(dstConfig, srcConfig, false, false, M_SQRT1_2, &remapLayout,
+    m_remapper->Init(dstConfig, srcConfig, false, false, M_SQRT1_2, M_SQRT1_2, &remapLayout,
                      AE_QUALITY_LOW, // not used for remapping
                      false, 0.0f);
 
@@ -281,7 +281,10 @@ unsigned int CActiveAEStream::AddData(const uint8_t* const *data, unsigned int o
       copied += minFrames;
 
       if (extData && extData->hasDownmix)
+      {
         m_currentBuffer->centerMixLevel = extData->centerMixLevel;
+        m_currentBuffer->surroundMixLevel = extData->surroundMixLevel;
+      }
 
       bool rawPktComplete = false;
       {

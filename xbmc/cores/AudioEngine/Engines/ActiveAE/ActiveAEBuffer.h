@@ -55,6 +55,7 @@ public:
   int pkt_start_offset = 0;
   int refCount = 0;
   double centerMixLevel;
+  double surroundMixLevel;
 };
 
 class CActiveAEBufferPool
@@ -109,6 +110,7 @@ protected:
   std::unique_ptr<IAEResample> m_resampler;
   double m_resampleRatio = 1.0;
   double m_centerMixLevel = M_SQRT1_2;
+  double m_surroundMixLevel = M_SQRT1_2;
   bool m_fillPackets = false;
   bool m_normalize = true;
   float m_mixSubLevel = 0.0f;

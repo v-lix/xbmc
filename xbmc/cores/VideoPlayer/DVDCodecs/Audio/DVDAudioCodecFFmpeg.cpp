@@ -243,6 +243,7 @@ void CDVDAudioCodecFFmpeg::GetData(DVDAudioFrame &frame)
   if (frame.hasDownmix)
   {
     frame.centerMixLevel = m_downmixInfo.center_mix_level;
+    frame.surroundMixLevel = m_downmixInfo.surround_mix_level;
   }
 }
 
