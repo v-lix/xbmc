@@ -4016,6 +4016,18 @@ bool CVideoPlayer::OpenVideoStream(CDVDStreamInfo& hint, bool reset)
                                                    (double)DVD_TIME_BASE * hint.fpsscale /
                                                    (hint.fpsrate * (hint.interlaced ? 2 : 1)));
 
+      // H.264 MBAFF/SeparatedFields content may report fpsrate as the field rate
+      // (e.g. 50 for 1080i50) while also flagging interlaced=true. Doubling an
+      // already-doubled rate produces nonsensical values (100fps). Re-derive
+      // without the interlace factor when this is detected.
+      if (hint.interlaced && hint.codec == AV_CODEC_ID_H264 && framerate > 61.0)
+      {
+        framerate = DVD_TIME_BASE / CDVDCodecUtils::NormalizeFrameduration(
+                                                     (double)DVD_TIME_BASE * hint.fpsscale /
+                                                     hint.fpsrate);
+        m_processInfo->SetVideoInterlaced(true);
+      }
+
       if (MathUtils::FloatEquals(25.0f, static_cast<float>(framerate), 0.01f))
       {
         framerate = 50.0;
