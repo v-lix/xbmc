@@ -242,11 +242,10 @@ bool CActiveAEResampleFFMPEG::Init(SampleConfig dstConfig,
     av_opt_set_int(m_pContext, "output_sample_bits", m_dst_bits, 0);
   }
 
-  // tell resampler to clamp float values
+  // tell resampler to normalize downmix matrix so output does not exceed 1.0
   // not required for sink stage (remapLayout == true)
   if ((m_dst_fmt == AV_SAMPLE_FMT_FLT || m_dst_fmt == AV_SAMPLE_FMT_FLTP) &&
-      (m_src_fmt == AV_SAMPLE_FMT_FLT || m_src_fmt == AV_SAMPLE_FMT_FLTP) && !remapLayout &&
-      normalize)
+      !remapLayout && normalize)
   {
     av_opt_set_double(m_pContext, "rematrix_maxval", 1.0, 0);
   }
