@@ -2463,8 +2463,8 @@ msgid "Enable component-specific logging"
 msgstr "Komponentenspezifische Protokollierung aktivieren"
 
 msgctxt "#667"
-msgid "Enable Dolby Digital (AC3) transcoding"
-msgstr "Dolby-Digital-(AC3)-Umwandlung aktivieren"
+msgid "Enable Dolby Digital transcoding"
+msgstr "Dolby-Digital-Umwandlung aktivieren"
 
 msgctxt "#668"
 msgid "Specify component-specific logging..."
@@ -15903,8 +15903,8 @@ msgid "Record"
 msgstr "Aufnehmen"
 
 msgctxt "#36429"
-msgid "Select this if the audio out connection only supports multichannel audio as Dolby Digital 5.1 (AC-3), such as a S/PDIF connection. If your system supports PCM multichannel audio via HDMI, leave this disabled."
-msgstr "Auswählen, wenn der Audioausgang nur Mehrkanalton als Dolby Digital 5.1 (AC-3) unterstützt, wie beispielsweise S/PDIF-Verbindungen. Unterstützt das System PCM-Mehrkanalton über HDMI, dann ausgeschaltet lassen."
+msgid "Select this if the audio out connection only supports multichannel audio as Dolby Digital 5.1 (AC-3), such as a S/PDIF connection. When E-AC3 passthrough is also enabled, Dolby Digital Plus (E-AC3) is used for higher quality. If your system supports PCM multichannel audio via HDMI, leave this disabled."
+msgstr "Auswählen, wenn der Audioausgang nur Mehrkanalton als Dolby Digital 5.1 (AC-3) unterstützt, wie beispielsweise S/PDIF-Verbindungen. Wenn zusätzlich E-AC3-Passthrough aktiviert ist, wird Dolby Digital Plus (E-AC3) für höhere Qualität verwendet. Unterstützt das System PCM-Mehrkanalton über HDMI, dann ausgeschaltet lassen."
 
 msgctxt "#36430"
 msgid "Configure how video processing will be accelerated. This includes things like decoding and scaling."
