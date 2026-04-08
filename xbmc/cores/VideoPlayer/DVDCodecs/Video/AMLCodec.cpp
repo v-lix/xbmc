@@ -2091,6 +2091,16 @@ bool CAMLCodec::OpenDecoder()
   if (m_fullscreen || !skipWindowed)
     aml_dv_open(hints.hdrType, hints.bitdepth, hints.colorPrimaries);
 
+  // L5 active area detection: only for native DV content (not VS10 SDR/HDR10/HLG
+  // conversions) and not for Profile 9 (AVC-based, probe causes h264 decode errors).
+  if (hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION && hints.dovi.dv_profile != 9)
+  {
+    const auto settingsComponent = CServiceBroker::GetSettingsComponent();
+    if (settingsComponent->GetSettings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5) &&
+        settingsComponent->GetSettings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA))
+      aml_dv_detect_active_area_start();
+  }
+
   // Now have the HDRType resolved, ok to set the transfer pq - so renderer can set the shaders as needed.
   aml_set_transfer_pq(hints.hdrType, hints.bitdepth);
 

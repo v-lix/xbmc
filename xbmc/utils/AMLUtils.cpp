@@ -572,8 +572,6 @@ unsigned int aml_dv_on(unsigned int mode)
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detect_active_area", dv_detect_active_area);
   CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_on - L5 detect: l5_enabled={} detect_setting={} → detect={}",
             dv_level5_enabled, dv_detect_active_area, dv_detect_active_area);
-  if (dv_detect_active_area)
-    aml_dv_detect_active_area_start();
 
   unsigned int xbmc_dv_vsvdb_source_lum_limit_num = 0;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_source_lum_limit_num", xbmc_dv_vsvdb_source_lum_limit_num);
