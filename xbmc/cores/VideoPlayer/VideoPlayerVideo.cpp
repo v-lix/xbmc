@@ -268,6 +268,8 @@ void CVideoPlayerVideo::OpenStream(CDVDStreamInfo& hint, std::unique_ptr<CDVDVid
 
 void CVideoPlayerVideo::CloseStream(bool bWaitForBuffers)
 {
+  m_renderManager.SetDeinterlaceDelay(0);
+
   // wait until buffers are empty
   if (bWaitForBuffers && m_speed > 0)
   {
@@ -859,20 +861,27 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
       // includes a deinterlace module (di0) that buffers multiple fields before
       // producing output (buffer_keep_count=3, start_frame_drop=2, plus post-
       // processing). Kodi captures PTS via V4L2 DQBUF *before* the DI stage,
-      // so the frame appears on screen ~240ms later than Kodi's sync expects.
-      // Shift the video start timestamp forward to delay audio accordingly.
-      double diCompensation = 0;
+      // so the frame appears on screen later than Kodi's sync expects.
+      // Set deinterlace delay on the render manager — this compensates both
+      // the initial sync timestamp AND the ongoing displayLatency (frame
+      // release timing in PrepareNextRender), mirroring how the user's manual
+      // AV offset works but automatically gated on hardware DI.
       if (m_processInfo.GetVideoInterlaced() && m_processInfo.IsVideoHwDecoder() &&
           CSysfsPath{"/sys/class/deinterlace/di0/frame_format"}.Exists())
       {
         constexpr int DI_PIPELINE_FIELDS = 12;
-        diCompensation = DI_PIPELINE_FIELDS * DVD_TIME_BASE / m_fFrameRate;
+        int diDelayMs = static_cast<int>(DI_PIPELINE_FIELDS * 1000.0 / m_fFrameRate);
+        m_renderManager.SetDeinterlaceDelay(diDelayMs);
         CLog::Log(LOGDEBUG, "CVideoPlayerVideo - DI pipeline latency compensation: "
-                  "{:.0f}ms ({} fields at {:.1f}Hz)",
-                  diCompensation / (DVD_TIME_BASE / 1000), DI_PIPELINE_FIELDS, m_fFrameRate);
+                  "{}ms ({} fields at {:.1f}Hz)",
+                  diDelayMs, DI_PIPELINE_FIELDS, m_fFrameRate);
+      }
+      else
+      {
+        m_renderManager.SetDeinterlaceDelay(0);
       }
 
-      msg.timestamp = hasTimestamp ? (pts + m_renderManager.GetDelay() * 1000 + diCompensation) : DVD_NOPTS_VALUE;
+      msg.timestamp = hasTimestamp ? (pts + (m_renderManager.GetDelay() + m_renderManager.GetDeinterlaceDelay()) * 1000) : DVD_NOPTS_VALUE;
       m_messageParent.Put(std::make_shared<CDVDMsgType<SStartMsg>>(CDVDMsg::PLAYER_STARTED, msg));
     }
 
