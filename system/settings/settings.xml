@@ -4461,13 +4461,12 @@
           </dependencies>
           <control type="toggle" />
         </setting>
-        <setting id="coreelec.amlogic.dolbyvision.detect.throttle" type="boolean" label="60196" help="60197" parent="coreelec.amlogic.dolbyvision.level5">
+        <setting id="coreelec.amlogic.dolbyvision.detect.throttle" type="boolean" label="60196" help="60197" parent="coreelec.amlogic.dolbyvision.detect.active.area">
           <requirement>HAVE_AMCODEC</requirement>
           <visible>true</visible>
           <level>3</level>
           <default>false</default>
           <dependencies>
-            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.level5" operator="is">true</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.detect.active.area" operator="is">true</dependency>
           </dependencies>
           <control type="toggle" />
