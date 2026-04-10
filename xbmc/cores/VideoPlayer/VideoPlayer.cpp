@@ -2042,7 +2042,13 @@ void CVideoPlayer::HandlePlaySpeed()
       // care for live streams
       else if (m_pInputStream->IsRealtime())
       {
-        if (m_CurrentAudio.id >= 0 && m_clock.GetClock() > DVD_MSEC_TO_TIME(1000))
+        // Skip SpeedAdjust for passthrough audio: the message queue level (aq)
+        // drains near-instantly for passthrough since packets are tiny, so aq:0
+        // triggers SpeedAdjust -0.05 immediately and aq>4 is never reached to
+        // restore it. The clock then drifts at -50ms/s for the entire session,
+        // creating persistent sync oscillation in ActiveAE.
+        if (m_CurrentAudio.id >= 0 && !IsPassthrough() &&
+            m_clock.GetClock() > DVD_MSEC_TO_TIME(1000))
         {
           double adjust = -1.0; // a unique value
           if (m_clock.GetSpeedAdjust() >= 0 && m_VideoPlayerAudio->GetLevel() < 1) {
@@ -2123,7 +2129,8 @@ void CVideoPlayer::HandlePlaySpeed()
       }
       else if (m_CurrentAudio.starttime != DVD_NOPTS_VALUE && m_CurrentAudio.packets > 0)
       {
-        if (m_pInputStream->IsRealtime())
+        bool realtimePassthrough = m_pInputStream->IsRealtime() && IsPassthrough();
+        if (m_pInputStream->IsRealtime() && !realtimePassthrough)
           clock = m_CurrentAudio.starttime - m_CurrentAudio.cachetime - DVD_MSEC_TO_TIME(1000);
         else
           clock = m_CurrentAudio.starttime - m_CurrentAudio.cachetime;
@@ -2131,7 +2138,19 @@ void CVideoPlayer::HandlePlaySpeed()
         if (m_CurrentVideo.starttime != DVD_NOPTS_VALUE && (m_CurrentVideo.packets > 0))
         {
           const double videoClock = m_CurrentVideo.starttime - m_CurrentVideo.cachetotal;
-          if (videoClock < clock)
+          if (realtimePassthrough)
+          {
+            // For live passthrough, keep the audio-derived clock even when video
+            // starts later. Audio passthrough correction is very slow (one AC3/EAC3
+            // frame per iteration = 32ms steps) so pulling the clock up to video
+            // would cause 6-8 seconds of audible frame skipping. The video decoder
+            // catches up almost instantly by dropping early frames.
+            CLog::Log(LOGDEBUG, "VideoPlayer::Sync - live passthrough: keeping audio "
+                      "clock {:.3f}, video starts {:.3f}s later",
+                      clock / DVD_TIME_BASE,
+                      (videoClock - clock) / DVD_TIME_BASE);
+          }
+          else if (videoClock < clock)
           {
             // Video starts before audio. This typically happens after a chapter skip
             // where the video decoder outputs key-frame references (earlier PTS) while
