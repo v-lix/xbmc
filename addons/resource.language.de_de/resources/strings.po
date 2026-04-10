@@ -19060,6 +19060,14 @@ msgctxt "#60195"
 msgid "Detect black borders at playback start when the source provides no Level 5 active area metadata. Samples up to 7 frames spread across the file in a background thread, skipping frames that lack contrast and retrying at nearby positions. Results are snapped to common aspect ratios (4:3 through 2.76:1) and require majority consensus. Movies with variable aspect ratios (e.g. IMAX scenes) are detected and skipped to avoid incorrect cropping. Pre-cropped content (non-16:9 encoded resolution) is recognised automatically — no bars are scanned and no L5 is shown, since the resolution itself defines the active area; subtitle restriction still works via the display letterbox. Runs once at playback start with negligible performance impact."
 msgstr "Erkennt schwarze Ränder bei Wiedergabestart, wenn die Quelle keine Level-5-Aktivbereich-Metadaten liefert. Tastet bis zu 7 Frames über die Datei verteilt in einem Hintergrund-Thread ab, überspringt kontrastarme Frames und versucht benachbarte Positionen. Ergebnisse werden auf gängige Seitenverhältnisse (4:3 bis 2,76:1) eingerastet und erfordern Mehrheitskonsens. Filme mit variablem Seitenverhältnis (z.B. IMAX-Szenen) werden erkannt und übersprungen, um falsches Beschneiden zu vermeiden. Vorgeschnittene Inhalte (nicht-16:9-Auflösung) werden automatisch erkannt — es werden keine Ränder gescannt und kein L5 angezeigt, da die Auflösung selbst den Aktivbereich definiert; die Untertitelbeschränkung funktioniert weiterhin über den Display-Letterbox. Läuft einmalig bei Wiedergabestart mit vernachlässigbarem Leistungseinfluss."
 
+msgctxt "#60196"
+msgid "Throttle detection I/O"
+msgstr "Erkennungs-I/O drosseln"
+
+msgctxt "#60197"
+msgid "Reduce I/O impact of active area detection on playback. Adds a short delay before detection starts and yields between scan positions, preventing the detection thread from starving the player of network bandwidth. Enable this if detection causes stuttering on slow network shares (e.g. SMB)."
+msgstr "Reduziert die I/O-Belastung der Aktivbereich-Erkennung auf die Wiedergabe. Fügt eine kurze Verzögerung vor dem Erkennungsstart ein und pausiert zwischen den Scanpositionen, damit der Erkennungs-Thread dem Player keine Netzwerkbandbreite entzieht. Aktivieren, wenn die Erkennung auf langsamen Netzwerkfreigaben (z.B. SMB) Ruckler verursacht."
+
 msgctxt "#60200"
 msgid "Set Limit VSVDB luminance"
 msgstr "VSVDB-Helligkeit begrenzen"
