@@ -1648,6 +1648,23 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       /* No early exit — always collect all available samples.
        * Variable AR content (IMAX + scope) needs every sample to detect
        * the full-frame outlier that prevents a false scope crop. */
+
+      /* Check if source L5 appeared during our scan — by now the RPU parser
+       * has had time to process frames from the current playback (no stale
+       * data risk unlike an upfront check).  Abort to avoid wasted I/O. */
+      {
+        auto srcMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
+        if (srcMeta.has_level5_metadata &&
+            (srcMeta.level5_active_area_top_offset || srcMeta.level5_active_area_bottom_offset ||
+             srcMeta.level5_active_area_left_offset || srcMeta.level5_active_area_right_offset))
+        {
+          CLog::Log(LOGINFO, "DetectActiveArea: source L5 appeared (T={} B={}) — aborting scan",
+                    srcMeta.level5_active_area_top_offset, srcMeta.level5_active_area_bottom_offset);
+          s_detectState.store(DV_DETECT_SKIPPED);
+          s_detectStable.store(true);
+          goto cleanup;
+        }
+      }
     }
 
     if (validSamples == 0)
