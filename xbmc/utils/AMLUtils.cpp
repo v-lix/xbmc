@@ -1226,6 +1226,8 @@ bool aml_dv_detect_active_area_stable()
 
 int aml_dv_detect_active_area_state()
 {
+  if (!aml_dv_detect_active_area_enabled())
+    return DV_DETECT_INACTIVE;
   return s_detectState.load();
 }
 
@@ -1918,6 +1920,7 @@ void aml_dv_detect_active_area_start()
     s_detectCancel.store(false);
   }
   CLog::Log(LOGDEBUG, "DetectActiveArea: thread join={}, spawning", wasJoinable);
+  s_detectState.store(DV_DETECT_RUNNING);
 
   s_detectThread = std::thread([filePath]() {
     DetectActiveAreaFromFile(filePath);

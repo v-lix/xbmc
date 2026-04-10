@@ -157,7 +157,8 @@ bool aml_dv_detect_active_area_stable();
 void aml_dv_detect_active_area_get(uint16_t& top, uint16_t& bottom, uint16_t& left, uint16_t& right);
 enum DvDetectState { DV_DETECT_FAILED = 0, DV_DETECT_SKIP_NON16X9 = 1,
                      DV_DETECT_SKIP_IMAX = 2, DV_DETECT_OK = 3,
-                     DV_DETECT_SKIPPED = 4 };
+                     DV_DETECT_SKIPPED = 4, DV_DETECT_INACTIVE = 5,
+                     DV_DETECT_RUNNING = 6 };
 int aml_dv_detect_active_area_state();
 void aml_dv_detect_set_file(const std::string& path);
 void aml_dv_detect_active_area_start();
