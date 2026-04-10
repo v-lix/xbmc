@@ -1271,8 +1271,7 @@ static int64_t detect_avio_seek(void *opaque, int64_t pos, int whence)
 
 static bool detect_throttle_enabled()
 {
-  return CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
-      CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_THROTTLE);
+  return settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_THROTTLE);
 }
 
 /* Sleep in small increments, checking cancel flag.  Returns true if cancelled. */
@@ -1299,6 +1298,8 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
   int videoIdx = -1;
   uint16_t detTop = 0, detBottom = 0, detLeft = 0, detRight = 0;
   const bool throttle = detect_throttle_enabled();
+  if (throttle)
+    CLog::Log(LOGDEBUG, "DetectActiveArea: I/O throttle enabled, delaying 3s");
 
   /* Throttle: let playback establish its I/O pipeline before we start
    * competing for network bandwidth. */
