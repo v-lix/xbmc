@@ -4455,7 +4455,7 @@
           <requirement>HAVE_AMCODEC</requirement>
           <visible>true</visible>
           <level>2</level>
-          <default>true</default>
+          <default>false</default>
           <dependencies>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.level5" operator="is">true</dependency>
           </dependencies>
