@@ -1242,6 +1242,15 @@ static const uint32_t s_commonAR[] = {
   1333, 1370, 1667, 1778, 1850, 1896, 2000, 2200, 2350, 2390, 2400, 2550, 2760
 };
 
+/* Cancel flag — set by stop(), checked by ffmpeg interrupt callback and
+ * between seek positions.  Allows clean abort of slow network I/O. */
+static std::atomic<bool> s_detectCancel{false};
+
+static int detect_interrupt_cb(void *opaque)
+{
+  return s_detectCancel.load() ? 1 : 0;
+}
+
 /* AVIO callbacks for reading through Kodi's VFS (handles nfs://, smb://, etc.) */
 static int detect_avio_read(void *opaque, uint8_t *buf, int size)
 {
@@ -1258,6 +1267,25 @@ static int64_t detect_avio_seek(void *opaque, int64_t pos, int whence)
   return file->Seek(pos, whence & ~AVSEEK_FORCE);
 }
 
+static bool detect_throttle_enabled()
+{
+  return CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+      CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_THROTTLE);
+}
+
+/* Sleep in small increments, checking cancel flag.  Returns true if cancelled. */
+static bool detect_sleep_ms(int ms)
+{
+  const int step = 100;
+  for (int elapsed = 0; elapsed < ms; elapsed += step)
+  {
+    if (s_detectCancel.load())
+      return true;
+    std::this_thread::sleep_for(std::chrono::milliseconds(std::min(step, ms - elapsed)));
+  }
+  return s_detectCancel.load();
+}
+
 static void DetectActiveAreaFromFile(const std::string& filePath)
 {
   AVFormatContext* fmtCtx = nullptr;
@@ -1268,6 +1296,12 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
   XFILE::CFile file;
   int videoIdx = -1;
   uint16_t detTop = 0, detBottom = 0, detLeft = 0, detRight = 0;
+  const bool throttle = detect_throttle_enabled();
+
+  /* Throttle: let playback establish its I/O pipeline before we start
+   * competing for network bandwidth. */
+  if (throttle && detect_sleep_ms(3000))
+    return;
 
   /* Open through Kodi VFS — supports nfs://, smb://, local paths, etc. */
   if (!file.Open(filePath, XFILE::READ_NO_CACHE))
@@ -1296,6 +1330,11 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     return;
   }
   fmtCtx->pb = avioCtx;
+  fmtCtx->interrupt_callback.callback = detect_interrupt_cb;
+  fmtCtx->interrupt_callback.opaque = nullptr;
+
+  if (s_detectCancel.load())
+    goto cleanup;
 
   if (avformat_open_input(&fmtCtx, filePath.c_str(), nullptr, nullptr) < 0)
   {
@@ -1418,6 +1457,13 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
 
     for (int s = 0; s < numSeeks && validSamples < numSeeks; s++)
     {
+      if (s_detectCancel.load())
+        break;
+
+      /* Throttle: yield between seek positions to let playback I/O breathe */
+      if (throttle && s > 0 && detect_sleep_ms(500))
+        break;
+
       bool usable = false;
 
       for (int retry = 0; retry <= maxRetries && !usable; retry++)
@@ -1834,6 +1880,7 @@ void aml_dv_detect_set_file(const std::string& path)
 void aml_dv_detect_active_area_start()
 {
   /* Reset state */
+  s_detectCancel.store(false);
   s_detectStable.store(false);
   s_detectState.store(DV_DETECT_FAILED);
   s_detectedTop.store(0);
@@ -1861,10 +1908,15 @@ void aml_dv_detect_active_area_start()
     return;
   }
 
-  /* Join previous detection thread if still running */
+  /* Join previous detection thread if still running — cancel it first
+   * so we don't block on a slow network read. */
   bool wasJoinable = s_detectThread.joinable();
   if (wasJoinable)
+  {
+    s_detectCancel.store(true);
     s_detectThread.join();
+    s_detectCancel.store(false);
+  }
   CLog::Log(LOGDEBUG, "DetectActiveArea: thread join={}, spawning", wasJoinable);
 
   s_detectThread = std::thread([filePath]() {
@@ -1874,6 +1926,7 @@ void aml_dv_detect_active_area_start()
 
 void aml_dv_detect_active_area_stop()
 {
+  s_detectCancel.store(true);
   s_detectStable.store(false);
   s_detectState.store(DV_DETECT_FAILED);
   if (s_detectThread.joinable())
