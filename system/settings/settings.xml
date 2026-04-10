@@ -4505,7 +4505,6 @@
               <option label="60322">0</option>
               <option label="60323">1</option>
               <option label="60324">2</option>
-              <option label="60325">3</option>
             </options>
           </constraints>
           <control type="spinner" format="string" />

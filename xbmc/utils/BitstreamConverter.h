@@ -102,7 +102,6 @@ enum DOVICMv40Mode : int
   CMV40_NONE = 0,
   CMV40_NO_L2,
   CMV40_ALWAYS,
-  CMV40_AUTO
 };
 
 class CBitstreamParser
@@ -141,10 +140,6 @@ public:
   void              SetAppendCMv40(enum DOVICMv40Mode value) {
                       if (m_append_cmv40 != value) InvalidateDoViCache();
                       m_append_cmv40 = value;
-                    }
-  void              SetCMv40DisplayParams(int dvType, int maxLumNits) {
-                      m_cmv40_dv_type = dvType;
-                      m_cmv40_max_lum_nits = maxLumNits;
                     }
   void              SetConvertHdr10Plus(bool value) { m_convert_Hdr10Plus = value; }
   void              SetPreferCovertHdr10Plus(bool value) { m_prefer_Hdr10Plus_conversion = value; }
@@ -233,9 +228,6 @@ protected:
   enum PeakBrightnessSource m_convert_Hdr10Plus_peak_brightness_source;
   bool              m_first_frame;
   enum DOVICMv40Mode m_append_cmv40;
-  uint8_t           m_cmv40_trim{1};
-  int               m_cmv40_dv_type{0};
-  int               m_cmv40_max_lum_nits{0};
   HDRStaticMetadataInfo m_hdrStaticMetadataInfo;
   std::vector<uint8_t> m_cached_dovi_rpu_in_nal;
   std::vector<uint8_t> m_cached_dovi_rpu_out_nal;
