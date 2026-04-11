@@ -741,10 +741,11 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
 
     // Detect progressive content misidentified as interlaced: if picture
     // duration consistently equals double what the fps implies, halve fps.
-    // Skip when the hardware deinterlace module has confirmed interlaced
-    // content (vfmt) — MBAFF streams legitimately mix field and frame
-    // output, and the full-frame duration would falsely trigger this.
-    if (m_processInfo.GetVideoInterlaced() && m_vfmt != "interlace" &&
+    // Only allow when the hardware deinterlace module has positively
+    // confirmed "progressive" — without that, stay conservative. MBAFF
+    // streams legitimately mix field and frame output, and full-frame
+    // durations would falsely trigger the fallback before vfmt is ready.
+    if (m_processInfo.GetVideoInterlaced() && m_vfmt == "progressive" &&
         MathUtils::FloatEquals(static_cast<float>(m_picture.iDuration), static_cast<float>(2 * DVD_TIME_BASE) / m_processInfo.GetVideoFps(), 700.0f))
     {
       if (++m_retryProgressive > 3)
