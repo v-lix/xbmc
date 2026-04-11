@@ -2129,23 +2129,23 @@ void CVideoPlayer::HandlePlaySpeed()
       }
       else if (m_CurrentAudio.starttime != DVD_NOPTS_VALUE && m_CurrentAudio.packets > 0)
       {
-        bool realtimePassthrough = m_pInputStream->IsRealtime() && IsPassthrough();
-        if (m_pInputStream->IsRealtime() && !realtimePassthrough)
-          clock = m_CurrentAudio.starttime - m_CurrentAudio.cachetime - DVD_MSEC_TO_TIME(1000);
-        else
-          clock = m_CurrentAudio.starttime - m_CurrentAudio.cachetime;
+        clock = m_CurrentAudio.starttime - m_CurrentAudio.cachetime;
 
         if (m_CurrentVideo.starttime != DVD_NOPTS_VALUE && (m_CurrentVideo.packets > 0))
         {
           const double videoClock = m_CurrentVideo.starttime - m_CurrentVideo.cachetotal;
-          if (realtimePassthrough)
+          if (m_pInputStream->IsRealtime())
           {
-            // For live passthrough, keep the audio-derived clock even when video
-            // starts later. Audio passthrough correction is very slow (one AC3/EAC3
-            // frame per iteration = 32ms steps) so pulling the clock up to video
-            // would cause 6-8 seconds of audible frame skipping. The video decoder
-            // catches up almost instantly by dropping early frames.
-            CLog::Log(LOGDEBUG, "VideoPlayer::Sync - live passthrough: keeping audio "
+            // For live streams, keep the audio-derived clock even when video starts
+            // later. MPEG-TS muxing puts audio PTS hundreds of ms before video PTS
+            // (normal for H264 keyframe intervals). Pulling the clock up to video via
+            // max(audio, video) forces ActiveAE to skip/delay hundreds of ms of audio:
+            // passthrough can only correct in 32ms AC3 frame steps (6-8s convergence),
+            // and decoded audio skip loops race against incoming data causing multi-
+            // second mute. The video decoder catches up almost instantly by dropping
+            // early frames; ~1s of blank screen during channel switch is invisible.
+            // The previous -1000ms realtime offset was always negated by max() anyway.
+            CLog::Log(LOGDEBUG, "VideoPlayer::Sync - live stream: keeping audio "
                       "clock {:.3f}, video starts {:.3f}s later",
                       clock / DVD_TIME_BASE,
                       (videoClock - clock) / DVD_TIME_BASE);
