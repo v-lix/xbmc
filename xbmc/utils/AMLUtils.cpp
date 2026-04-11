@@ -1295,6 +1295,8 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
   AVPacket pkt;
   AVIOContext* avioCtx = nullptr;
   XFILE::CFile file;
+  uint8_t* avioBuf = nullptr;
+  const int bufSize = 32768;
   int videoIdx = -1;
   uint16_t detTop = 0, detBottom = 0, detLeft = 0, detRight = 0;
   const bool throttle = detect_throttle_enabled();
@@ -1304,33 +1306,32 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
   /* Throttle: let playback establish its I/O pipeline before we start
    * competing for network bandwidth. */
   if (throttle && detect_sleep_ms(3000))
-    return;
+    goto cleanup;
 
   /* Open through Kodi VFS — supports nfs://, smb://, local paths, etc. */
   if (!file.Open(filePath, XFILE::READ_NO_CACHE))
   {
     CLog::Log(LOGWARNING, "DetectActiveArea: failed to open {}", filePath);
-    return;
+    goto cleanup;
   }
 
-  const int bufSize = 32768;
-  auto* avioBuf = static_cast<uint8_t*>(av_malloc(bufSize));
+  avioBuf = static_cast<uint8_t*>(av_malloc(bufSize));
   if (!avioBuf)
-    return;
+    goto cleanup;
 
   avioCtx = avio_alloc_context(avioBuf, bufSize, 0, &file,
                                detect_avio_read, nullptr, detect_avio_seek);
   if (!avioCtx)
   {
     av_free(avioBuf);
-    return;
+    goto cleanup;
   }
 
   fmtCtx = avformat_alloc_context();
   if (!fmtCtx)
   {
     avio_context_free(&avioCtx);
-    return;
+    goto cleanup;
   }
   fmtCtx->pb = avioCtx;
   fmtCtx->interrupt_callback.callback = detect_interrupt_cb;
@@ -1879,6 +1880,11 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     CLog::Log(LOGDEBUG, "DetectActiveArea: no borders found");
 
 cleanup:
+  /* Any exit path that didn't set a specific state leaves RUNNING — fall
+   * back to FAILED so the skin doesn't show a perpetual spinner. */
+  if (s_detectState.load() == DV_DETECT_RUNNING)
+    s_detectState.store(DV_DETECT_FAILED);
+
   if (frame)
     av_frame_free(&frame);
   if (codecCtx)
