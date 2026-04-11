@@ -4,7 +4,6 @@ set(SOURCES ActorProtocol.cpp
             Archive.cpp
             Base64.cpp
             BitstreamConverter.cpp
-            BitstreamIoReader.cpp
             BitstreamIoWriter.cpp
             BitstreamReader.cpp
             BitstreamStats.cpp
@@ -93,7 +92,6 @@ set(HEADERS ActorProtocol.h
             Archive.h
             Base64.h
             BitstreamConverter.h
-            BitstreamIoReader.h
             BitstreamIoWriter.h
             BitstreamReader.h
             BitstreamStats.h
