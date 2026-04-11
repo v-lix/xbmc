@@ -15,9 +15,6 @@
 #endif
 
 #include "BitstreamConverter.h"
-#include "BitstreamIoReader.h"
-#include "BitstreamIoWriter.h"
-#include "Crc32.h"
 #include "HevcSei.h"
 #include "HDR10.h"
 #include "HDR10Plus.h"
@@ -473,151 +470,6 @@ void GetDoviRpuInfo(uint8_t* nalBuf,
   dovi_rpu_free(opaque);
 }
 
-void AppendCMv40ExtensionBlock(BitstreamIoWriter& writer)
-{
-  writer.write_ue(4);                         // num_ext_blocks
-  writer.byte_align();                        // dm_alignment_zero_bit
-
-  static const std::vector<uint8_t> cached_ext_blocks = []() {
-    BitstreamIoWriter cacheWriter;
-
-    // L3
-    cacheWriter.write_ue(5);
-    cacheWriter.write_n<uint8_t>(3, 8);
-    cacheWriter.write_n<uint16_t>(2048, 12);
-    cacheWriter.write_n<uint16_t>(2048, 12);
-    cacheWriter.write_n<uint16_t>(2048, 12);
-    cacheWriter.write_n<uint8_t>(0, 4);
-
-    // L9
-    cacheWriter.write_ue(1);
-    cacheWriter.write_n<uint8_t>(9, 8);
-    cacheWriter.write_n<uint8_t>(0, 8);
-
-    // L11
-    cacheWriter.write_ue(4);
-    cacheWriter.write_n<uint8_t>(11, 8);
-    cacheWriter.write_n<uint8_t>(1, 8);
-    cacheWriter.write_n<uint8_t>(0, 8);
-    cacheWriter.write_n<uint8_t>(0, 8);
-    cacheWriter.write_n<uint8_t>(0, 8);
-
-    // L254
-    cacheWriter.write_ue(2);
-    cacheWriter.write_n<uint8_t>(254, 8);
-    cacheWriter.write_n<uint8_t>(0, 8);
-    cacheWriter.write_n<uint8_t>(2, 8);
-
-    cacheWriter.byte_align();
-    return cacheWriter.into_inner();
-  }();
-
-  writer.write_bytes(cached_ext_blocks.data(), cached_ext_blocks.size());
-}
-
-bool CopyRbspBits(BitstreamIoWriter& writer,
-                  const std::vector<uint8_t>& rbsp,
-                  size_t startBit,
-                  size_t bitCount)
-{
-  const size_t totalBits = rbsp.size() * 8;
-  if ((startBit > totalBits) || (bitCount > (totalBits - startBit))) return false;
-
-  BitstreamIoReader reader(rbsp);
-  if (!reader.skip_bits(startBit)) return false;
-
-  for (size_t i = 0; i < bitCount; ++i)
-  {
-    bool bit = false;
-    if (!reader.read(bit)) return false;
-
-    writer.write(bit);
-  }
-
-  return true;
-}
-
-bool GetCMv29PayloadInfo(const DoviVdrDmData* vdrDmData, size_t& dmPayloadEndBit)
-{
-  if (!vdrDmData || vdrDmData->cmv29_payload_end_bit == 0) return false;
-
-  dmPayloadEndBit = vdrDmData->cmv29_payload_end_bit;
-  return true;
-}
-
-bool BuildCMv40NaluPayload(const std::vector<uint8_t>& rbsp,
-                           size_t dmPayloadEndBit,
-                           std::vector<uint8_t>& naluPayloadOut)
-{
-  if (dmPayloadEndBit == 0) return false;
-
-  BitstreamIoWriter writer(rbsp.size() + 26);
-  if (!CopyRbspBits(writer, rbsp, 0, dmPayloadEndBit)) return false;
-
-  AppendCMv40ExtensionBlock(writer);
-  writer.byte_align();
-
-  writer.write_n<uint32_t>(Crc32::Compute(writer.as_slice() + 1, writer.as_slice_size() - 1), 32);
-  writer.write_n<uint8_t>(0x80, 8);
-
-  std::vector<uint8_t> newRbsp = writer.into_inner();
-
-  HevcAddStartCodeEmulationPrevention3Byte(newRbsp);
-
-  naluPayloadOut.swap(newRbsp);
-
-  return true;
-}
-
-DoviRpuOpaque* ParseAndValidateCmv40Nalu(const std::vector<uint8_t>& nalu)
-{
-  DoviRpuOpaque* opaque = dovi_parse_unspec62_nalu(nalu.data(), nalu.size());
-  if (!opaque) return nullptr;
-
-  const DoviVdrDmData* dm = dovi_rpu_get_vdr_dm_data(opaque);
-  const bool valid = (dm && dm->dm_data.level254);
-  dovi_rpu_free_vdr_dm_data(dm);
-
-  if (valid) return opaque;
-
-  dovi_rpu_free(opaque);
-  return nullptr;
-}
-
-DoviRpuOpaque* AppendCMv40ToRpuNalu(uint8_t* nalBuf,
-                                    int32_t nalSize,
-                                    const DoviVdrDmData* sourceVdrDmData,
-                                    std::vector<uint8_t>& out)
-{
-  if (!nalBuf || (nalSize <= 2)) return nullptr;
-
-  std::vector<uint8_t> rbsp;
-  HevcClearStartCodeEmulationPrevention3Byte(nalBuf + 2, static_cast<size_t>(nalSize - 2), rbsp);
-
-  if (rbsp.size() < 2) return nullptr;
-
-  size_t dmPayloadEndBit = 0;
-  if (!GetCMv29PayloadInfo(sourceVdrDmData, dmPayloadEndBit))
-    return nullptr;
-
-  std::vector<uint8_t> naluPayload;
-  if (!BuildCMv40NaluPayload(rbsp, dmPayloadEndBit, naluPayload))
-    return nullptr;
-
-  std::vector<uint8_t> naluOut;
-  naluOut.reserve(2 + naluPayload.size());
-  naluOut.push_back(nalBuf[0]);
-  naluOut.push_back(nalBuf[1]);
-  naluOut.insert(naluOut.end(), naluPayload.begin(), naluPayload.end());
-
-  DoviRpuOpaque* opaque = ParseAndValidateCmv40Nalu(naluOut);
-  if (!opaque) return nullptr;
-
-  out.swap(naluOut);
-  return opaque;
-}
-
-
 inline void ConvertDoVi(DOVIMode convertMode,
                         bool firstFrame,
                         DoviRpuOpaque* opaque,
@@ -667,30 +519,33 @@ inline void ConvertDoVi(DOVIMode convertMode,
   vdrDmData = dovi_rpu_get_vdr_dm_data(opaque);
 }
 
-inline void AppendCMv40(DOVICMv40Mode cmv40Mode,
+inline bool AppendCMv40(DOVICMv40Mode cmv40Mode,
                         const DoviRpuDataHeader* header,
                         const DoviVdrDmData* vdrDmData,
+                        DoviRpuOpaque* opaque,
                         uint8_t*& nalBuf,
                         int32_t& nalSize,
-                        std::vector<uint8_t>& nalu,
-                        DoviRpuOpaque*& opaque)
+                        const DoviData*& rpuData)
 {
-  if (!header || !vdrDmData) return;
+  if (!header || !vdrDmData || !opaque) return false;
 
   const bool hasLevel254 = vdrDmData->dm_data.level254;
-  if (hasLevel254) return;
+  if (hasLevel254) return false;
 
   const bool level2IsEmpty = (vdrDmData->dm_data.level2.len == 0);
   const bool shouldAppend =
       (cmv40Mode == DOVICMv40Mode::CMV40_ALWAYS) || level2IsEmpty;
-  if (!shouldAppend) return;
+  if (!shouldAppend) return false;
 
-  opaque = AppendCMv40ToRpuNalu(nalBuf, nalSize, vdrDmData, nalu);
-  if (opaque)
-  {
-    nalBuf = nalu.data();
-    nalSize = static_cast<int32_t>(nalu.size());
-  }
+  if (dovi_rpu_add_cmv40_safe_default_metadata(opaque) != 1)
+    return false;
+
+  rpuData = dovi_write_unspec62_nalu(opaque);
+  if (!rpuData) return false;
+
+  nalBuf = const_cast<uint8_t*>(rpuData->data);
+  nalSize = static_cast<int32_t>(rpuData->len);
+  return true;
 }
 
 } // namespace
@@ -1615,8 +1470,8 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
 
 #ifdef HAVE_LIBDOVI
   const DoviData* rpuData = nullptr;
-  DoviRpuOpaque* appendOpaque = nullptr;
-  std::vector<uint8_t> nalu;
+  const DoviData* appendRpuData = nullptr;
+  bool appended = false;
 
   // Cache: if input NAL matches previous frame, skip all parsing
   if (!m_first_frame && CachedRpuInputMatches(m_cached_dovi_rpu_in_nal, nal_buf, nal_size))
@@ -1641,18 +1496,17 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
                   m_hints, m_dataCacheCore, nal_buf, nal_size, rpuData);
 
     if (m_append_cmv40 != DOVICMv40Mode::CMV40_NONE)
-      AppendCMv40(m_append_cmv40, header, vdrDmData, nal_buf, nal_size,
-                  nalu, appendOpaque);
+      appended = AppendCMv40(m_append_cmv40, header, vdrDmData, opaque,
+                             nal_buf, nal_size, appendRpuData);
 
-    DoviRpuOpaque* metadataOpaque = appendOpaque ? appendOpaque : opaque;
-    if (metadataOpaque)
+    if (opaque)
     {
-      PopulateDoviRpuInfo(metadataOpaque, m_first_frame, m_hints.dovi_el_type,
+      PopulateDoviRpuInfo(opaque, m_first_frame, m_hints.dovi_el_type,
                           m_hints.dovi, pts, m_dataCacheCore,
                           &m_cached_dovi_frame_metadata);
     }
 
-    if (appendOpaque)
+    if (appended)
     {
       DOVIStreamMetadata meta = m_dataCacheCore.GetVideoDoViStreamMetadata();
       if (!meta.meta_version.empty() && meta.meta_version[0] != 'V')
@@ -1660,17 +1514,13 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
         meta.meta_version = "V" + meta.meta_version;
         m_dataCacheCore.SetVideoDoViStreamMetadata(meta);
       }
+      if (m_first_frame)
+        CLog::Log(LOGINFO, "CBitstreamConverter::ProcessDoViRpu - CMv4.0 extension appended to RPU");
     }
 
     if (header) dovi_rpu_free_header(header);
     if (vdrDmData) dovi_rpu_free_vdr_dm_data(vdrDmData);
     if (opaque) dovi_rpu_free(opaque);
-    if (appendOpaque)
-    {
-      dovi_rpu_free(appendOpaque);
-      if (m_first_frame)
-        CLog::Log(LOGINFO, "CBitstreamConverter::ProcessDoViRpu - CMv4.0 extension appended to RPU");
-    }
 
     m_cached_dovi_rpu_out_nal.assign(nal_buf, nal_buf + nal_size);
   }
@@ -1680,6 +1530,7 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
 
 #ifdef HAVE_LIBDOVI
   if (rpuData) dovi_data_free(rpuData);
+  if (appendRpuData) dovi_data_free(appendRpuData);
 #endif
 }
 
