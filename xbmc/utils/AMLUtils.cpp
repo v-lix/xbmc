@@ -1303,6 +1303,18 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
   if (throttle)
     CLog::Log(LOGDEBUG, "DetectActiveArea: I/O throttle enabled, delaying 3s");
 
+  /* BDMV/DVD: the file path is a bluray:// or dvd:// playlist URL that
+   * our AVIO wrapper can't resolve — the VFS handler needs the full Kodi
+   * playback context.  Skip early instead of failing at avformat_open. */
+  if (StringUtils::StartsWithNoCase(filePath, "bluray://") ||
+      StringUtils::StartsWithNoCase(filePath, "dvd://"))
+  {
+    CLog::Log(LOGINFO, "DetectActiveArea: disc source ({}) — skipping",
+              filePath.substr(0, filePath.find("//")+2));
+    s_detectState.store(DV_DETECT_SKIPPED);
+    goto cleanup;
+  }
+
   /* Throttle: let playback establish its I/O pipeline before we start
    * competing for network bandwidth. */
   if (throttle && detect_sleep_ms(3000))
