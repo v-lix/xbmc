@@ -207,6 +207,7 @@ protected:
   bool m_toneMap = false;
   ETONEMAPMETHOD m_toneMapMethod = VS_TONEMAPMETHOD_OFF;
   bool m_passthroughHDR = false;
+  bool m_dvOpened = false;
   unsigned char* m_planeBuffer = nullptr;
   size_t m_planeBufferSize = 0;
 
