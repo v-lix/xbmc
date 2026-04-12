@@ -20,23 +20,6 @@ enum class PeakBrightnessSource {
   HistogramPlus
 };
 
-struct VdrDmData {
-
-  VdrDmData() {} // Default constructor
-
-  uint16_t min_pq;
-  uint16_t max_pq;
-  uint16_t avg_pq;
-
-  uint16_t source_min_pq;
-  uint16_t source_max_pq;
-
-  uint16_t max_display_mastering_luminance;
-  uint16_t min_display_mastering_luminance;
-  uint16_t max_content_light_level;
-  uint16_t max_frame_average_light_level;
-};
-
 int max_pq_to_nits(int pq);
 
 std::vector<uint8_t> create_rpu_nalu_for_hdr10plus(
