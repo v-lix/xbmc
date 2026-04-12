@@ -1521,6 +1521,15 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
           }
         }
 
+        /* Flush: the decoder may hold a decoded frame waiting for the next
+         * packet (dual-RPU DV, B-frame reordering). Send NULL to drain. */
+        if (!gotFrame)
+        {
+          avcodec_send_packet(codecCtx, nullptr);
+          if (avcodec_receive_frame(codecCtx, frame) == 0)
+            gotFrame = true;
+        }
+
         if (!gotFrame || !frame->data[0] || frame->width < 64 || frame->height < 64)
           continue;
 
