@@ -141,6 +141,16 @@ bool CLinuxRendererGLES::Configure(const VideoPicture &picture, float fps, unsig
               m_passthroughHDR ? "on" : "off");
   }
 
+  // SW-decoded content bypasses AMLCodec, so aml_dv_open() (which manages
+  // the DV pipeline for VS10 settings) is never called.  Do it here so that
+  // e.g. SDR content with VS10 SDR8 = Bypass correctly turns DV off instead
+  // of inheriting the boot-time IPT Tunnel mode.
+  if (!m_dvOpened)
+  {
+    aml_dv_open(picture.hdrType, picture.colorBits, picture.color_primaries);
+    m_dvOpened = true;
+  }
+
   // Configure GUI/OSD for HDR PQ when display is in HDR PQ mode
   aml_set_transfer_pq(picture.hdrType, picture.colorBits);
 
@@ -786,6 +796,12 @@ void CLinuxRendererGLES::UnInit()
 
   CServiceBroker::GetWinSystem()->SetHDR(nullptr);
   m_passthroughHDR = false;
+
+  if (m_dvOpened)
+  {
+    aml_dv_close();
+    m_dvOpened = false;
+  }
 }
 
 bool CLinuxRendererGLES::CreateTexture(int index)
