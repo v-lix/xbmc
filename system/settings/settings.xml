@@ -4147,16 +4147,9 @@
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">3</dependency>
-            <!-- <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="!is">1</dependency> -->
-            <!-- <dependency type="visible" setting="coreelec.amlogic.dolbyvision.vsvdb.inject" operator="is">true</dependency> -->
           </dependencies>
-          <constraints>
-            <options>
-              <option label="60081">0</option> <!-- DCI-P3 -->
-              <option label="60082">1</option> <!-- BT.2020 -->
-              <option label="60083">2</option> <!-- BT.709 -->
-              <option label="60563">3</option> <!-- DISPLAY -->
-            </options>
+            <constraints>
+            <options>DolbyVisionVSVDBColourSpace</options>
           </constraints>
           <control type="spinner" format="string" />
         </setting>
