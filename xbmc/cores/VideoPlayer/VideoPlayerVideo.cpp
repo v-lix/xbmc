@@ -644,8 +644,18 @@ void CVideoPlayerVideo::Process()
           CSysfsPath frame_format{"/sys/class/deinterlace/di0/frame_format"};
           if (frame_format.Exists())
             m_vfmt = frame_format.Get<std::string>().value();
+          // Only update interlace state from vfmt when it gives a definitive answer.
+          // For MBAFF content, the DI module transiently reports "progressive"
+          // (reflecting current macroblock type), then falls back to "null".
+          // Don't let a transient "progressive" clear interlace when the demuxer
+          // flagged the stream as interlaced — the demuxer is authoritative for
+          // the overall stream type, vfmt only for truly misidentified content.
           if (m_vfmt.size() > 4)
-            m_processInfo.SetVideoInterlaced(m_vfmt.compare("progressive"));
+          {
+            bool vfmtIsInterlaced = m_vfmt.compare("progressive") != 0;
+            if (vfmtIsInterlaced || !(m_hints.codecOptions & CODEC_INTERLACED))
+              m_processInfo.SetVideoInterlaced(vfmtIsInterlaced);
+          }
           CLog::Log(LOGDEBUG, "CVideoPlayerVideo - CDVDMsg::DEMUXER_PACKET - checking interlace vfmt: {}", m_vfmt);
         }
       }
