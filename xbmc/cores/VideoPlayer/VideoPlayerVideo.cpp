@@ -750,9 +750,10 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
     {
       if (++m_retryProgressive > 3)
       {
-        m_processInfo.SetVideoFps(m_processInfo.GetVideoFps() / 2.0f);
+        float halvedFps = m_processInfo.GetVideoFps() / 2.0f;
+        m_processInfo.SetVideoFps(halvedFps);
         m_processInfo.SetVideoInterlaced(false);
-        m_renderManager.TriggerUpdateResolution(m_processInfo.GetVideoFps() / 2.0f, m_hints.width, m_hints.height, m_hints.stereo_mode);
+        m_renderManager.TriggerUpdateResolution(halvedFps, m_hints.width, m_hints.height, m_hints.stereo_mode);
       }
     }
     else
