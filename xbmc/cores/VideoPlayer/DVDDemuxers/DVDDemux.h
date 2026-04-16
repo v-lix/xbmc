@@ -378,6 +378,12 @@ public:
   virtual void OpenStream(int64_t demuxerId, int id) { OpenStream(id); }
 
   /*
+   * returns the preferred video stream index, or -1 for no preference.
+   * used by multi-stream DV to override default/cached stream selection.
+   */
+  virtual int GetPreferredVideoStream() const { return -1; }
+
+  /*
    * sets desired width / height for video stream
    * adaptive demuxers like DASH can use this to choose best fitting video stream
    */

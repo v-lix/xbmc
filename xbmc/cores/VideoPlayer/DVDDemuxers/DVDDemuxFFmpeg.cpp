@@ -1766,21 +1766,97 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
         // https://github.com/FFmpeg/FFmpeg/blob/release/7.0/doc/APIchanges
         const AVPacketSideData* sideData = nullptr;
 
-        if (streamIdx > 0 && st->hdr_type == StreamHdrType::HDR_TYPE_DOLBYVISION)
-          m_dv_dual_stream = true;
-
         if (st->hdr_type == StreamHdrType::HDR_TYPE_DOLBYVISION)
         {
-
           sideData =
               av_packet_side_data_get(pStream->codecpar->coded_side_data,
                                       pStream->codecpar->nb_coded_side_data, AV_PKT_DATA_DOVI_CONF);
-          if (!m_dv_dual_stream && sideData && sideData->size)
-            st->dovi = *reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(sideData->data);
-          // force dovi configuration for DV dual stream
+
+          // UHD BD has a dependency-layer EL on a separate track with PID 0x1015.
+          // That is the only case where dual-stream BL+EL combining is needed.
+          // MKV dual-layer DV uses BlockAddition instead of separate tracks.
+          // Any other DV track (with its own dvcC) is an independent stream —
+          // never combine layers between independent streams.
+          if (streamIdx > 0 && !m_dv_dual_stream)
+          {
+            if (pStream->id == 0x1015)
+            {
+              m_dv_dual_stream = true;
+              CLog::Log(LOGDEBUG, "DVDDemuxFFmpeg::AddStream - UHD BD DV EL (PID 0x1015), combining BL+EL");
+            }
+            else
+            {
+              // Independent DV stream — determine preferred video stream based on:
+              // - DUAL_PRIORITY: 0 = prefer DV, 1 = prefer HDR10+
+              // - HDR10PLUS_CONVERT + PREFER_CONVERT: overrides DV priority
+              bool preferThisStream = aml_dolby_vision_enabled();
+              if (preferThisStream)
+              {
+                auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+                bool hdr10PlusPrio = settings && settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_DUAL_PRIORITY) == 1;
+                bool convertEnabled = settings && settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT);
+                bool preferConvert = convertEnabled && settings &&
+                    settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PREFER_CONVERT);
+
+                // HDR10+ wins when user set HDR10+ priority, or when conversion
+                // is both enabled and preferred (overrides DV priority).
+                bool preferHdr10Plus = hdr10PlusPrio || preferConvert;
+
+                if (preferHdr10Plus)
+                {
+                  if (preferConvert && sideData && sideData->size &&
+                      reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(sideData->data)
+                          ->dv_bl_signal_compatibility_id > 0)
+                  {
+                    // This DV stream can do HDR10+ conversion — prefer it
+                  }
+                  else
+                  {
+                    // Look for an HDR10+ capable alternative among preceding streams
+                    for (unsigned int i = 0; i < static_cast<unsigned int>(streamIdx); ++i)
+                    {
+                      AVStream* prev = m_pFormatContext->streams[i];
+                      if (!prev || prev->codecpar->codec_type != AVMEDIA_TYPE_VIDEO)
+                        continue;
+
+                      const auto* prevDovi = av_packet_side_data_get(
+                          prev->codecpar->coded_side_data, prev->codecpar->nb_coded_side_data,
+                          AV_PKT_DATA_DOVI_CONF);
+                      if (!prevDovi || !prevDovi->size)
+                      {
+                        preferThisStream = false;
+                        m_dv_preferred_video_stream = i;
+                        break;
+                      }
+                      auto* prevConf = reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(prevDovi->data);
+                      if (prevConf->dv_bl_signal_compatibility_id > 0)
+                      {
+                        preferThisStream = false;
+                        m_dv_preferred_video_stream = i;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+
+              if (preferThisStream)
+                m_dv_preferred_video_stream = streamIdx;
+
+              CLog::Log(LOGDEBUG, "DVDDemuxFFmpeg::AddStream - independent DV stream (not combining), preferred video stream: {}",
+                m_dv_preferred_video_stream);
+            }
+          }
+
+          if (!m_dv_dual_stream)
+          {
+            // Single stream or independent multi-stream: set dovi config on this stream
+            if (sideData && sideData->size)
+              st->dovi = *reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(sideData->data);
+          }
           else if (aml_dolby_vision_enabled())
           {
-            // force dovi side data to bl stream
+            // Multi-layer: force dovi side data to bl stream
             CDemuxStream* bl_stream = GetStream(0);
             if (bl_stream)
             {
