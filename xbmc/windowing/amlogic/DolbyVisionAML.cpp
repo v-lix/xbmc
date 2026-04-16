@@ -532,6 +532,27 @@ void vs10_dv_filler(const SettingConstPtr& setting, std::vector<IntegerSettingOp
   if (support_dv()) add_vs10_dv_bypass(list);
 }
 
+void vsvdb_colour_space_filler(const SettingConstPtr& setting, std::vector<IntegerSettingOption>& list, int& current, void* data)
+{
+  CLog::Log(LOGDEBUG, "CDolbyVisionAML - vsvdb_colour_space_filler: list construction");
+  list.clear();
+  
+  // Base options
+  list.emplace_back(g_localizeStrings.Get(60081), 0); // DCI-P3
+  list.emplace_back(g_localizeStrings.Get(60082), 1); // BT.2020
+  list.emplace_back(g_localizeStrings.Get(60083), 2); // BT.709
+
+  enum DV_TYPE dv_type(static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
+  CLog::Log(LOGDEBUG, "CDolbyVisionAML - vsvdb_colour_space_filler: DV Type actuel = {}", (int)dv_type);
+
+  // Add DISPLAY (3) only if Display-LED (0) mode
+  if (dv_type == DV_TYPE_DISPLAY_LED)
+  {
+    CLog::Log(LOGDEBUG, "CDolbyVisionAML - vsvdb_colour_space_filler: Add DISPLAY option");
+    list.emplace_back(g_localizeStrings.Get(60563), 3);
+  }
+}
+
 CDolbyVisionAML::CDolbyVisionAML()
 {
 }
@@ -608,6 +629,7 @@ bool CDolbyVisionAML::Setup()
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionVS10HDR10Plus", vs10_hdr10_filler);
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionVS10HDRHLG", vs10_hdr_hlg_filler);
   settingsManager->RegisterSettingOptionsFiller("DolbyVisionVS10DV", vs10_dv_filler);
+  settingsManager->RegisterSettingOptionsFiller("DolbyVisionVSVDBColourSpace", vsvdb_colour_space_filler);
 
   // Register for ui dv mode change - to change on the fly.
   std::set<std::string> settingSet;
