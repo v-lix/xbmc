@@ -181,5 +181,9 @@ protected:
   double m_startTime = 0;
   bool m_dv_dual_stream = false;
   bool m_dv_dual_stream_started = false;
+  int m_dv_preferred_video_stream = -1;
+
+public:
+  int GetPreferredVideoStream() const override { return m_dv_preferred_video_stream; }
 };
 

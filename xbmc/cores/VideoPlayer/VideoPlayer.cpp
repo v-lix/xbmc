@@ -934,7 +934,22 @@ void CVideoPlayer::OpenDefaultStreams(bool reset)
   // open video stream
   valid   = false;
 
-  PredicateVideoFilter vf(m_processInfo->GetVideoSettings().m_VideoStream);
+  // If the demuxer has a preferred video stream (e.g. multi-stream DV), use it
+  // to override both cached selection and container default flags.
+  int videoStreamPref = m_processInfo->GetVideoSettings().m_VideoStream;
+  int preferredVideoId = m_pDemuxer ? m_pDemuxer->GetPreferredVideoStream() : -1;
+  if (preferredVideoId >= 0)
+  {
+    for (const auto& s : m_SelectionStreams.Get(STREAM_VIDEO))
+    {
+      if (s.id == preferredVideoId)
+      {
+        videoStreamPref = s.type_index;
+        break;
+      }
+    }
+  }
+  PredicateVideoFilter vf(videoStreamPref);
   for (const auto &stream : m_SelectionStreams.Get(STREAM_VIDEO, vf))
   {
     if (OpenStream(m_CurrentVideo, stream.demuxerId, stream.id, stream.source, reset))
