@@ -1176,11 +1176,28 @@ void CVideoPlayerVideo::CalcFrameRate()
       //store the calculated framerate if it differs too much from m_fFrameRate
       if (fabs(m_fFrameRate - (m_fStableFrameRate / m_iFrameRateCount)) > MAXFRAMERATEDIFF || m_bFpsInvalid)
       {
-        CLog::Log(LOGDEBUG, "{} framerate was:{:f} calculated:{:f}", __FUNCTION__, m_fFrameRate,
-                  m_fStableFrameRate / m_iFrameRateCount);
-        m_fFrameRate = m_fStableFrameRate / m_iFrameRateCount;
-        m_bFpsInvalid = false;
-        m_processInfo.SetVideoFps(static_cast<float>(m_fFrameRate));
+        double calculated = m_fStableFrameRate / m_iFrameRateCount;
+        // For demuxer-flagged interlaced content (e.g. MBAFF), don't let the
+        // calculated frame rate halve the field rate just because progressive
+        // sections dominate the measurement window — the stream is still
+        // interlaced overall, and halving m_fFrameRate to 25 makes the
+        // renderer and DI output path behave as if it were 25fps progressive.
+        bool skipHalving = (m_hints.codecOptions & CODEC_INTERLACED) &&
+                           calculated > 0 &&
+                           fabs(m_fFrameRate - 2.0 * calculated) < MAXFRAMERATEDIFF;
+        if (skipHalving)
+        {
+          CLog::Log(LOGDEBUG, "{} skipping halve: interlaced stream, keeping fps {:f} (measured {:f})",
+                    __FUNCTION__, m_fFrameRate, calculated);
+        }
+        else
+        {
+          CLog::Log(LOGDEBUG, "{} framerate was:{:f} calculated:{:f}", __FUNCTION__, m_fFrameRate,
+                    calculated);
+          m_fFrameRate = calculated;
+          m_bFpsInvalid = false;
+          m_processInfo.SetVideoFps(static_cast<float>(m_fFrameRate));
+        }
       }
 
       //reset the stored framerates
