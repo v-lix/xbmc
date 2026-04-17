@@ -650,6 +650,19 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
     case PLAYER_PROCESS_VIDEO_DOVI_HAS_HEADER:
       value = std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViStreamInfo().has_header);
       return true;
+    case PLAYER_PROCESS_VIDEO_DOVI_DUAL_TRACK:
+    {
+      // "DT-DL" = dual-track dual-layer (UHD BD: BL + EL on separate tracks).
+      // "ST-DL" = single-track dual-layer (EL in-stream: MKV BlockAddition or
+      //          P7 single-stream packaging).
+      // empty when there is no EL at all (single-layer DV, non-DV).
+      const auto& info = CServiceBroker::GetDataCacheCore().GetVideoDoViStreamInfo();
+      if (info.dovi_el_type == DOVIELType::TYPE_NONE)
+        value = "";
+      else
+        value = info.is_dual_track ? "DT-DL" : "ST-DL";
+      return true;
+    }
 
     case PLAYER_PROCESS_VIDEO_DOVI_L1_MIN_PQ:
       value = std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata().level1_min_pq);

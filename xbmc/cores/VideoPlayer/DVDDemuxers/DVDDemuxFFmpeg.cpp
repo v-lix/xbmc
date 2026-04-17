@@ -1862,6 +1862,7 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
             {
               CDemuxStreamVideo *bl_video_stream = static_cast<CDemuxStreamVideo*>(bl_stream);
               bl_video_stream->hdr_type = StreamHdrType::HDR_TYPE_DOLBYVISION;
+              bl_video_stream->is_dual_track = true;
 
               // use dovi side data if available
               if (sideData && sideData->size)
