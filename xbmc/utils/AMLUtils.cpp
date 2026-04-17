@@ -58,7 +58,11 @@ extern "C" {
 #include <amcodec/codec.h>
 
 static bool vs10_conversion = false;
-static bool vs10_conversion_reset_hdr10 = true;
+// Only true after aml_dv_set_vs10_mode() flips from VS10 HDR10 mapping to
+// Bypass mid-playback; aml_kodi_reset_cd_cs() then restores IPT at close.
+// Default must be false or the IPT restore fires spuriously on the first
+// HDR10 close of the session (see aml_kodi_reset_cd_cs).
+static bool vs10_conversion_reset_hdr10 = false;
 static bool s_pm4kActive = false;
 static CGUIWindow* s_pm4kHome = nullptr;
 
@@ -799,12 +803,15 @@ unsigned int aml_dv_on(unsigned int mode)
       aml_dv_trigger_update_resolution(StreamHdrType::HDR_TYPE_DOLBYVISION); // Required for 60Hz VS10 > DV.
       aml_dv_display_auto_now();
     }
-    else if (dv_non_ipt &&
-             (existing_mode == DOLBY_VISION_OUTPUT_MODE_IPT ||
-              existing_mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)) {
-      // Coming from IPT: the HDMI TX attr is stale from the DV tunnel mode.
-      // Write user's colour settings and trigger mode re-evaluation in one
-      // atomic attr write (separate writes don't work: "now" overwrites fmt_attr).
+    else if (dv_non_ipt) {
+      // Any transition into a VS10 non-IPT output mode needs the HDMI TX
+      // re-evaluated.  Coming from IPT the attr is stale from the DV tunnel;
+      // coming from Bypass (DV_MODE_ON_DEMAND between playbacks) the attr
+      // still reflects the prior non-DV output so the kernel DV pipeline
+      // activates while HDMI keeps sending the old signal -> colour
+      // corruption (purple/green playback).  Write user's colour settings
+      // and trigger mode re-evaluation in one atomic attr write (separate
+      // writes don't work: "now" overwrites fmt_attr).
       int force_cs = settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS);
       int limit_cd = settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD);
       const std::string force_cs_str[] = { "rgb", "420", "422", "444" };
@@ -2990,10 +2997,20 @@ void aml_kodi_reset_cd_cs()
   aml_linux_force_422 = false;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
 
+  // DV_MODE_ON: IPT is the idle state, so restore it here when user toggled
+  // VS10 HDR10 mapping to Bypass mid-playback.  (The Player.OnStop handler
+  // would restore IPT asynchronously anyway; doing it synchronously avoids
+  // a visible transient.)
+  // DV_MODE_ON_DEMAND: idle state is Bypass -- the aml_dv_close() that
+  // follows this reset already takes us there, so restoring to IPT here
+  // would cause a pointless HDR10 -> IPT Tunnel -> Bypass cycle with a
+  // 3s DV VSIF wait that never arrives (the screen corruption seen on
+  // exit of HDR10 playback after DV content).
   if (CServiceBroker::GetDataCacheCore().GetVideoHdrType() == StreamHdrType::HDR_TYPE_HDR10 &&
-           vs10_conversion_reset_hdr10)
+      vs10_conversion_reset_hdr10 &&
+      aml_dv_mode() == DV_MODE_ON)
   {
     aml_dv_on(DOLBY_VISION_OUTPUT_MODE_IPT);
-    vs10_conversion_reset_hdr10 = false;
   }
+  vs10_conversion_reset_hdr10 = false;
 }
