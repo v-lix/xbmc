@@ -1358,6 +1358,19 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     goto cleanup;
   }
 
+  /* MPEG-TS (m2ts/ts) has no reliable seek index — byte-position estimation
+   * often produces stale frames (decoder returns same frame repeatedly).
+   * Skip rather than waste I/O on unreliable seeks. */
+  if (fmtCtx->iformat && fmtCtx->iformat->name &&
+      (strstr(fmtCtx->iformat->name, "mpegts") ||
+       strstr(fmtCtx->iformat->name, "m2ts")))
+  {
+    CLog::Log(LOGINFO, "DetectActiveArea: MPEG-TS container ({}) — skipping, "
+              "seek unreliable", fmtCtx->iformat->name);
+    s_detectState.store(DV_DETECT_SKIPPED);
+    goto cleanup;
+  }
+
   if (avformat_find_stream_info(fmtCtx, nullptr) < 0)
   {
     CLog::Log(LOGWARNING, "DetectActiveArea: failed to find stream info");
@@ -1448,6 +1461,14 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     int validSamples = 0;
     int lastWidth = 0, lastHeight = 0;
     const int agreeTolerance = 5; /* pixels */
+    /* Stale-frame detection: catches broken-seek cases (format-specific
+     * quirks beyond the MPEG-TS skip) where the decoder returns the same
+     * frame repeatedly.  If we see identical pixel values across several
+     * seek positions, abort — it's not producing fresh data. */
+    uint32_t staleRow0 = UINT32_MAX, staleMid = UINT32_MAX, staleLast = UINT32_MAX;
+    int staleCount = 0;
+    const int maxStale = 5;
+    bool staleAbort = false;
 
     auto pickBest = [](uint16_t* v, int n) -> uint16_t {
       uint16_t best = v[0];
@@ -1571,6 +1592,25 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
                   seekPct, lastWidth, lastHeight, frame->format, shift,
                   row0Y, midY, lastY, contrast, vContrast, hContrast);
 
+        /* Stale-frame check: if the decoder keeps returning the exact same
+         * pixel values, seeks aren't working.  Abort rather than waste I/O. */
+        if (row0Y == staleRow0 && midY == staleMid && lastY == staleLast)
+        {
+          if (++staleCount >= maxStale)
+          {
+            CLog::Log(LOGWARNING, "DetectActiveArea: decoder returning identical "
+                      "frames ({} times) — seeks not working, aborting",
+                      staleCount);
+            staleAbort = true;
+            break;
+          }
+        }
+        else
+        {
+          staleCount = 0;
+          staleRow0 = row0Y; staleMid = midY; staleLast = lastY;
+        }
+
         if (contrast < minContrast)
         {
           CLog::Log(LOGDEBUG, "DetectActiveArea: insufficient contrast at {}% ({}), retrying",
@@ -1578,6 +1618,12 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
           continue;
         }
         usable = true;
+      }
+
+      if (staleAbort)
+      {
+        s_detectState.store(DV_DETECT_FAILED);
+        goto cleanup;
       }
 
       if (!usable)
