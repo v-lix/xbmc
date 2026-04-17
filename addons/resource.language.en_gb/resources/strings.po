@@ -25832,7 +25832,7 @@ msgstr ""
 #. "Dolby Vision Detect Active Area Help"
 #: system/settings/settings.xml
 msgctxt "#60195"
-msgid "Detect black borders at playback start when the source provides no Level 5 active area metadata. Samples frames spread across the file in a background thread. Results are snapped to common aspect ratios and require majority consensus. Variable aspect ratio content (e.g. IMAX scenes) is detected and skipped. Pre-cropped content (non-16:9 resolution) is recognised automatically. Note: opens a separate file handle for scanning — on slow network shares (SMB) this may cause playback stutters or hangs on stop. Enable 'Throttle detection I/O' if affected."
+msgid "Detect black borders at playback start when the source provides no Level 5 active area metadata. Samples frames spread across the file in a background thread. Results are snapped to common aspect ratios and require majority consensus. Variable aspect ratio content (e.g. IMAX scenes) is detected and skipped. Pre-cropped content (non-16:9 resolution) is recognised automatically. Disc sources (bluray/dvd) and MPEG-TS (m2ts/ts) containers are skipped since their seek behaviour is unreliable. Note: opens a separate file handle for scanning — on slow network shares (SMB) this may cause playback stutters or hangs on stop. Enable 'Throttle detection I/O' if affected."
 msgstr ""
 
 #. "Dolby Vision Detect Active Area Throttle Label"
