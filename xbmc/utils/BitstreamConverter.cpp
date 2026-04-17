@@ -296,6 +296,37 @@ static bool has_sei_recovery_point(const uint8_t *p, const uint8_t *end)
 namespace
 {
 
+constexpr char PTS_MARKER[] = "PTS_US64=";
+
+bool IsValidPtsForInjection(double pts)
+{
+  return std::isfinite(pts) && pts >= 0.0;
+}
+
+/* Append a "PTS_US64=<16 hex>;" trailer into the DV RPU NAL's payload, right
+ * before the final rbsp_trailing_bits byte (0x80).  The kernel hevc decoder
+ * parses this out of the aux data and uses it to recover the correct PTS for
+ * the matching BL picture when the kernel's own PTS tracking fails (observed
+ * on DV P7 FEL DT-DL after a seek — BL output zigzags in decode order with
+ * invalid PTS until the next seek/reset).  Injection is gated to DT-DL FEL at
+ * the call site so single-stream P7 and MEL never see it. */
+bool AppendPtsToDoviRpuNalu(std::vector<uint8_t>& nalu, uint64_t ptsUs64)
+{
+  if (nalu.empty() || nalu.back() != 0x80)
+    return false;
+
+  std::vector<uint8_t> trailer;
+  trailer.reserve(sizeof(PTS_MARKER) - 1 + 16 + 1);
+  trailer.insert(trailer.end(), reinterpret_cast<const uint8_t*>(PTS_MARKER),
+                 reinterpret_cast<const uint8_t*>(PTS_MARKER) + (sizeof(PTS_MARKER) - 1));
+  const std::string ptsHex = fmt::format("{:016X}", ptsUs64);
+  trailer.insert(trailer.end(), ptsHex.begin(), ptsHex.end());
+  trailer.push_back(static_cast<uint8_t>(';'));
+
+  nalu.insert(nalu.end() - 1, trailer.begin(), trailer.end());
+  return true;
+}
+
 bool CachedRpuInputMatches(const std::vector<uint8_t>& cachedNalu,
                            const uint8_t* nalBuf,
                            int32_t nalSize)
@@ -811,6 +842,8 @@ void CBitstreamConverter::Close(void)
 
 bool CBitstreamConverter::Convert(uint8_t *pData, int iSize, double pts)
 {
+  m_is_dt_dl = false;
+
   if (m_convertBuffer)
   {
     av_free(m_convertBuffer);
@@ -920,6 +953,8 @@ bool CBitstreamConverter::Convert(uint8_t *pData, int iSize, double pts)
 
 bool CBitstreamConverter::Convert(uint8_t *pData_bl, int iSize_bl, uint8_t *pData_el, int iSize_el, double pts)
 {
+  m_is_dt_dl = true;
+
   if (m_convertBuffer)
   {
     av_free(m_convertBuffer);
@@ -1523,6 +1558,33 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
     if (opaque) dovi_rpu_free(opaque);
 
     m_cached_dovi_rpu_out_nal.assign(nal_buf, nal_buf + nal_size);
+  }
+
+  /* PTS trailer injection for DV P7 FEL DT-DL: append "PTS_US64=<hex>;" to
+   * the EL's RPU payload so the kernel hevc decoder can recover BL PTS post-
+   * seek.  Gated tight so everything else is untouched:
+   *   - DOVIMode::MODE_NONE: never inject during a P7→P8/MEL conversion
+   *   - m_is_dt_dl: only the 4-arg Convert(BL, EL, pts) overload, not the
+   *     single-stream path (which handles P7 via MKV side data — untested,
+   *     no reported issue)
+   *   - dovi_el_type == FEL: MEL doesn't need this (its pipeline isn't
+   *     affected by the seek-induced zigzag)
+   *   - finite, non-negative pts
+   * Cache stores the pre-injection NAL so repeat frames still hit the cache,
+   * and each frame gets a fresh PTS trailer appended below. */
+  std::vector<uint8_t> injectedNal;
+  if (m_convert_dovi == DOVIMode::MODE_NONE &&
+      m_is_dt_dl &&
+      m_hints.dovi_el_type == DOVIELType::TYPE_FEL &&
+      IsValidPtsForInjection(pts) &&
+      nal_buf && nal_size > 0)
+  {
+    injectedNal.assign(nal_buf, nal_buf + nal_size);
+    if (AppendPtsToDoviRpuNalu(injectedNal, static_cast<uint64_t>(pts)))
+    {
+      nal_buf = injectedNal.data();
+      nal_size = static_cast<int32_t>(injectedNal.size());
+    }
   }
 #endif
 

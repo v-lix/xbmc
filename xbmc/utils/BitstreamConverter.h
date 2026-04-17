@@ -232,6 +232,7 @@ protected:
   std::vector<uint8_t> m_cached_dovi_rpu_in_nal;
   std::vector<uint8_t> m_cached_dovi_rpu_out_nal;
   DOVIFrameMetadata m_cached_dovi_frame_metadata{};
+  bool              m_is_dt_dl = false;
 };
 
 void aml_dv_send_md_levels();
