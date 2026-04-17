@@ -1262,6 +1262,7 @@ const infomap player_process[] = {{"videodecoder", PLAYER_PROCESS_VIDEODECODER},
                                   {"video.dovi.meta.version", PLAYER_PROCESS_VIDEO_DOVI_META_VERSION },
 
                                   {"video.dovi.has.header", PLAYER_PROCESS_VIDEO_DOVI_HAS_HEADER },
+                                  {"video.dovi.dual.track", PLAYER_PROCESS_VIDEO_DOVI_DUAL_TRACK },
 
                                   {"video.dovi.l1.min.pq", PLAYER_PROCESS_VIDEO_DOVI_L1_MIN_PQ },
                                   {"video.dovi.l1.max.pq", PLAYER_PROCESS_VIDEO_DOVI_L1_MAX_PQ },

@@ -171,6 +171,7 @@ public:
   std::string stereo_mode; // expected stereo mode
   StreamHdrType hdr_type = StreamHdrType::HDR_TYPE_NONE; // type of HDR for this stream (hdr10, etc)
   AVDOVIDecoderConfigurationRecord dovi{};
+  bool is_dual_track = false; // UHD BD dual-track DV (BL + EL on a separate track)
   bool bInterlaced; // progressive/interlaced flag
   bool bUnknownIP; // progressive/interlace unknown
 };

@@ -72,6 +72,7 @@ struct DOVIStreamInfo
   DOVIELType dovi_el_type = DOVIELType::TYPE_NONE;
   bool has_config = false;
   bool has_header = false;
+  bool is_dual_track = false;
   AVDOVIDecoderConfigurationRecord dovi = {};
 };
 
@@ -146,6 +147,12 @@ public:
   std::string stereo_mode; // stereoscopic 3d mode
   AVDOVIDecoderConfigurationRecord dovi{};
   DOVIELType dovi_el_type = DOVIELType::TYPE_NONE;
+  /* UHD BD dual-track transport: BL on primary stream, EL on a separate track
+   * (PID 0x1015). Set by DVDDemuxFFmpeg when the second track is detected.
+   * Orthogonal to dovi_el_type (FEL/MEL refers to EL content; is_dual_track
+   * refers to transport). Used for skin labels (DT-DL vs ST-DL) and the
+   * PTS-marker injection gate in BitstreamConverter. */
+  bool is_dual_track = false;
   CDVDClock *pClock;
 
   static constexpr AVDOVIDecoderConfigurationRecord empty_dovi{}; // For comparison

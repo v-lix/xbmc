@@ -352,6 +352,7 @@ inline void PopulateDoviRpuInfo(DoviRpuOpaque* opaque,
                                 AVDOVIDecoderConfigurationRecord& dovi,
                                 double pts,
                                 CDataCacheCore& dataCacheCore,
+                                bool isDualTrack = false,
                                 DOVIFrameMetadata* outDoViFrameMetadata = nullptr)
 {
   const DoviVdrDmData* vdrDmData = dovi_rpu_get_vdr_dm_data(opaque);
@@ -479,6 +480,7 @@ inline void PopulateDoviRpuInfo(DoviRpuOpaque* opaque,
     doviStreamInfo.has_config =
         (memcmp(&dovi, &CDVDStreamInfo::empty_dovi, sizeof(AVDOVIDecoderConfigurationRecord)) != 0);
     doviStreamInfo.has_header = (header != nullptr);
+    doviStreamInfo.is_dual_track = isDualTrack;
 
     dataCacheCore.SetVideoDoViStreamInfo(doviStreamInfo);
     aml_dv_send_el_type();
@@ -1538,6 +1540,7 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
     {
       PopulateDoviRpuInfo(opaque, m_first_frame, m_hints.dovi_el_type,
                           m_hints.dovi, pts, m_dataCacheCore,
+                          m_hints.is_dual_track,
                           &m_cached_dovi_frame_metadata);
     }
 

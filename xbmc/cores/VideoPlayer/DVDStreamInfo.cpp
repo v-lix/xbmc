@@ -240,6 +240,8 @@ void CDVDStreamInfo::Assign(const CDVDStreamInfo& right, bool withextradata)
   contentLightMetadata = right.contentLightMetadata;
   stereo_mode = right.stereo_mode;
   dovi = right.dovi;
+  dovi_el_type = right.dovi_el_type;
+  is_dual_track = right.is_dual_track;
 
   // AUDIO
   channels      = right.channels;
@@ -315,6 +317,7 @@ void CDVDStreamInfo::Assign(const CDemuxStream& right, bool withextradata)
     contentLightMetadata = stream->contentLightMetaData;
     stereo_mode = stream->stereo_mode;
     dovi = stream->dovi;
+    is_dual_track = stream->is_dual_track;
   }
   else if (right.type == STREAM_SUBTITLE)
   {
