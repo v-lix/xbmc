@@ -23,6 +23,7 @@
 #include "settings/lib/Setting.h"
 #include "settings/lib/SettingDefinitions.h"
 #include "storage/MediaManager.h"
+#include "utils/AMLUtils.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 #include "utils/XMLUtils.h"
@@ -133,6 +134,9 @@ bool write_resolution_ini(RESOLUTION_INFO res)
       fmt_attr += std::string(force_cs[settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS) - 1] + ",").c_str();
     if (settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD) > 0)
       fmt_attr += limit_cd[settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD) - 1].c_str();
+    else if (settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
+             && aml_display_support_12bit())
+      fmt_attr += "12bit";
     ofs << fmt_attr.c_str() << "\n";
     CSysfsPath("/sys/class/amhdmitx/amhdmitx0/attr", fmt_attr);
     ofs << "allfmt_names=" << allfmt_names.c_str() << "\n";

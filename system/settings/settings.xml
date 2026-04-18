@@ -4531,14 +4531,11 @@
           </dependencies>
           <control type="toggle" />
         </setting>
-        <setting id="coreelec.amlogic.dolbyvision.dither" type="boolean" label="60612" help="60613">
+        <setting id="coreelec.amlogic.prefer.12bit" type="boolean" label="60614" help="60615">
           <requirement>HAVE_AMCODEC</requirement>
-          <visible>false</visible>
+          <visible>true</visible>
           <level>2</level>
           <default>false</default>
-          <dependencies>
-            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
-          </dependencies>
           <control type="toggle" />
         </setting>
       </group>

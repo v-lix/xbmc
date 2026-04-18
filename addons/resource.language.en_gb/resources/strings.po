@@ -26580,12 +26580,12 @@ msgctxt "#60611"
 msgid "When enabled, Dolby Vision mode switching is suppressed for windowed video playback. This avoids HDMI handshakes during e.g. trailer previews in skins, but also prevents DV activation in video screensavers. Disable this if you want screensavers to trigger Dolby Vision."
 msgstr ""
 
-msgctxt "#60612"
-msgid "Reduce color banding (VS10)"
+msgctxt "#60614"
+msgid "12-bit Deep Color pipeline"
 msgstr ""
 
-msgctxt "#60613"
-msgid "Preserve 12-bit precision through the VPP and apply HDMI TX dithering during the 12→10 output stage to reduce visible banding in color gradients during VS10 playback. Disabled by default.[CR][CR]Enable only if your TV handles the dithered signal cleanly. Some sets misread the dither noise as fine detail, which can show up as oversharpened edges, crushed backgrounds, visible greenscreen compositing, or loss of perceived depth. This is TV-side detail/edge enhancement reacting to the dither (not sharpening added by Kodi), and some TVs cannot fully disable it even in Filmmaker or Dolby Vision modes."
+msgctxt "#60615"
+msgid "When enabled and the TV advertises 12-bit support on 4:4:4, 4:2:2, or RGB chroma in its EDID, Kodi writes 12bit into the HDMI attribute and preserves full 12-bit precision through the DV VPP during VS10 playback. Because the HDMI output is already 12-bit, no 12→10 truncation happens at the HDMI TX — no dither noise reaches the wire, so there is no oversharpening side effect on TVs with aggressive detail/edge enhancement. Falls back silently to Auto if the sink does not support 12-bit on a non-4:2:0 chroma. Disabled by default."
 msgstr ""
 
 #. Title of Dolby Vision RPU conversion setting
