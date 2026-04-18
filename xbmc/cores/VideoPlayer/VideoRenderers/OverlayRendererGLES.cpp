@@ -159,17 +159,24 @@ COverlayTextureGLES::COverlayTextureGLES(const CDVDOverlayImage& o, CRect& rSour
     m_pma = !!USE_PREMULTIPLIED_ALPHA;
     if (m_pma)
     {
-      // Premultiply alpha so bilinear/mipmap filtering preserves correct edge colors
+      // Premultiply alpha in linear light so bilinear/mipmap filtering
+      // preserves correct edge colors and semi-transparent edges don't appear
+      // dark under HDR/PQ output.
       const size_t count = static_cast<size_t>(o.width) * o.height;
       std::vector<uint32_t> pma(count);
       const uint32_t* src = reinterpret_cast<const uint32_t*>(o.pixels.data());
       for (size_t i = 0; i < count; i++)
       {
-        uint32_t a = (src[i] >> PIXEL_ASHIFT) & 0xff;
-        uint32_t r = (((src[i] >> PIXEL_RSHIFT) & 0xff) * a / 255) << PIXEL_RSHIFT;
-        uint32_t g = (((src[i] >> PIXEL_GSHIFT) & 0xff) * a / 255) << PIXEL_GSHIFT;
-        uint32_t b = (((src[i] >> PIXEL_BSHIFT) & 0xff) * a / 255) << PIXEL_BSHIFT;
-        pma[i] = (a << PIXEL_ASHIFT) | r | g | b;
+        const uint32_t a = (src[i] >> PIXEL_ASHIFT) & 0xff;
+        const float af = a / 255.0f;
+        const int rp = OVERLAY::LinearToSrgb8(
+            OVERLAY::SrgbToLinear((src[i] >> PIXEL_RSHIFT) & 0xff) * af);
+        const int gp = OVERLAY::LinearToSrgb8(
+            OVERLAY::SrgbToLinear((src[i] >> PIXEL_GSHIFT) & 0xff) * af);
+        const int bp = OVERLAY::LinearToSrgb8(
+            OVERLAY::SrgbToLinear((src[i] >> PIXEL_BSHIFT) & 0xff) * af);
+        pma[i] = (a << PIXEL_ASHIFT) | (rp << PIXEL_RSHIFT) | (gp << PIXEL_GSHIFT) |
+                 (bp << PIXEL_BSHIFT);
       }
       LoadTexture(GL_TEXTURE_2D, o.width, o.height, o.width * 4, &m_u, &m_v, false, pma.data());
     }
