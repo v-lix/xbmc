@@ -19577,8 +19577,8 @@ msgid "Reduce color banding (VS10)"
 msgstr "Farbbanding reduzieren (VS10)"
 
 msgctxt "#60613"
-msgid "Preserve 12-bit precision through the VPP and enable HDMI TX dithering to reduce visible banding in color gradients during VS10 playback. Disabled by default."
-msgstr "12-Bit-Präzision im VPP beibehalten und HDMI-TX-Dithering aktivieren, um sichtbares Banding in Farbverläufen bei VS10-Wiedergabe zu reduzieren. Standardmäßig aktiviert."
+msgid "Preserve 12-bit precision through the VPP and apply HDMI TX dithering during the 12→10 output stage to reduce visible banding in color gradients during VS10 playback. Disabled by default.[CR][CR]Enable only if your TV handles the dithered signal cleanly. Some sets misread the dither noise as fine detail, which can show up as oversharpened edges, crushed backgrounds, visible greenscreen compositing, or loss of perceived depth. This is TV-side detail/edge enhancement reacting to the dither (not sharpening added by Kodi), and some TVs cannot fully disable it even in Filmmaker or Dolby Vision modes."
+msgstr "12-Bit-Präzision im VPP beibehalten und beim 12→10-Ausgabe-Stage Dithering am HDMI-TX anwenden, um sichtbares Banding in Farbverläufen bei VS10-Wiedergabe zu reduzieren. Standardmäßig deaktiviert.[CR][CR]Nur aktivieren, wenn der Fernseher das mit Dither versehene Signal sauber verarbeitet. Manche Geräte interpretieren das Dither-Rauschen als Feinheiten, was sich als überschärfte Kanten, zugedrückte Hintergründe, sichtbares Greenscreen-Compositing oder Verlust der Tiefenwahrnehmung zeigen kann. Ursache ist die Detail-/Kantenverstärkung des Fernsehers, die auf das Dither reagiert (keine von Kodi hinzugefügte Schärfung) — bei manchen Geräten lässt sie sich auch im Filmmaker- oder Dolby-Vision-Modus nicht vollständig deaktivieren."
 
 msgctxt "#69196"
 msgid "Convert DV Profile 7 FEL to MEL or to Profile 8.1"

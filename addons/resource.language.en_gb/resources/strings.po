@@ -26585,7 +26585,7 @@ msgid "Reduce color banding (VS10)"
 msgstr ""
 
 msgctxt "#60613"
-msgid "Preserve 12-bit precision through the VPP and enable HDMI TX dithering to reduce visible banding in color gradients during VS10 playback. Enabled by default."
+msgid "Preserve 12-bit precision through the VPP and apply HDMI TX dithering during the 12→10 output stage to reduce visible banding in color gradients during VS10 playback. Disabled by default.[CR][CR]Enable only if your TV handles the dithered signal cleanly. Some sets misread the dither noise as fine detail, which can show up as oversharpened edges, crushed backgrounds, visible greenscreen compositing, or loss of perceived depth. This is TV-side detail/edge enhancement reacting to the dither (not sharpening added by Kodi), and some TVs cannot fully disable it even in Filmmaker or Dolby Vision modes."
 msgstr ""
 
 #. Title of Dolby Vision RPU conversion setting
