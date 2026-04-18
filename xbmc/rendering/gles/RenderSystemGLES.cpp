@@ -500,6 +500,15 @@ void CRenderSystemGLES::InitialiseShaders()
                         "and link failed");
   }
 
+  m_pShader[ShaderMethodGLES::SM_FONTS_SUBTITLE] = std::make_unique<CGLESShader>(
+      "gles_shader_simple.vert", "gles_shader_fonts_subtitle.frag", defines);
+  if (!m_pShader[ShaderMethodGLES::SM_FONTS_SUBTITLE]->CompileAndLink())
+  {
+    m_pShader[ShaderMethodGLES::SM_FONTS_SUBTITLE]->Free();
+    m_pShader[ShaderMethodGLES::SM_FONTS_SUBTITLE].reset();
+    CLog::Log(LOGERROR, "GUI Shader gles_shader_fonts_subtitle.frag - compile and link failed");
+  }
+
   m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND] =
       std::make_unique<CGLESShader>("gles_shader_texture_noblend.frag", defines);
   if (!m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND]->CompileAndLink())
@@ -612,6 +621,10 @@ void CRenderSystemGLES::ReleaseShaders()
   if (m_pShader[ShaderMethodGLES::SM_FONTS_SHADER_CLIP])
     m_pShader[ShaderMethodGLES::SM_FONTS_SHADER_CLIP]->Free();
   m_pShader[ShaderMethodGLES::SM_FONTS_SHADER_CLIP].reset();
+
+  if (m_pShader[ShaderMethodGLES::SM_FONTS_SUBTITLE])
+    m_pShader[ShaderMethodGLES::SM_FONTS_SUBTITLE]->Free();
+  m_pShader[ShaderMethodGLES::SM_FONTS_SUBTITLE].reset();
 
   if (m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND])
     m_pShader[ShaderMethodGLES::SM_TEXTURE_NOBLEND]->Free();
