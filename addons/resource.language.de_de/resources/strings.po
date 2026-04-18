@@ -16127,8 +16127,8 @@ msgid "Sets the visual depth of subtitles for stereoscopic 3D videos. The higher
 msgstr "Legt die visuelle Tiefe der Untertitel für stereoskopische 3D-Videos fest. Je höher der Wert, desto näher wirken die Untertitel."
 
 msgctxt "#36547"
-msgid "Sets the base brightness level for OSD, subtitles and GUI elements. Applies to both native HDR10 and DV VS10 playback. In VS10 mode, this does not affect the DV OSD peak nits setting — it scales the overall OSD brightness independently."
-msgstr "Stellt die Grundhelligkeit für OSD, Untertitel und GUI-Elemente ein. Gilt sowohl für native HDR10- als auch DV-VS10-Wiedergabe. Im VS10-Modus wird die DV-OSD-Spitzenhelligkeit nicht beeinflusst — die OSD-Helligkeit wird unabhängig davon skaliert."
+msgid "Sets the base brightness level for OSD, text-based subtitles and GUI elements. Applies to both native HDR10 and DV VS10 playback. In VS10 mode, this does not affect the DV OSD peak nits setting — it scales the overall OSD brightness independently."
+msgstr "Stellt die Grundhelligkeit für OSD, textbasierte Untertitel und GUI-Elemente ein. Gilt sowohl für native HDR10- als auch DV-VS10-Wiedergabe. Im VS10-Modus wird die DV-OSD-Spitzenhelligkeit nicht beeinflusst — die OSD-Helligkeit wird unabhängig davon skaliert."
 
 msgctxt "#36548"
 msgid "Limits resolution of GUI to save memory. Does not affect video playback. Requires restart."

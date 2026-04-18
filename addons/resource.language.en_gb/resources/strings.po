@@ -21588,7 +21588,7 @@ msgstr ""
 #. Description of setting with label #36097 "System / Display / OSD base brightness (HDR/DV)"
 #: system/settings/settings.xml
 msgctxt "#36547"
-msgid "Sets the base brightness level for OSD, subtitles and GUI elements. Applies to both native HDR10 and DV VS10 playback. In VS10 mode, this does not affect the DV OSD peak nits setting — it scales the overall OSD brightness independently."
+msgid "Sets the base brightness level for OSD, text-based subtitles and GUI elements. Applies to both native HDR10 and DV VS10 playback. In VS10 mode, this does not affect the DV OSD peak nits setting — it scales the overall OSD brightness independently."
 msgstr ""
 
 #. Description of setting with label #37021 "Set GUI resolution limit"
