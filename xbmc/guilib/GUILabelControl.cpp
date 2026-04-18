@@ -10,6 +10,9 @@
 
 #include "GUIFont.h"
 #include "GUIMessage.h"
+#include "ServiceBroker.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/CharsetConverter.h"
 #include "utils/ColorUtils.h"
 #include "utils/StringUtils.h"
@@ -28,7 +31,10 @@ CGUILabelControl::CGUILabelControl(int parentID, int controlID, float posX, floa
   m_startHighlight = m_endHighlight = 0;
   m_startSelection = m_endSelection = 0;
   m_minWidth = 0;
-  m_label.SetScrollLoopCount(2);
+  // Limit scroll loops only when smartredraw is active (CPU-saving mode).
+  // Default: unlimited, so long descriptions don't freeze after a few cycles.
+  if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_guiSmartRedraw)
+    m_label.SetScrollLoopCount(2);
 }
 
 CGUILabelControl::~CGUILabelControl(void) = default;
