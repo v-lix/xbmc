@@ -499,7 +499,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES = "coreelec.amlogic.dolbyvision.force.modes";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID = "coreelec.amlogic.dolbyvision.override.edid";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_SKIP_WINDOWED = "coreelec.amlogic.dolbyvision.skip.windowed";
-  static constexpr auto SETTING_COREELEC_AMLOGIC_DV_DITHER = "coreelec.amlogic.dolbyvision.dither";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_PREFER_12BIT = "coreelec.amlogic.prefer.12bit";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_ACTIVE_AREA = "coreelec.amlogic.dolbyvision.restrict.subs.active.area";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_USER_POS = "coreelec.amlogic.dolbyvision.restrict.subs.user.pos";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA = "coreelec.amlogic.dolbyvision.detect.active.area";

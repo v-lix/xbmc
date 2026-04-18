@@ -341,6 +341,21 @@ bool aml_display_support_dv()
   return support_dv;
 }
 
+bool aml_display_support_12bit()
+{
+  // Require 12-bit on at least one non-4:2:0 chroma.  420-only 12-bit is
+  // too restricted: with no explicit CS in attr the kernel picks its own
+  // chroma (typically 422/444 for HDR10), and landing on a CS the TV
+  // doesn't support at 12-bit produces a broken signal or 8-bit fallback.
+  CSysfsPath dc_cap{"/sys/class/amhdmitx/amhdmitx0/dc_cap"};
+  if (!dc_cap.Exists())
+    return false;
+  std::string valstr = dc_cap.Get<std::string>().value();
+  return (valstr.find("444,12bit") != std::string::npos) ||
+         (valstr.find("422,12bit") != std::string::npos) ||
+         (valstr.find("rgb,12bit")  != std::string::npos);
+}
+
 bool aml_display_support_3d()
 {
   static int support_3d = -1;
@@ -678,7 +693,15 @@ unsigned int aml_dv_on(unsigned int mode)
   // Force CD/CS for all DV modes
   aml_kodi_set_cd_cs(1);
 
-  bool dv_dither(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DITHER));
+  // Enable VPP 12-bit precision preservation when the "12-bit Deep Color
+  // pipeline" toggle is on AND the sink advertises 12-bit on a non-4:2:0
+  // chroma.  The VPU_HDMI_FMT_CTRL bit 4 that xbmc_dv_dither also sets is a
+  // no-op here: the HDMI output is already 12-bit so there is no 12→10 stage
+  // to dither, and no noise reaches the wire (which is what avoids the
+  // TV-side edge-enhancer oversharpening seen when dither was applied at
+  // 10-bit output).
+  bool dv_dither = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
+                && aml_display_support_12bit();
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_dither", dv_dither);
 
   // For VS10 non-IPT output (HDR10, SDR), the DV module is active but the
@@ -822,6 +845,14 @@ unsigned int aml_dv_on(unsigned int mode)
       if (limit_cd > 0) {
         if (!fmt_attr.empty()) fmt_attr += ",";
         fmt_attr += limit_cd_str[limit_cd - 1];
+      } else if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
+                 && aml_display_support_12bit()) {
+        // User left CD on Auto and requested the 12-bit Deep Color pipeline.
+        // Writing "12bit" opts out of the kernel's Auto-depth loop and its
+        // 4K60 4:4:4 bandwidth clamp to 8-bit; EDID-gated so we fall back to
+        // plain Auto when the sink can't accept 12-bit on a non-420 chroma.
+        if (!fmt_attr.empty()) fmt_attr += ",";
+        fmt_attr += "12bit";
       }
       if (!fmt_attr.empty()) fmt_attr += ",";
       fmt_attr += "now";

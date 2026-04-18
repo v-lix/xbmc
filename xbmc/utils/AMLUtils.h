@@ -103,6 +103,7 @@ bool aml_display_support_dv();
 bool aml_display_support_dv_ll();
 bool aml_display_support_dv_std();
 bool aml_display_support_3d();
+bool aml_display_support_12bit();
 bool aml_support_hevc();
 bool aml_support_hevc_4k2k();
 bool aml_support_hevc_8k4k();
