@@ -36,6 +36,13 @@ struct SQuads
   std::vector<SQuad> quad;
 };
 
+// Linear-light alpha premultiplication for overlay pixels.
+// Premultiplying gamma-encoded values directly produces edges that are
+// too dark, especially pronounced when the OSD is displayed in HDR/PQ mode.
+// These helpers perform the multiplication in linear space (gamma 2.2).
+float SrgbToLinear(int v);
+int LinearToSrgb8(float v);
+
 void convert_rgba(const CDVDOverlayImage& o, bool mergealpha, std::vector<uint32_t>& rgba);
 void convert_rgba(const CDVDOverlaySpu& o,
                   bool mergealpha,

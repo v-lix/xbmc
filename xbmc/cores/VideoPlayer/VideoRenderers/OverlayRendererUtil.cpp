@@ -16,16 +16,45 @@
 #include "settings/SettingsComponent.h"
 #include "windowing/GraphicContext.h"
 
+#include <array>
+#include <cmath>
+
 namespace OVERLAY
 {
 
+float SrgbToLinear(int v)
+{
+  static const auto lut = []() {
+    std::array<float, 256> t{};
+    for (int i = 0; i < 256; i++)
+      t[i] = std::pow(i / 255.0f, 2.2f);
+    return t;
+  }();
+  return lut[v & 0xff];
+}
+
+int LinearToSrgb8(float v)
+{
+  if (v <= 0.0f)
+    return 0;
+  if (v >= 1.0f)
+    return 255;
+  return static_cast<int>(std::pow(v, 1.0f / 2.2f) * 255.0f + 0.5f);
+}
+
+// Premultiply alpha in linear light so semi-transparent edges don't appear dark
+// on HDR displays (where gamma-space PMA gets mapped to very low PQ luminance).
+// Also improves SDR correctness for anti-aliased overlay edges.
 static uint32_t build_rgba(int a, int r, int g, int b, bool mergealpha)
 {
-  if(mergealpha)
-    return      a        << PIXEL_ASHIFT
-         | (r * a / 255) << PIXEL_RSHIFT
-         | (g * a / 255) << PIXEL_GSHIFT
-         | (b * a / 255) << PIXEL_BSHIFT;
+  if (mergealpha)
+  {
+    const float af = a / 255.0f;
+    const int rp = LinearToSrgb8(SrgbToLinear(r) * af);
+    const int gp = LinearToSrgb8(SrgbToLinear(g) * af);
+    const int bp = LinearToSrgb8(SrgbToLinear(b) * af);
+    return a << PIXEL_ASHIFT | rp << PIXEL_RSHIFT | gp << PIXEL_GSHIFT | bp << PIXEL_BSHIFT;
+  }
   else
     return a << PIXEL_ASHIFT
          | r << PIXEL_RSHIFT
