@@ -4448,6 +4448,7 @@
           <level>2</level>
           <default>false</default>
           <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.level5" operator="is">true</dependency>
           </dependencies>
           <control type="toggle" />
@@ -4458,6 +4459,7 @@
           <level>2</level>
           <default>false</default>
           <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.level5" operator="is">true</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.restrict.subs.active.area" operator="is">true</dependency>
           </dependencies>
@@ -4469,6 +4471,7 @@
           <level>2</level>
           <default>false</default>
           <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.level5" operator="is">true</dependency>
           </dependencies>
           <control type="toggle" />
@@ -4479,6 +4482,7 @@
           <level>3</level>
           <default>false</default>
           <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.detect.active.area" operator="is">true</dependency>
           </dependencies>
           <control type="toggle" />
