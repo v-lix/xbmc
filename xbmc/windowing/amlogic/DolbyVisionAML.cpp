@@ -874,7 +874,12 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
       settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_PLAYER_LED_HDR);
       return;
     }
-    set_vsvdb_children_visible(true);
+    // Only re-show VSVDB children if the DV group is meant to be visible at all —
+    // otherwise a reset cascade that flips override.edid off first and then touches
+    // DV type would pop VSVDB rows back into view on !dv_supported devices.
+    bool dv_group_visible = aml_support_dolby_vision() ||
+                            settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
+    set_vsvdb_children_visible(dv_group_visible);
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
     if (reset_dv_vs10_dv) settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV, DOLBY_VISION_OUTPUT_MODE_IPT);
     if (dv_type == DV_TYPE_VS10_ONLY) settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_DV, DOLBY_VISION_OUTPUT_MODE_SDR10);
@@ -907,7 +912,9 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT)
   {
-    set_vsvdb_children_visible(true);
+    bool dv_group_visible = aml_support_dolby_vision() ||
+                            settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
+    set_vsvdb_children_visible(dv_group_visible);
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_CS)
