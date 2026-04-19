@@ -8,10 +8,13 @@
 
 #include "DolbyVisionAML.h"
 
+#include <atomic>
+#include <chrono>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <thread>
 
 #include "ServiceBroker.h"
 #include "settings/Settings.h"
@@ -611,6 +614,127 @@ static void set_dv_settings_visible(bool show)
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES, show);
 }
 
+enum TV_PRESET : int
+{
+  TV_PRESET_MANUAL = 0,
+  TV_PRESET_AUTO,
+  TV_PRESET_LG,
+  TV_PRESET_SONY,
+  TV_PRESET_SAMSUNG,
+  TV_PRESET_PANASONIC,
+  TV_PRESET_PHILIPS,
+  TV_PRESET_TCL
+};
+
+static std::atomic<bool> s_applying_tv_preset{false};
+// Scheduling state for deferred preset application. When the preset setting changes,
+// the apply is deferred to a detached thread so it runs after the current event handling
+// completes — critical for "Reset the above settings", which writes the preset then
+// iterates to each child and writes its XML default. Running apply after the reset
+// burst ensures preset-driven child values are the final state. The scheduled flag also
+// suppresses the flip-to-Manual guard during the window so child resets mid-burst don't
+// prematurely clear the pending preset.
+static std::atomic<bool> s_tv_preset_apply_scheduled{false};
+static std::atomic<int> s_tv_preset_pending{TV_PRESET_MANUAL};
+
+static void apply_tv_preset(int preset)
+{
+  if (preset == TV_PRESET_MANUAL) return;
+  s_applying_tv_preset = true;
+
+  bool preset_has_dv = false;
+  bool preset_has_hdr10plus = false;
+
+  switch (preset)
+  {
+    case TV_PRESET_AUTO:
+      preset_has_dv = aml_display_support_dv();
+      preset_has_hdr10plus = aml_display_support_hdr10plus();
+      break;
+    case TV_PRESET_LG:
+    case TV_PRESET_SONY:
+      preset_has_dv = true;
+      preset_has_hdr10plus = false;
+      break;
+    case TV_PRESET_SAMSUNG:
+      preset_has_dv = false;
+      preset_has_hdr10plus = true;
+      break;
+    case TV_PRESET_PANASONIC:
+    case TV_PRESET_PHILIPS:
+    case TV_PRESET_TCL:
+      preset_has_dv = true;
+      preset_has_hdr10plus = true;
+      break;
+  }
+
+  CLog::Log(LOGINFO,
+    "CDolbyVisionAML::apply_tv_preset - preset={}, pnpid={}, classify: dv={}, hdr10plus={}",
+    preset, xbmc_dv_cap::edid_pnpid, preset_has_dv, preset_has_hdr10plus);
+
+  if (!preset_has_dv && !preset_has_hdr10plus)
+  {
+    CLog::Log(LOGINFO, "CDolbyVisionAML::apply_tv_preset - display has neither DV nor HDR10+, no changes applied");
+    s_applying_tv_preset = false;
+    return;
+  }
+
+  enum DV_MODE cur_mode(static_cast<DV_MODE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE)));
+  if (cur_mode == DV_MODE_OFF)
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE, DV_MODE_ON_DEMAND);
+
+  // When a file carries both DV and HDR10+ streams, pick the stream the TV
+  // actually supports: DV on DV-capable TVs, HDR10+ on Samsung.
+  settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_DUAL_PRIORITY, preset_has_dv ? 0 : 1);
+
+  // HDR10+→DV conversion is on only if the TV can't do HDR10+ natively. Prefer-
+  // convert (choose converted HDR10+ over native DV when both present) is never a
+  // good default — the native DV stream is always higher quality.
+  settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PREFER_CONVERT, false);
+
+  if (preset_has_dv)
+  {
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_DISPLAY_LED);
+    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT, !preset_has_hdr10plus);
+    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT, true);
+
+    // Display-LED benefits from L5 active-area handling (subtitles/OSD
+    // unaffected by letterbox crops) and CMv4.0 extension blocks (display-
+    // managed tonemapping quality bump).
+    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5, true);
+    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5, true);
+    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST, true);
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS, 2); // Subtitles on screen
+    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA, true);
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, 2); // Always
+  }
+  else
+  {
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_PLAYER_LED_LLDV);
+    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT, false);
+  }
+
+  s_applying_tv_preset = false;
+}
+
+static void schedule_tv_preset_apply(int preset)
+{
+  if (preset == TV_PRESET_MANUAL) return;
+
+  s_tv_preset_pending.store(preset);
+
+  // If an apply is already scheduled, the updated pending value will be picked up
+  // when the existing thread wakes. Avoid spawning a second thread.
+  if (s_tv_preset_apply_scheduled.exchange(true)) return;
+
+  std::thread([]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    int preset_to_apply = s_tv_preset_pending.load();
+    s_tv_preset_apply_scheduled.store(false);
+    apply_tv_preset(preset_to_apply);
+  }).detach();
+}
+
 bool CDolbyVisionAML::Setup()
 {
   CLog::Log(LOGDEBUG, "CDolbyVisionAML::Setup - Begin");
@@ -632,6 +756,7 @@ bool CDolbyVisionAML::Setup()
 
   // Register for ui dv mode change - to change on the fly.
   std::set<std::string> settingSet;
+  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_TV_PRESET);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS);
@@ -707,6 +832,22 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   bool dv_type_vp_auto(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO));
 
   const std::string& settingId = setting->GetId();
+
+  if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_TV_PRESET)
+  {
+    schedule_tv_preset_apply(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TV_PRESET));
+    return;
+  }
+
+  // Any direct user edit of a DV setting (not driven by a preset apply) invalidates
+  // the preset state — flip it to Manual so the label doesn't misrepresent what's active.
+  // Suppressed while a preset apply is in flight (either currently running, or scheduled
+  // and waiting for the current event — e.g. a reset — to finish before it writes).
+  if (!s_applying_tv_preset && !s_tv_preset_apply_scheduled.load() &&
+      settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TV_PRESET) != TV_PRESET_MANUAL)
+  {
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TV_PRESET, TV_PRESET_MANUAL);
+  }
 
   if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE)
   {

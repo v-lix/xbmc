@@ -99,6 +99,7 @@ enum DV_COLORIMETRY : int
 int  aml_get_cpufamily_id();
 bool aml_display_support_hdr_pq();
 bool aml_display_support_hdr_hlg();
+bool aml_display_support_hdr10plus();
 bool aml_display_support_dv();
 bool aml_display_support_dv_ll();
 bool aml_display_support_dv_std();
@@ -135,6 +136,7 @@ struct xbmc_dv_cap
   static inline int dv_bx_i = 0;
   static inline int dv_by_i = 0;
   static inline std::string dv_vsvdb_s = "";
+  static inline std::string edid_pnpid = "";
 };
 unsigned int aml_dv_dolby_vision_mode();
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries = AVCOL_PRI_UNSPECIFIED);

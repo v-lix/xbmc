@@ -312,6 +312,7 @@ void CSettings::InitializeSettingTypes()
   GetSettingsManager()->RegisterSettingType("date", this);
   GetSettingsManager()->RegisterSettingType("path", this);
   GetSettingsManager()->RegisterSettingType("time", this);
+  GetSettingsManager()->RegisterSettingType("notifyint", this);
 }
 
 void CSettings::InitializeControls()
