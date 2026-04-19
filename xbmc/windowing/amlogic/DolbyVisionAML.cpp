@@ -697,15 +697,6 @@ static void apply_tv_preset(int preset)
     settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_DISPLAY_LED);
     settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT, !preset_has_hdr10plus);
     settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT, true);
-
-    // Display-LED benefits from L5 active-area handling (subtitles/OSD
-    // unaffected by letterbox crops) and CMv4.0 extension blocks (display-
-    // managed tonemapping quality bump).
-    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5, true);
-    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5, true);
-    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST, true);
-    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS, 2); // Subtitles on screen
-    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA, true);
     settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, 2); // Always
   }
   else
