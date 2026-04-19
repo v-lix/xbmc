@@ -719,8 +719,12 @@ static void apply_tv_preset(int preset)
   else
   {
     // Samsung-class: no DV on the TV. LLDV is what Samsung's HDMI path
-    // typically accepts; keep as the explicit intent even when EDID doesn't
-    // advertise it (force modes / manual override territory).
+    // typically accepts even though EDID doesn't advertise it. Enable
+    // force.modes first so LLDV is a valid option in dv_type_filler; without
+    // this the spinner normalises the value away (filler excludes LLDV when
+    // aml_display_support_dv_ll() is false) and the DV_TYPE change handler
+    // then falls back to Player-LED HDR (444) — which washes out DV playback.
+    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES, true);
     settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_PLAYER_LED_LLDV);
     settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT, false);
   }
