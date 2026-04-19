@@ -644,37 +644,42 @@ static void apply_tv_preset(int preset)
 
   bool preset_has_dv = false;
   bool preset_has_hdr10plus = false;
+  bool preset_has_hdr10 = false;
 
   switch (preset)
   {
     case TV_PRESET_AUTO:
       preset_has_dv = aml_display_support_dv();
       preset_has_hdr10plus = aml_display_support_hdr10plus();
+      preset_has_hdr10 = preset_has_hdr10plus || aml_display_support_hdr_pq();
       break;
     case TV_PRESET_LG:
     case TV_PRESET_SONY:
       preset_has_dv = true;
       preset_has_hdr10plus = false;
+      preset_has_hdr10 = true;
       break;
     case TV_PRESET_SAMSUNG:
       preset_has_dv = false;
       preset_has_hdr10plus = true;
+      preset_has_hdr10 = true;
       break;
     case TV_PRESET_PANASONIC:
     case TV_PRESET_PHILIPS:
     case TV_PRESET_TCL:
       preset_has_dv = true;
       preset_has_hdr10plus = true;
+      preset_has_hdr10 = true;
       break;
   }
 
   CLog::Log(LOGINFO,
-    "CDolbyVisionAML::apply_tv_preset - preset={}, pnpid={}, classify: dv={}, hdr10plus={}",
-    preset, xbmc_dv_cap::edid_pnpid, preset_has_dv, preset_has_hdr10plus);
+    "CDolbyVisionAML::apply_tv_preset - preset={}, pnpid={}, classify: dv={}, hdr10plus={}, hdr10={}",
+    preset, xbmc_dv_cap::edid_pnpid, preset_has_dv, preset_has_hdr10plus, preset_has_hdr10);
 
-  if (!preset_has_dv && !preset_has_hdr10plus)
+  if (!preset_has_dv && !preset_has_hdr10)
   {
-    CLog::Log(LOGINFO, "CDolbyVisionAML::apply_tv_preset - display has neither DV nor HDR10+, no changes applied");
+    CLog::Log(LOGINFO, "CDolbyVisionAML::apply_tv_preset - display has no DV and no HDR10, no changes applied");
     s_applying_tv_preset = false;
     return;
   }
@@ -697,13 +702,14 @@ static void apply_tv_preset(int preset)
     // Pick the best DV output type the connected display actually supports.
     // Prefer Display-LED (DV-std) since the TV owns tonemapping and CMv4.0
     // metadata is useful there. Fall back to LLDV when the TV is DV-LL-only
-    // (some Panasonic models), and further to Player-LED HDR / VS10-only for
-    // more exotic cases.
+    // (some Panasonic models), and further to HDR10 4:2:2 12-bit / VS10-only
+    // for more exotic cases. 4:4:4 (DV_TYPE_PLAYER_LED_HDR) is deliberately
+    // avoided — it washes out DV playback on non-DV-std displays.
     DV_TYPE picked = DV_TYPE_DISPLAY_LED;
     if (!aml_display_support_dv_std())
     {
       if (aml_display_support_dv_ll()) picked = DV_TYPE_PLAYER_LED_LLDV;
-      else if (aml_display_support_hdr_pq()) picked = DV_TYPE_PLAYER_LED_HDR;
+      else if (aml_display_support_hdr_pq()) picked = DV_TYPE_PLAYER_LED_HDR2;
       else picked = DV_TYPE_VS10_ONLY;
     }
     settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, picked);
@@ -870,10 +876,12 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
   {
-    // Smart default: fall back from Display-LED on non-DV-std displays (e.g. after settings reset)
+    // Smart default: fall back from Display-LED on non-DV-std displays (e.g. after settings reset).
+    // Land on HDR10 4:2:2 12-bit — 4:4:4 (DV_TYPE_PLAYER_LED_HDR) is deliberately avoided
+    // because it washes out DV playback on these sinks.
     if (dv_type == DV_TYPE_DISPLAY_LED && !aml_display_support_dv_std() && !force_modes())
     {
-      settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_PLAYER_LED_HDR);
+      settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_PLAYER_LED_HDR2);
       return;
     }
     // Only re-show VSVDB children if the DV group is meant to be visible at all —
