@@ -694,13 +694,29 @@ static void apply_tv_preset(int preset)
 
   if (preset_has_dv)
   {
-    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_DISPLAY_LED);
+    // Pick the best DV output type the connected display actually supports.
+    // Prefer Display-LED (DV-std) since the TV owns tonemapping and CMv4.0
+    // metadata is useful there. Fall back to LLDV when the TV is DV-LL-only
+    // (some Panasonic models), and further to Player-LED HDR / VS10-only for
+    // more exotic cases.
+    DV_TYPE picked = DV_TYPE_DISPLAY_LED;
+    if (!aml_display_support_dv_std())
+    {
+      if (aml_display_support_dv_ll()) picked = DV_TYPE_PLAYER_LED_LLDV;
+      else if (aml_display_support_hdr_pq()) picked = DV_TYPE_PLAYER_LED_HDR;
+      else picked = DV_TYPE_VS10_ONLY;
+    }
+    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, picked);
     settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT, !preset_has_hdr10plus);
     settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT, true);
-    settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, 2); // Always
+    if (picked == DV_TYPE_DISPLAY_LED)
+      settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, 2); // Always
   }
   else
   {
+    // Samsung-class: no DV on the TV. LLDV is what Samsung's HDMI path
+    // typically accepts; keep as the explicit intent even when EDID doesn't
+    // advertise it (force modes / manual override territory).
     settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, DV_TYPE_PLAYER_LED_LLDV);
     settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT, false);
   }
