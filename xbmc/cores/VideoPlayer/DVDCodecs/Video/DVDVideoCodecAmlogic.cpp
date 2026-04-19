@@ -78,7 +78,10 @@ CDVDVideoCodecAmlogic::CDVDVideoCodecAmlogic(CProcessInfo &processInfo)
   {
     if (const auto settings = settingsComponent->GetSettings())
     {
-      settings->RegisterCallback(this, {CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND});
+      settings->RegisterCallback(this, {
+        CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND,
+        CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE
+      });
       m_settingsCallbackRegistered = true;
     }
   }
@@ -103,14 +106,24 @@ void CDVDVideoCodecAmlogic::UpdateAppendCMv40SettingCache()
   if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
   {
     if (const auto settings = settingsComponent->GetSettings())
-      m_appendCMv40ModeSetting.store(
-          settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND));
+    {
+      // CMv4.0 metadata append only makes sense for Display-LED DV, where the TV
+      // consumes the RPU and tonemaps using CMv4.0 blocks. On Player-LED paths
+      // (LLDV / HDR / HDR2) and VS10-only, we're the tonemapper, so appending
+      // CMv4.0 is wasted work on the stream.
+      int cmv40 = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND);
+      if (aml_dv_type() != DV_TYPE_DISPLAY_LED)
+        cmv40 = 0;
+      m_appendCMv40ModeSetting.store(cmv40);
+    }
   }
 }
 
 void CDVDVideoCodecAmlogic::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
 {
-  if (setting->GetId() == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND)
+  const auto& id = setting->GetId();
+  if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND ||
+      id == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
     UpdateAppendCMv40SettingCache();
 }
 
