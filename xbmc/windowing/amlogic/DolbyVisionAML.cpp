@@ -708,9 +708,13 @@ static void apply_tv_preset(int preset)
     }
     settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE, picked);
     settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT, !preset_has_hdr10plus);
-    settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT, true);
     if (picked == DV_TYPE_DISPLAY_LED)
+    {
+      // 12-bit Deep Color pipeline targets the VS10 → HDMI TX path on Display-LED
+      // and CMv4.0 append is only consumed by the TV in Display-LED too.
+      settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT, true);
       settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, 2); // Always
+    }
   }
   else
   {
