@@ -295,6 +295,18 @@ bool aml_display_support_hdr_hlg()
   return support;
 }
 
+bool aml_display_support_hdr10plus()
+{
+  bool support = false;
+  CSysfsPath hdr_cap{"/sys/class/amhdmitx/amhdmitx0/hdr_cap"};
+  if (hdr_cap.Exists())
+  {
+    std::string valstr = hdr_cap.Get<std::string>().value();
+    support = (valstr.find("HDR10Plus Supported: 1") != std::string::npos);
+  }
+  return support;
+}
+
 bool aml_display_support_dv_ll()
 {
   int support_ll = 0;
@@ -865,6 +877,21 @@ unsigned int aml_dv_on(unsigned int mode)
 
 void aml_get_dv_cap()
 {
+  xbmc_dv_cap::edid_pnpid = "";
+  CSysfsPath edid_dump{"/sys/class/amhdmitx/amhdmitx0/edid"};
+  if (edid_dump.Exists())
+  {
+    std::string parsed = edid_dump.Get<std::string>().value();
+    size_t mpos = parsed.find("Rx Manufacturer Name:");
+    if (mpos != std::string::npos)
+    {
+      size_t lstart = parsed.find_first_not_of(" \t", mpos + 21);
+      size_t lend = parsed.find('\n', lstart);
+      if (lstart != std::string::npos && lend != std::string::npos && lend > lstart)
+        xbmc_dv_cap::edid_pnpid = parsed.substr(lstart, lend - lstart);
+    }
+  }
+
   if (aml_display_support_dv())
   {
     CSysfsPath dv_cap{"/sys/devices/virtual/amhdmitx/amhdmitx0/dv_cap"};

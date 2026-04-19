@@ -11,6 +11,7 @@
 #include "settings/SettingAddon.h"
 #include "settings/SettingDateTime.h"
 #include "settings/SettingPath.h"
+#include "settings/SettingNotifyInt.h"
 #include "utils/StringUtils.h"
 
 std::shared_ptr<CSetting> CSettingCreator::CreateSetting(const std::string &settingType, const std::string &settingId, CSettingsManager *settingsManager /* = nullptr */) const
@@ -23,6 +24,8 @@ std::shared_ptr<CSetting> CSettingCreator::CreateSetting(const std::string &sett
     return std::make_shared<CSettingDate>(settingId, settingsManager);
   else if (StringUtils::EqualsNoCase(settingType, "time"))
     return std::make_shared<CSettingTime>(settingId, settingsManager);
+  else if (StringUtils::EqualsNoCase(settingType, "notifyint"))
+    return std::make_shared<CSettingNotifyInt>(settingId, settingsManager);
 
   return nullptr;
 }

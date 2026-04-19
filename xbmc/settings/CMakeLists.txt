@@ -10,6 +10,7 @@ set(SOURCES AdvancedSettings.cpp
             SettingControl.cpp
             SettingCreator.cpp
             SettingDateTime.cpp
+            SettingNotifyInt.cpp
             SettingPath.cpp
             Settings.cpp
             SettingsBase.cpp
@@ -34,6 +35,7 @@ set(HEADERS AdvancedSettings.h
             SettingControl.h
             SettingCreator.h
             SettingDateTime.h
+            SettingNotifyInt.h
             SettingPath.h
             Settings.h
             SettingsBase.h

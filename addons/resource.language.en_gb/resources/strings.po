@@ -26585,7 +26585,67 @@ msgid "12-bit Deep Color pipeline"
 msgstr ""
 
 msgctxt "#60615"
-msgid "When enabled and the TV advertises 12-bit support on 4:4:4, 4:2:2, or RGB chroma in its EDID, Kodi writes 12bit into the HDMI attribute and preserves full 12-bit precision through the DV VPP during VS10 playback. Because the HDMI output is already 12-bit, no 12→10 truncation happens at the HDMI TX — no dither noise reaches the wire, so there is no oversharpening side effect on TVs with aggressive detail/edge enhancement. Falls back silently to Auto if the sink does not support 12-bit on a non-4:2:0 chroma. Disabled by default."
+msgid "When enabled and the TV advertises 12-bit support on 4:4:4, 4:2:2, or RGB chroma in its EDID, Kodi writes 12bit into the HDMI attribute and preserves full 12-bit precision through the DV VPP during VS10 playback. Because the HDMI output is already 12-bit, no 12→10 truncation happens at the HDMI TX — no dither noise reaches the wire, so there is no oversharpening side effect on TVs with aggressive detail/edge enhancement. Falls back silently to Auto if the sink does not support 12-bit on a non-4:2:0 chroma. Enabled by default."
+msgstr ""
+
+#. TV preset label
+#: system/settings/settings.xml
+msgctxt "#60616"
+msgid "TV preset"
+msgstr ""
+
+#. TV preset help
+#: system/settings/settings.xml
+msgctxt "#60617"
+msgid "Apply a pipeline preset based on your TV's HDR capabilities. Auto uses the EDID (DV + HDR10+ support bits) to pick the best pipeline. Brand presets set the pipeline for typical behaviour of that brand: LG/Sony assume DV but no HDR10+ (enables HDR10+→DV P8.1 conversion); Samsung assumes HDR10+ only, no DV (uses Player-LED LLDV for DV sources); Panasonic/Philips/TCL assume all formats supported (no conversion). Sets DV type, HDR10+ conversion, and the 12-bit Deep Color pipeline. Leave as Manual if you want full control."
+msgstr ""
+
+#. TV preset — Manual
+#: system/settings/settings.xml
+msgctxt "#60618"
+msgid "Manual"
+msgstr ""
+
+#. TV preset — Auto (from EDID)
+#: system/settings/settings.xml
+msgctxt "#60619"
+msgid "Auto (from EDID)"
+msgstr ""
+
+#. TV preset — LG
+#: system/settings/settings.xml
+msgctxt "#60620"
+msgid "LG"
+msgstr ""
+
+#. TV preset — Sony
+#: system/settings/settings.xml
+msgctxt "#60621"
+msgid "Sony"
+msgstr ""
+
+#. TV preset — Samsung
+#: system/settings/settings.xml
+msgctxt "#60622"
+msgid "Samsung"
+msgstr ""
+
+#. TV preset — Panasonic
+#: system/settings/settings.xml
+msgctxt "#60623"
+msgid "Panasonic"
+msgstr ""
+
+#. TV preset — Philips
+#: system/settings/settings.xml
+msgctxt "#60624"
+msgid "Philips"
+msgstr ""
+
+#. TV preset — TCL
+#: system/settings/settings.xml
+msgctxt "#60625"
+msgid "TCL"
 msgstr ""
 
 #. Title of Dolby Vision RPU conversion setting
