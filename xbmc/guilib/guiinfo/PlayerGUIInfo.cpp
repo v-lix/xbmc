@@ -665,14 +665,19 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
     }
     case PLAYER_PROCESS_VIDEO_HDMI_OUTPUT:
     {
-      // Current HDMI output attribute, e.g. "444,12bit" / "422,10bit" — reflects
-      // the actual chroma subsampling + bit depth on the wire after any DV/HDR
-      // mode negotiation. Empty on non-Amlogic platforms.
+      // Current HDMI output attribute, e.g. "4:4:4, 12bit" / "4:2:2, 10bit" —
+      // reflects the actual chroma subsampling + bit depth on the wire after
+      // any DV/HDR mode negotiation. Empty on non-Amlogic platforms.
       CSysfsPath attr{"/sys/class/amhdmitx/amhdmitx0/attr"};
       if (attr.Exists())
       {
         value = attr.Get<std::string>().value_or("");
         StringUtils::Trim(value);
+        StringUtils::TrimRight(value, ",");
+        StringUtils::Replace(value, "444", "4:4:4");
+        StringUtils::Replace(value, "422", "4:2:2");
+        StringUtils::Replace(value, "420", "4:2:0");
+        StringUtils::Replace(value, ",", ", ");
       }
       else
       {
