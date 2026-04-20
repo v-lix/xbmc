@@ -25730,7 +25730,7 @@ msgstr ""
 #. "Dolby Vision Level 5 Subtitle Handling"
 #: system/settings/settings.xml
 msgctxt "#60157"
-msgid "Dynamically sets Level 5 metadata to zero when subtitles are present, preventing the display from cropping or dimming them. 'Subtitle track enabled' sets L5 to zero whenever a subtitle track is turned on. 'Subtitles on screen' only sets L5 to zero when text subtitles are displayed or image-based subtitles extend outside the active area."
+msgid "Dynamically sets Level 5 metadata to zero when subtitles overlap the letterbox bars, preventing the display from cropping or dimming them. 'Subtitle track enabled' sets L5 to zero whenever a subtitle track is turned on. 'Subtitles on screen' only sets L5 to zero when subtitles actually overlap the bars: image-based subtitles extending outside the active area, or text subtitles whose margin does not clear the L5 bar (when subtitle restriction is off). Text subs that sit inside the active area — either via the restriction setting or a margin larger than the bars — do not trigger L5 changes."
 msgstr ""
 
 #. "Dolby Vision Level 5 Subtitle Handling - Subtitle track active"
