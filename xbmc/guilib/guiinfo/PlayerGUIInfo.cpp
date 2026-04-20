@@ -663,6 +663,23 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
         value = info.is_dual_track ? "DT-DL" : "ST-DL";
       return true;
     }
+    case PLAYER_PROCESS_VIDEO_HDMI_OUTPUT:
+    {
+      // Current HDMI output attribute, e.g. "444,12bit" / "422,10bit" — reflects
+      // the actual chroma subsampling + bit depth on the wire after any DV/HDR
+      // mode negotiation. Empty on non-Amlogic platforms.
+      CSysfsPath attr{"/sys/class/amhdmitx/amhdmitx0/attr"};
+      if (attr.Exists())
+      {
+        value = attr.Get<std::string>().value_or("");
+        StringUtils::Trim(value);
+      }
+      else
+      {
+        value = "";
+      }
+      return true;
+    }
 
     case PLAYER_PROCESS_VIDEO_DOVI_L1_MIN_PQ:
       value = std::to_string(CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata().level1_min_pq);
