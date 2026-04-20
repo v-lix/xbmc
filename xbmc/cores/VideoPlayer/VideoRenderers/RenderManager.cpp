@@ -23,6 +23,7 @@
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
+#include "settings/SubtitlesSettings.h"
 #include "threads/SingleLock.h"
 #include "utils/AMLUtils.h"
 #include "utils/StringUtils.h"
@@ -834,27 +835,54 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
     {
       // When visible: signal for text subs on screen
       signalSubtitles = m_overlays.HasTextOverlay(m_presentsource);
-      // Also signal for image subs outside the active area (only when not restricted)
-      if (!signalSubtitles && !restrictSubsToActiveArea &&
-          m_picture.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
+
+      // Resolve effective L5 bars (source, falling back to detected)
+      uint16_t sigTop = 0, sigBottom = 0;
+      if (m_picture.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
       {
         const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
-        uint16_t sigTop = doviMeta.has_level5_metadata ? doviMeta.level5_active_area_top_offset : 0;
-        uint16_t sigBottom = doviMeta.has_level5_metadata ? doviMeta.level5_active_area_bottom_offset : 0;
-
-        // When source L5 is zero, use detected values if available
+        if (doviMeta.has_level5_metadata)
+        {
+          sigTop = doviMeta.level5_active_area_top_offset;
+          sigBottom = doviMeta.level5_active_area_bottom_offset;
+        }
         if (sigTop == 0 && sigBottom == 0 && aml_dv_detect_active_area_enabled() &&
             aml_dv_detect_active_area_stable())
         {
           uint16_t detLeft, detRight;
           aml_dv_detect_active_area_get(sigTop, sigBottom, detLeft, detRight);
         }
+      }
 
-        if (sigTop > 0 || sigBottom > 0)
-        {
-          signalSubtitles = m_overlays.HasImageSubOutsideActiveArea(
-              m_presentsource, sigTop, sigBottom);
-        }
+      // Optimization: text subs are inside the active area and don't need
+      // signaling when (a) restriction is on — CalcOverlayActiveArea already
+      // placed them inside, or (b) the subtitle margin clears the L5 bar.
+      // Avoids unnecessary L5 flipping for common aspect ratios like 1.85:1
+      // and 2.00:1 where subs never overlap the small bars.
+      if (signalSubtitles && restrictSubsToActiveArea)
+      {
+        signalSubtitles = false;
+      }
+      else if (signalSubtitles && (sigTop > 0 || sigBottom > 0) && src.Height() > 0)
+      {
+        float scaleY = dst.Height() / src.Height();
+        float topBarDisp = sigTop * scaleY;
+        float botBarDisp = sigBottom * scaleY;
+        float guiHeight = CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight();
+        float marginPerc = CServiceBroker::GetSettingsComponent()
+            ->GetSubtitlesSettings()->GetVerticalMarginPerc();
+        float marginDisp = (marginPerc / 100.0f) * guiHeight;
+        // Check against the larger bar — handles top-positioned subs too
+        if (marginDisp > std::max(topBarDisp, botBarDisp))
+          signalSubtitles = false;
+      }
+
+      // Also signal for image subs outside the active area (only when not restricted)
+      if (!signalSubtitles && !restrictSubsToActiveArea &&
+          (sigTop > 0 || sigBottom > 0))
+      {
+        signalSubtitles = m_overlays.HasImageSubOutsideActiveArea(
+            m_presentsource, sigTop, sigBottom);
       }
     }
     aml_dv_set_subtitles(signalSubtitles);
