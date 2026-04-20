@@ -868,12 +868,21 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
         float scaleY = dst.Height() / src.Height();
         float topBarDisp = sigTop * scaleY;
         float botBarDisp = sigBottom * scaleY;
-        float guiHeight = CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight();
+        // Use the calibrated subtitle baseline, not just screen height.
+        // resInfo.iSubtitles is the baseline Y from screen top (defaults
+        // to screenHeight - guiInsets.bottom); sub renders at (iSubtitles
+        // - marginPixels) from top.  Distance from video bottom to sub
+        // baseline = dst.y2 - (iSubtitles - marginPixels).
+        const RESOLUTION_INFO resInfo =
+            CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
         float marginPerc = CServiceBroker::GetSettingsComponent()
             ->GetSubtitlesSettings()->GetVerticalMarginPerc();
-        float marginDisp = (marginPerc / 100.0f) * guiHeight;
-        // Check against the larger bar — handles top-positioned subs too
-        if (marginDisp > std::max(topBarDisp, botBarDisp))
+        float marginPixels = (marginPerc / 100.0f) * resInfo.iHeight;
+        float subBaselineFromTop = resInfo.iSubtitles - marginPixels;
+        float subClearanceBottom = dst.y2 - subBaselineFromTop;
+        float subClearanceTop = subBaselineFromTop - dst.y1;
+        // Sub clears both bars → no need to signal
+        if (subClearanceBottom > botBarDisp && subClearanceTop > topBarDisp)
           signalSubtitles = false;
       }
 
