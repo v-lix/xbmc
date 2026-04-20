@@ -1504,10 +1504,16 @@ double CDVDDemuxFFmpeg::SelectAspect(AVStream* st, bool& forced)
     AVDictionaryEntry* entry = av_dict_get(st->metadata, "stereo_mode", NULL, 0);
     if (entry)
     {
+      // Per-eye DAR = full-frame DAR / 2 for SBS, * 2 for TAB. The previous
+      // width/1920 (height/1080) heuristic only worked when matroska reported
+      // SAR=1:1 for the stereo frame; ffmpeg 8.x derives SAR from the
+      // container's DisplayWidth tag and reports SAR=2:1 for HSBS at native
+      // 1920 width, which made the heuristic a no-op and propagated the
+      // full-frame DAR to the renderer.
       if (strcmp(entry->value, "left_right") == 0 || strcmp(entry->value, "right_left") == 0)
-        dar /= (st->codecpar->width / 1920.0);
+        dar /= 2.0;
       else if (strcmp(entry->value, "top_bottom") == 0 || strcmp(entry->value, "bottom_top") == 0)
-        dar *= (st->codecpar->height / 1080.0);
+        dar *= 2.0;
     }
     return dar;
   }
