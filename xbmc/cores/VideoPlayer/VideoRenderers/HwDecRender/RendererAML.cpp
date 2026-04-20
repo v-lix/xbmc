@@ -172,12 +172,6 @@ bool CRendererAML::Flush(bool saveBuffers)
 
 void CRendererAML::RenderUpdate(int index, int index2, bool clear, unsigned int flags, unsigned int alpha)
 {
-  // The Amlogic hardware video plane always shows the full decoded frame;
-  // per-eye source cropping and ratio adjustment from ManageRenderArea would
-  // cause incorrect letterboxing.  Force stereo view OFF so the dest rect is
-  // calculated for the full frame.  AMLCodec::SetVideoRect handles the SBS/TAB
-  // width/height doubling for the hardware scaler separately.
-  CServiceBroker::GetWinSystem()->GetGfxContext().SetStereoView(RENDER_STEREO_VIEW_OFF);
   ManageRenderArea();
 
   CVideoBuffer* videoBuffer = m_buffers[index].videoBuffer;
