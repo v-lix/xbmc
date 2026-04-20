@@ -1263,6 +1263,7 @@ const infomap player_process[] = {{"videodecoder", PLAYER_PROCESS_VIDEODECODER},
 
                                   {"video.dovi.has.header", PLAYER_PROCESS_VIDEO_DOVI_HAS_HEADER },
                                   {"video.dovi.dual.track", PLAYER_PROCESS_VIDEO_DOVI_DUAL_TRACK },
+                                  {"video.hdmi.output", PLAYER_PROCESS_VIDEO_HDMI_OUTPUT },
 
                                   {"video.dovi.l1.min.pq", PLAYER_PROCESS_VIDEO_DOVI_L1_MIN_PQ },
                                   {"video.dovi.l1.max.pq", PLAYER_PROCESS_VIDEO_DOVI_L1_MAX_PQ },
