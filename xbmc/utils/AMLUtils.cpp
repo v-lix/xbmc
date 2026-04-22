@@ -705,22 +705,25 @@ unsigned int aml_dv_on(unsigned int mode)
   // Force CD/CS for all DV modes
   aml_kodi_set_cd_cs(1);
 
-  // Enable VPP 12-bit precision preservation when the "12-bit Deep Color
-  // pipeline" toggle is on AND the sink advertises 12-bit on a non-4:2:0
-  // chroma.  The VPU_HDMI_FMT_CTRL bit 4 that xbmc_dv_dither also sets is a
-  // no-op here: the HDMI output is already 12-bit so there is no 12→10 stage
-  // to dither, and no noise reaches the wire (which is what avoids the
-  // TV-side edge-enhancer oversharpening seen when dither was applied at
-  // 10-bit output).
-  bool dv_dither = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
-                && aml_display_support_12bit();
-  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_dither", dv_dither);
-
   // For VS10 non-IPT output (HDR10, SDR), the DV module is active but the
   // kernel HDMI TX may still have a stale DV EOTF from a previous IPT mode.
   // Tell the kernel to skip DV tunnel overrides so normal colour params apply.
   bool dv_non_ipt = (mode >= DOLBY_VISION_OUTPUT_MODE_HDR10 && mode <= DOLBY_VISION_OUTPUT_MODE_SDR8);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_non_ipt", dv_non_ipt);
+
+  // Enable VPP 12-bit precision preservation when the "12-bit Deep Color
+  // pipeline" toggle is on.  For DV tunnel modes (IPT, IPT_TUNNEL) we skip
+  // the EDID 12-bit wire check: amdolby_vision.c:2570-2573 gates
+  // VPU_HDMI_FMT_CTRL bit 4 off for those modes, so xbmc_dv_deep_color only
+  // affects VPP internal precision (DAT_CONV + DOLBY_CTRL), never the wire.
+  // DV-Std tunnels through RGB 4:4:4 8-bit regardless; DV-LL is already
+  // 422,12bit on the wire — in both cases VPP 12-bit preservation is a
+  // strict quality win and doesn't depend on the sink advertising wire
+  // 12-bit.  For VS10 non-IPT the HDMI TX dither bit does apply, so we
+  // keep the EDID 12-bit gate there to avoid dither noise on a 10-bit wire.
+  bool dv_deep_color = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
+                    && (!dv_non_ipt || aml_display_support_12bit());
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_deep_color", dv_deep_color);
 
   // Enable HDR10 metadata injection for DV LL output (VP/HDR modes)
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_for_dv_ll",
@@ -1034,7 +1037,7 @@ void aml_dv_off(bool skip_hdmi_update)
   aml_linux_force_422 = false;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422", aml_linux_force_422);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_non_ipt", false);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_dither", false);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_deep_color", false);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp_tm", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
