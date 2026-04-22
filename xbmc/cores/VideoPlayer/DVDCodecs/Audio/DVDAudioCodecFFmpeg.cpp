@@ -265,8 +265,12 @@ int CDVDAudioCodecFFmpeg::GetData(uint8_t** dst)
           }
           else if (sd->type == AV_FRAME_DATA_DOWNMIX_INFO)
           {
-            m_downmixInfo = *(AVDownmixInfo*)sd->data;
-            m_hasDownmix = true;
+            if (!CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+                    "audiooutput.ignoredownmixmetadata"))
+            {
+              m_downmixInfo = *(AVDownmixInfo*)sd->data;
+              m_hasDownmix = true;
+            }
           }
         }
       }

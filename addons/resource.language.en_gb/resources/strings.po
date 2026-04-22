@@ -22713,6 +22713,18 @@ msgctxt "#38022"
 msgid "No rating"
 msgstr ""
 
+#. Label for audio downmix setting that ignores stream-carried center/surround mix levels
+#: system/settings/settings.xml
+msgctxt "#38027"
+msgid "Ignore stream downmix metadata"
+msgstr ""
+
+#. Description for the setting with label #38027 "Ignore stream downmix metadata"
+#: system/settings/settings.xml
+msgctxt "#38028"
+msgid "Ignore centre and surround mix levels provided by AC3/E-AC3/DTS streams when downmixing. Fixed default levels (-3 dB, 0.7071) are used instead. Helpful when stream-provided values produce a poor downmix."
+msgstr ""
+
 #. Used for the rating selection
 #: xbmc/music/MusicUtils.cpp
 #: xbmc/video/dialogs/GUIDialogVideoInfo.cpp

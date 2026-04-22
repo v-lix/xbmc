@@ -16934,6 +16934,14 @@ msgctxt "#38022"
 msgid "No rating"
 msgstr "Keine Bewertung"
 
+msgctxt "#38027"
+msgid "Ignore stream downmix metadata"
+msgstr "Downmix-Metadaten aus Stream ignorieren"
+
+msgctxt "#38028"
+msgid "Ignore centre and surround mix levels provided by AC3/E-AC3/DTS streams when downmixing. Fixed default levels (-3 dB, 0.7071) are used instead. Helpful when stream-provided values produce a poor downmix."
+msgstr "Ignoriert die im Stream (AC3/E-AC3/DTS) übermittelten Mischpegel für Center- und Surround-Kanäle beim Downmix. Stattdessen werden feste Standardwerte (-3 dB, 0,7071) verwendet. Hilfreich, wenn die stream-eigenen Werte einen schlechten Downmix ergeben."
+
 msgctxt "#38023"
 msgid "Set my rating"
 msgstr "Bewerten"
