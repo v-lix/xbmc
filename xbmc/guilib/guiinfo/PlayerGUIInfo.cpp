@@ -665,23 +665,22 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
     }
     case PLAYER_PROCESS_VIDEO_HDMI_OUTPUT:
     {
-      // Current HDMI output attribute, e.g. "4:4:4, 12bit" / "4:2:2, 10bit" —
-      // reflects the actual chroma subsampling + bit depth on the wire after
-      // any DV/HDR mode negotiation. Empty on non-Amlogic platforms.
-      CSysfsPath attr{"/sys/class/amhdmitx/amhdmitx0/attr"};
-      if (attr.Exists())
+      // Current HDMI wire format, e.g. "4:4:4, 12-bit" / "4:2:2, 10-bit" —
+      // parsed from live HDMI TX registers via /sys/.../config. The sibling
+      // /sys/.../attr is only a cached request string (holds "now" after DV
+      // tunnel mode changes), so it can't be used here. Empty on non-Amlogic.
+      std::string cs = GetAMLConfigInfo("Colourspace");
+      std::string cd = GetAMLConfigInfo("Colour depth");
+      if (cs == "unknown" || cd == "unknown")
       {
-        value = attr.Get<std::string>().value_or("");
-        StringUtils::Trim(value);
-        StringUtils::TrimRight(value, ",");
-        StringUtils::Replace(value, "444", "4:4:4");
-        StringUtils::Replace(value, "422", "4:2:2");
-        StringUtils::Replace(value, "420", "4:2:0");
-        StringUtils::Replace(value, ",", ", ");
+        value = "";
       }
       else
       {
-        value = "";
+        StringUtils::Replace(cs, "YUV444", "4:4:4");
+        StringUtils::Replace(cs, "YUV422", "4:2:2");
+        StringUtils::Replace(cs, "YUV420", "4:2:0");
+        value = cs + ", " + cd;
       }
       return true;
     }
