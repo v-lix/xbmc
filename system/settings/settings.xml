@@ -3391,6 +3391,11 @@
             <formatlabel>38009</formatlabel>
           </control>
         </setting>
+        <setting id="audiooutput.ignoredownmixmetadata" type="boolean" label="38027" help="38028">
+          <level>2</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
         <setting id="audiooutput.lowlatency" type="boolean" label="295" help="36441">
           <level>2</level>
           <default>true</default>
