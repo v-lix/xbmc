@@ -11,6 +11,8 @@
 #include "windowing/VideoSync.h"
 #include "guilib/DispResource.h"
 
+#include <cstdint>
+
 class CVideoSyncAML : public CVideoSync, IDispResource
 {
 public:
@@ -23,4 +25,6 @@ public:
   virtual void OnResetDisplay()override;
 private:
   volatile bool m_abort;
+  int m_fbFd{-1};
+  int64_t m_lastKernelTs{0};
 };
