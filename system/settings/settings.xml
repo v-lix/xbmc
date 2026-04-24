@@ -4593,6 +4593,12 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
+        <setting id="coreelec.amlogic.usedisplayasclock" type="boolean" label="14298" help="14299">
+          <requirement>HAVE_AMCODEC</requirement>
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
       </group>
     </category>
     <category id="cache" label="439" help="36399">

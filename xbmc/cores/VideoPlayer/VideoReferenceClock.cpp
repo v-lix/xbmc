@@ -46,8 +46,14 @@ CVideoReferenceClock::~CVideoReferenceClock()
 
 void CVideoReferenceClock::Start()
 {
-  if (!IsRunning())
-    Create();
+  if (IsRunning())
+    return;
+
+  const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  if (settings && !settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK))
+    return;
+
+  Create();
 }
 
 void CVideoReferenceClock::UpdateClock(int NrVBlanks, uint64_t time)

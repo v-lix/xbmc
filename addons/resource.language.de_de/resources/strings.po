@@ -6862,6 +6862,14 @@ msgctxt "#14297"
 msgid "Use this option to disable Dolby Vision support if available."
 msgstr "Diese Option verwenden, um die Dolby Vision-Unterstützung zu deaktivieren, sofern verfügbar."
 
+msgctxt "#14298"
+msgid "Use display vsync as playback reference clock"
+msgstr "Display-VSync als Wiedergabe-Referenztakt verwenden"
+
+msgctxt "#14299"
+msgid "Drive the playback reference clock from real HDMI vsync events instead of the system clock. Improves timing accuracy and reduces micro-hitches. Disable to fall back to the legacy system-clock based timing."
+msgstr "Steuert den Wiedergabe-Referenztakt anhand echter HDMI-VSync-Ereignisse statt der Systemuhr. Verbessert die Genauigkeit der Frame-Synchronisation und reduziert kleine Ruckler. Deaktivieren, um auf das ältere systemuhrbasierte Timing zurückzufallen."
+
 msgctxt "#14280"
 msgid "Maintenance"
 msgstr "Wartung"
