@@ -136,7 +136,9 @@ void CVideoReferenceClock::UpdateClockInternal(int NrVBlanks, bool CheckMissed)
   {
     m_MissedVblanks += NrVBlanks;      //tell the vblank clock how many vblanks it missed
     m_TotalMissedVblanks += NrVBlanks; //for the codec information screen
-    m_VblankTime += m_SystemFrequency * static_cast<int64_t>(NrVBlanks) / MathUtils::round_int(m_RefreshRate); //set the vblank time forward
+    // double divide so fractional rates (23.976/29.97/59.94) don't round up to integer
+    m_VblankTime += static_cast<int64_t>(
+        static_cast<double>(m_SystemFrequency) / m_RefreshRate * NrVBlanks);
   }
 
   if (NrVBlanks > 0) //update the clock with the adjusted frequency if we have any vblanks
