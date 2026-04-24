@@ -46,7 +46,8 @@ CVideoReferenceClock::~CVideoReferenceClock()
 
 void CVideoReferenceClock::Start()
 {
-  return;
+  if (!IsRunning())
+    Create();
 }
 
 void CVideoReferenceClock::UpdateClock(int NrVBlanks, uint64_t time)
