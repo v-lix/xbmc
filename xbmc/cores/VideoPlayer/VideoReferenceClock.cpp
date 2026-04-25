@@ -267,7 +267,9 @@ double CVideoReferenceClock::GetRefreshRate(double* interval /*= NULL*/)
 //increase that by 30% to allow for errors
 int64_t CVideoReferenceClock::TimeOfNextVblank() const
 {
-  return m_VblankTime + (m_SystemFrequency / MathUtils::round_int(m_RefreshRate) * MAXVBLANKDELAY / 10LL);
+  // double divide for fractional-rate precision; consistent with UpdateClockInternal
+  return m_VblankTime + static_cast<int64_t>(
+      static_cast<double>(m_SystemFrequency) / m_RefreshRate * MAXVBLANKDELAY / 10.0);
 }
 
 //for the codec information screen
