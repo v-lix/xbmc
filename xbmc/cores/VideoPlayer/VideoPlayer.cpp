@@ -2456,11 +2456,33 @@ bool CVideoPlayer::CheckContinuity(CCurrentStream& current, DemuxPacket* pPacket
   const double backwardThreshold = DVD_MSEC_TO_TIME(hasDTSClassic ? 1000 : 500);
   if (pPacket->dts + backwardThreshold < current.dts_end())
   {
-    CLog::Log(
-        LOGDEBUG,
-        "CVideoPlayer::CheckContinuity - resync backward :{}, prev:{:f}, curr:{:f}, diff:{:f}",
-        current.type, current.dts, pPacket->dts, pPacket->dts - current.dts);
-    correction = pPacket->dts - current.dts_end();
+    // At stream open the demuxer can emit packets whose DTS reflects the H.264
+    // reorder buffer (up to ~bframes × frame_period — ~680ms for x264 with
+    // bframes=16 b_pyramid=2 at 25fps) before the stream-start packet with
+    // DTS≈0 arrives. That looks like a backward resync but is just the
+    // encoder's reorder buffer normalising; applying a correction here drops
+    // a PTS discontinuity into the audio queue that already holds
+    // pre-correction packets, and ActiveAE::SyncStream then thrashes on it
+    // for several seconds (audible IEC bitstream glitches on passthrough).
+    // Real seeks always FlushBuffers, which resets current.packets to 0 —
+    // so this gate distinguishes "stream just opened" from "stream seeked".
+    const bool isStreamStartReorderArtefact =
+        current.packets < 64 && pPacket->dts < DVD_MSEC_TO_TIME(100);
+    if (isStreamStartReorderArtefact)
+    {
+      CLog::Log(LOGDEBUG,
+                "CVideoPlayer::CheckContinuity - stream-start reorder :{}, "
+                "prev:{:f}, curr:{:f}, diff:{:f}",
+                current.type, current.dts, pPacket->dts, pPacket->dts - current.dts);
+    }
+    else
+    {
+      CLog::Log(
+          LOGDEBUG,
+          "CVideoPlayer::CheckContinuity - resync backward :{}, prev:{:f}, curr:{:f}, diff:{:f}",
+          current.type, current.dts, pPacket->dts, pPacket->dts - current.dts);
+      correction = pPacket->dts - current.dts_end();
+    }
   }
   else if(pPacket->dts < current.dts)
   {
