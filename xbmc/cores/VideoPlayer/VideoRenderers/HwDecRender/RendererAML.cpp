@@ -172,6 +172,12 @@ bool CRendererAML::Flush(bool saveBuffers)
 
 void CRendererAML::RenderUpdate(int index, int index2, bool clear, unsigned int flags, unsigned int alpha)
 {
+  // The Amlogic hardware video plane always shows the full decoded frame.
+  // Force stereo view OFF before ManageRenderArea so any leftover stereo
+  // state from a previous render pass can't leave the GUI render context
+  // in a half-viewport configuration on the next GUI flip — that produces
+  // a stale-framebuffer row at the screen edge (grey line) on first play.
+  CServiceBroker::GetWinSystem()->GetGfxContext().SetStereoView(RENDER_STEREO_VIEW_OFF);
   ManageRenderArea();
 
   CVideoBuffer* videoBuffer = m_buffers[index].videoBuffer;
