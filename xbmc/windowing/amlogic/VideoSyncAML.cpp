@@ -92,13 +92,21 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
         if (kernelTs > 0 && kernelTs != m_lastKernelTs)
         {
           int countVSyncs = 1;
+          int64_t deltaNs = 0;
           if (m_lastKernelTs > 0 && expectedIntervalNs > 0)
           {
-            const int64_t deltaNs = kernelTs - m_lastKernelTs;
+            deltaNs = kernelTs - m_lastKernelTs;
             countVSyncs = static_cast<int>(
                 (deltaNs + expectedIntervalNs / 2) / expectedIntervalNs);
             if (countVSyncs < 1)
               countVSyncs = 1;
+          }
+          if (countVSyncs > 1)
+          {
+            CLog::Log(LOGDEBUG,
+                      "CVideoSyncAML: caught up {} vsyncs (deltaNs={}, "
+                      "expectedNs={})",
+                      countVSyncs, deltaNs, expectedIntervalNs);
           }
           m_lastKernelTs = kernelTs;
           numVBlanks += static_cast<uint64_t>(countVSyncs);
@@ -106,6 +114,10 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
           continue;
         }
         // kernelTs == 0 when VD1 is powered down: drop to legacy path
+        if (kernelTs == 0)
+          CLog::Log(LOGDEBUG, "CVideoSyncAML: ioctl returned ts=0 (VD1 off?), legacy fallback");
+        else
+          CLog::Log(LOGDEBUG, "CVideoSyncAML: ioctl ts unchanged ({}), legacy fallback", kernelTs);
       }
       else
       {

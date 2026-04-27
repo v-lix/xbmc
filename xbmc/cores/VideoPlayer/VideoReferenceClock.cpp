@@ -135,8 +135,19 @@ void CVideoReferenceClock::UpdateClockInternal(int NrVBlanks, bool CheckMissed)
           "CVideoReferenceClock: detected {} vblanks, missed {}, refreshrate might have changed",
           NrVBlanks, m_MissedVblanks);
 
+    const int origNr = NrVBlanks;
+    const int origMissed = m_MissedVblanks;
     NrVBlanks -= m_MissedVblanks; //subtract the vblanks we missed
     m_MissedVblanks = 0;
+    if (NrVBlanks <= 0)
+    {
+      // real vsync arrived but synthesized vblanks already ate the budget;
+      // m_CurrTime won't advance on this real tick.
+      CLog::Log(LOGDEBUG,
+                "CVideoReferenceClock: UpdateClock skipped advance "
+                "(NrVBlanks={} - missed={} = {})",
+                origNr, origMissed, NrVBlanks);
+    }
   }
   else
   {
@@ -180,10 +191,22 @@ int64_t CVideoReferenceClock::GetTime(bool interpolated /* = true*/)
     Now = CurrentHostCounter();        //get current system time
     NextVblank = TimeOfNextVblank();   //get time when the next vblank should happen
 
+    int synth = 0;
+    const int64_t stale_us = (Now > m_VblankTime)
+        ? (Now - m_VblankTime) * 1'000'000 / m_SystemFrequency
+        : 0;
     while(Now >= NextVblank)  //keep looping until the next vblank is in the future
     {
       UpdateClockInternal(1, false); //update clock when next vblank should have happened already
       NextVblank = TimeOfNextVblank(); //get time when the next vblank should happen
+      ++synth;
+    }
+    if (synth > 1)
+    {
+      CLog::Log(LOGDEBUG,
+                "CVideoReferenceClock: GetTime synthesis fired {} iterations "
+                "(stale_us={}, missed={}, total_missed={})",
+                synth, stale_us, m_MissedVblanks, m_TotalMissedVblanks);
     }
 
     if (interpolated)
