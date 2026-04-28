@@ -68,22 +68,47 @@ bool CVideoSyncAML::Setup()
 
 void CVideoSyncAML::Run(CEvent& stopEvent)
 {
-  const double fps = (m_fps > 1.0f) ? static_cast<double>(m_fps) : 60.0;
-  const double frameIntervalUs = 1'000'000.0 / fps;
-  const int64_t expectedIntervalNs = static_cast<int64_t>(1'000'000'000.0 / fps);
-
   // steady_clock so NTP wall-clock jumps don't corrupt elapsed math
-  const auto startTs = std::chrono::steady_clock::now();
+  auto startTs = std::chrono::steady_clock::now();
   uint64_t numVBlanks = 0;
-
-  const auto legacyTimeout = std::chrono::microseconds(
-      static_cast<int64_t>(std::max(8000.0, 3.0 * frameIntervalUs)));
 
   /* This shouldn't be very busy and timing is important so increase priority */
   CThread::GetCurrentThread()->SetPriority(ThreadPriority::ABOVE_NORMAL);
 
+  // Default to 60Hz until the first valid GfxContext fps read.
+  double last_fps = 0.0;
+  double frameIntervalUs = 1'000'000.0 / 60.0;
+  int64_t expectedIntervalNs = static_cast<int64_t>(1'000'000'000.0 / 60.0);
+  auto legacyTimeout = std::chrono::microseconds(
+      static_cast<int64_t>(std::max(8000.0, 3.0 * frameIntervalUs)));
+
   while (!stopEvent.Signaled() && !m_abort)
   {
+    // Refresh fps each loop from GfxContext so display mode switches mid-Run
+    // (e.g. GUI 60Hz → 1080p25 for PAL playback) take effect without needing
+    // the framework to call OnResetDisplay. Otherwise expectedIntervalNs is
+    // frozen at whatever fps the thread started with, and the kernel-ts
+    // catch-up math interprets every real vsync as multiple vblanks.
+    const double cur_fps = static_cast<double>(
+        CServiceBroker::GetWinSystem()->GetGfxContext().GetFPS());
+    if (cur_fps != last_fps && cur_fps > 1.0)
+    {
+      frameIntervalUs = 1'000'000.0 / cur_fps;
+      expectedIntervalNs = static_cast<int64_t>(1'000'000'000.0 / cur_fps);
+      legacyTimeout = std::chrono::microseconds(
+          static_cast<int64_t>(std::max(8000.0, 3.0 * frameIntervalUs)));
+      // Reset the legacy-path baseline so its elapsedUs / frameIntervalUs
+      // estimate starts fresh after a rate change.
+      startTs = std::chrono::steady_clock::now();
+      numVBlanks = 0;
+      m_lastKernelTs = 0;
+      if (last_fps > 0.0)
+        CLog::Log(LOGDEBUG,
+                  "CVideoSyncAML: fps changed {:.3f} → {:.3f}, reset clock",
+                  last_fps, cur_fps);
+      last_fps = cur_fps;
+    }
+
     if (m_fbFd >= 0)
     {
       int64_t kernelTs = 0;
