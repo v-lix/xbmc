@@ -353,19 +353,28 @@ bool aml_display_support_dv()
   return support_dv;
 }
 
-bool aml_display_support_12bit()
+bool aml_display_support_12bit(int force_cs)
 {
-  // Require 12-bit on at least one non-4:2:0 chroma.  420-only 12-bit is
-  // too restricted: with no explicit CS in attr the kernel picks its own
-  // chroma (typically 422/444 for HDR10), and landing on a CS the TV
-  // doesn't support at 12-bit produces a broken signal or 8-bit fallback.
+  // CS-aware EDID gate for the 12-bit Deep Color toggle.  force_cs uses the
+  // same indexing as SETTING_COREELEC_AMLOGIC_FORCE_CS: 0=Auto, 1=rgb,
+  // 2=420, 3=422, 4=444.  When the user has an explicit chroma we verify
+  // 12-bit is listed for *that* chroma — otherwise injecting "<cs>,12bit"
+  // would produce a broken signal on TVs that only support 12-bit on a
+  // different chroma.  When on Auto we inject "422,12bit" ourselves, so
+  // require 422,12bit support; per HDMI spec a TV that supports 4:2:2 at
+  // all always lists 422,12bit (kernel's dc_cap show: hdmi_tx_main.c:3502).
   CSysfsPath dc_cap{"/sys/class/amhdmitx/amhdmitx0/dc_cap"};
   if (!dc_cap.Exists())
     return false;
   std::string valstr = dc_cap.Get<std::string>().value();
-  return (valstr.find("444,12bit") != std::string::npos) ||
-         (valstr.find("422,12bit") != std::string::npos) ||
-         (valstr.find("rgb,12bit")  != std::string::npos);
+  switch (force_cs)
+  {
+    case 1: return valstr.find("rgb,12bit") != std::string::npos;
+    case 2: return valstr.find("420,12bit") != std::string::npos;
+    case 3: return valstr.find("422,12bit") != std::string::npos;
+    case 4: return valstr.find("444,12bit") != std::string::npos;
+    default: return valstr.find("422,12bit") != std::string::npos;
+  }
 }
 
 bool aml_display_support_3d()
@@ -722,7 +731,9 @@ unsigned int aml_dv_on(unsigned int mode)
   // 12-bit.  For VS10 non-IPT the HDMI TX dither bit does apply, so we
   // keep the EDID 12-bit gate there to avoid dither noise on a 10-bit wire.
   bool dv_deep_color = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
-                    && (!dv_non_ipt || aml_display_support_12bit());
+                    && (!dv_non_ipt
+                        || aml_display_support_12bit(
+                             settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS)));
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_deep_color", dv_deep_color);
 
   // Enable HDR10 metadata injection for DV LL output (VP/HDR modes)
@@ -861,7 +872,7 @@ unsigned int aml_dv_on(unsigned int mode)
       const std::string force_cs_str[] = { "rgb", "420", "422", "444" };
       const std::string limit_cd_str[] = { "8bit", "10bit", "12bit", "16bit" };
       const bool deep_color = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
-                           && aml_display_support_12bit();
+                           && aml_display_support_12bit(force_cs);
       std::string fmt_attr;
       if (force_cs > 0)
         fmt_attr += force_cs_str[force_cs - 1];

@@ -137,10 +137,10 @@ bool write_resolution_ini(RESOLUTION_INFO res)
     // wins.  4:2:2 is picked over 4:4:4 to sidestep the kernel's 4K50/60
     // 4:4:4 → 8-bit bandwidth clamp; chroma-detail loss vs 4:4:4 is
     // imperceptible on video.  Toggle off / EDID gate fails: prior behaviour.
-    const bool deep_color = settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
-                         && aml_display_support_12bit();
     const int cur_force_cs = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS);
     const int cur_limit_cd = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD);
+    const bool deep_color = settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
+                         && aml_display_support_12bit(cur_force_cs);
     if (cur_force_cs > 0)
       fmt_attr += std::string(force_cs[cur_force_cs - 1] + ",").c_str();
     else if (deep_color)
