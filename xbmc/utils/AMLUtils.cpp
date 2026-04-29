@@ -850,24 +850,29 @@ unsigned int aml_dv_on(unsigned int mode)
       // corruption (purple/green playback).  Write user's colour settings
       // and trigger mode re-evaluation in one atomic attr write (separate
       // writes don't work: "now" overwrites fmt_attr).
+      // Mirror the native path's 12-bit Deep Color logic (see
+      // DisplaySettings::write_resolution_ini): toggle forces 12-bit on the
+      // depth axis; injects 4:2:2 on chroma only when force_cs is Auto.
+      // Rarely fires here because aml_kodi_set_cd_cs(1) for Player-LED VS10
+      // already forced force_cs/limit_cd before this branch runs — covers the
+      // edge cases (e.g. DV→SDR outside Player-LED) for consistency.
       int force_cs = settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS);
       int limit_cd = settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD);
       const std::string force_cs_str[] = { "rgb", "420", "422", "444" };
       const std::string limit_cd_str[] = { "8bit", "10bit", "12bit", "16bit" };
+      const bool deep_color = settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
+                           && aml_display_support_12bit();
       std::string fmt_attr;
       if (force_cs > 0)
         fmt_attr += force_cs_str[force_cs - 1];
-      if (limit_cd > 0) {
-        if (!fmt_attr.empty()) fmt_attr += ",";
-        fmt_attr += limit_cd_str[limit_cd - 1];
-      } else if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
-                 && aml_display_support_12bit()) {
-        // User left CD on Auto and requested the 12-bit Deep Color pipeline.
-        // Writing "12bit" opts out of the kernel's Auto-depth loop and its
-        // 4K60 4:4:4 bandwidth clamp to 8-bit; EDID-gated so we fall back to
-        // plain Auto when the sink can't accept 12-bit on a non-420 chroma.
+      else if (deep_color)
+        fmt_attr += "422";
+      if (deep_color) {
         if (!fmt_attr.empty()) fmt_attr += ",";
         fmt_attr += "12bit";
+      } else if (limit_cd > 0) {
+        if (!fmt_attr.empty()) fmt_attr += ",";
+        fmt_attr += limit_cd_str[limit_cd - 1];
       }
       if (!fmt_attr.empty()) fmt_attr += ",";
       fmt_attr += "now";

@@ -130,13 +130,25 @@ bool write_resolution_ini(RESOLUTION_INFO res)
     ofs << "frac_rate_policy=" << std::to_string((res.fRefreshRate == floor(res.fRefreshRate)) ? 0 : 1).c_str() << "\n";
     ofs << "native_4k_gui=" << std::to_string(nativeGui).c_str() << "\n";
     ofs << "hdmitx=";
-    if (settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS) > 0)
-      fmt_attr += std::string(force_cs[settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS) - 1] + ",").c_str();
-    if (settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD) > 0)
-      fmt_attr += limit_cd[settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD) - 1].c_str();
-    else if (settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
-             && aml_display_support_12bit())
+    // 12-bit Deep Color pipeline (when on + EDID supports 12-bit on a non-420
+    // chroma): the toggle's name promises 12-bit, so it forces the depth axis
+    // regardless of the user's limit_cd; on the chroma axis it injects 4:2:2
+    // only when the user left force_cs on Auto, an explicit user CS choice
+    // wins.  4:2:2 is picked over 4:4:4 to sidestep the kernel's 4K50/60
+    // 4:4:4 → 8-bit bandwidth clamp; chroma-detail loss vs 4:4:4 is
+    // imperceptible on video.  Toggle off / EDID gate fails: prior behaviour.
+    const bool deep_color = settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT)
+                         && aml_display_support_12bit();
+    const int cur_force_cs = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS);
+    const int cur_limit_cd = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD);
+    if (cur_force_cs > 0)
+      fmt_attr += std::string(force_cs[cur_force_cs - 1] + ",").c_str();
+    else if (deep_color)
+      fmt_attr += "422,";
+    if (deep_color)
       fmt_attr += "12bit";
+    else if (cur_limit_cd > 0)
+      fmt_attr += limit_cd[cur_limit_cd - 1].c_str();
     ofs << fmt_attr.c_str() << "\n";
     CSysfsPath("/sys/class/amhdmitx/amhdmitx0/attr", fmt_attr);
     ofs << "allfmt_names=" << allfmt_names.c_str() << "\n";
