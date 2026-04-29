@@ -2466,7 +2466,11 @@ bool CVideoPlayer::CheckContinuity(CCurrentStream& current, DemuxPacket* pPacket
     // for several seconds (audible IEC bitstream glitches on passthrough).
     // Real seeks always FlushBuffers, which resets current.packets to 0 —
     // so this gate distinguishes "stream just opened" from "stream seeked".
+    // Scoped to H.264 video to match the reproduced root cause; other codecs
+    // hit the outer 500ms threshold only in genuine resync cases.
     const bool isStreamStartReorderArtefact =
+        current.type == STREAM_VIDEO &&
+        current.hint.codec == AV_CODEC_ID_H264 &&
         current.packets < 64 && pPacket->dts < DVD_MSEC_TO_TIME(100);
     if (isStreamStartReorderArtefact)
     {
