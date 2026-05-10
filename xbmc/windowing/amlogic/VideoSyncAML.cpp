@@ -103,9 +103,17 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
       numVBlanks = 0;
       m_lastKernelTs = 0;
       if (last_fps > 0.0)
+      {
         CLog::Log(LOGDEBUG,
                   "CVideoSyncAML: fps changed {:.3f} → {:.3f}, reset clock",
                   last_fps, cur_fps);
+        // Also refresh VideoReferenceClock::m_RefreshRate so UpdateInterval()
+        // advances m_CurrTime by the correct ns-per-vblank for the new rate.
+        // Without this, m_RefreshRate stays at whatever the rate was at
+        // Setup time and m_CurrTime drifts; audio resampler corrects via
+        // SetSpeed but the transition can produce visible micro-stutter.
+        m_refClock->UpdateRefreshrate();
+      }
       last_fps = cur_fps;
     }
 
