@@ -4059,6 +4059,21 @@ bool CVideoPlayer::OpenVideoStream(CDVDStreamInfo& hint, bool reset)
     {
       const CStereoscopicsManager &stereoscopicsManager = gui->GetStereoscopicsManager();
       hint.stereo_mode = stereoscopicsManager.DetectStereoModeByString(m_item.GetPath());
+
+      // Filename-detected stereo files bypass DVDDemuxFFmpeg::SelectAspect,
+      // so hint.aspect stays as the full-frame DAR.  For full-SBS/TAB this
+      // is double the per-eye DAR; the renderer needs per-eye to fit one
+      // view into the halved viewport.  Width/height-based heuristic is
+      // safe here because no MKV stereo_mode tag is present (we only enter
+      // this branch when hint.stereo_mode was empty), so there's no SAR
+      // scaling from the container's DisplayWidth tag to interfere.
+      if (!hint.stereo_mode.empty() && hint.width > 0 && hint.height > 0 && hint.aspect > 0.0)
+      {
+        if (hint.stereo_mode == "left_right" || hint.stereo_mode == "right_left")
+          hint.aspect /= (hint.width / 1920.0);
+        else if (hint.stereo_mode == "top_bottom" || hint.stereo_mode == "bottom_top")
+          hint.aspect *= (hint.height / 1080.0);
+      }
     }
   }
 
