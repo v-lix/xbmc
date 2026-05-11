@@ -439,6 +439,8 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int GetLimitCDPrevVal() const;
     int m_limitCDPrevVal{0};
 
+    std::string m_dvCustomVsvdb; // Stores raw hex string from advancedsettings.xml ex : "EB0146D0..."
+
   private:
     void Initialize();
     void Clear();
