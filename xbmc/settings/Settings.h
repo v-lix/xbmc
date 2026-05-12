@@ -468,6 +468,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_FORCE_CS = "coreelec.amlogic.forcecs";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING = "coreelec.amlogic.disableguiscaling";
   static constexpr auto SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK = "coreelec.amlogic.usedisplayasclock";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_FAST_SEEK = "coreelec.amlogic.fastseek";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_TV_PRESET = "coreelec.amlogic.dolbyvision.tv.preset";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_MODE = "coreelec.amlogic.dolbyvision.mode";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE = "coreelec.amlogic.dolbyvision.mode.on.luminance";

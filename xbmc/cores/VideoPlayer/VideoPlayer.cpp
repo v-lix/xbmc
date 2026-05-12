@@ -2167,12 +2167,17 @@ void CVideoPlayer::HandlePlaySpeed()
           }
           else if (videoClock < clock)
           {
-            // Video starts before audio. This typically happens after a chapter skip
-            // where the video decoder outputs key-frame references (earlier PTS) while
-            // audio starts at the chapter position. For passthrough audio, pulling the
-            // clock back creates a large timing gap that ActiveAE can only correct very
-            // slowly (~20ms per TrueHD MAT frame), causing audible dropouts lasting
-            // several seconds. Cap the pullback to 2 seconds to avoid this.
+            // Video starts before audio. After a seek the demuxer hands the
+            // decoder a key-frame at or before the seek target while audio
+            // starts at the target itself, so videoClock can sit up to a full
+            // GOP behind. Pulling the master clock back to videoClock either
+            // makes ActiveAE crawl forward one passthrough frame at a time
+            // (TrueHD/AC3 — audible multi-second dropouts) or leaves decoded
+            // audio queued waiting for the clock to advance to its PTS
+            // (multi-second silence). Cap at 2s so the clock stays anchored
+            // on the audio seek target; the late-frame drop in
+            // VideoPlayerVideo::OutputPicture then prevents the renderer
+            // from presenting the pre-target reference frames.
             if ((clock - videoClock) > DVD_SEC_TO_TIME(2))
             {
               CLog::Log(LOGDEBUG, "VideoPlayer::Sync - video start {:.3f}s behind audio, "
@@ -3724,10 +3729,22 @@ void CVideoPlayer::SeekTime(int64_t iTime)
 {
   int64_t seekOffset = iTime - GetTime();
 
+  // Fast (keyframe-accurate) seek toggle. When on, accurate=false tells the
+  // pipeline not to drop pre-target packets in CheckPlayerInit — audio
+  // anchors at the demuxer's keyframe landing time instead of the seek
+  // target, matching video. Result: clean snap to keyframe with both
+  // streams in sync, at the cost of landing up to one GOP-length earlier
+  // than requested. Off restores frame-accurate seek and its fast-forward
+  // catch-up window on hardware decoders that can't fast-decode pre-target
+  // frames (AML hwdec).
+  const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  const bool fastSeek =
+      settings && settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_FAST_SEEK);
+
   CDVDMsgPlayerSeek::CMode mode;
   mode.time = static_cast<double>(iTime);
   mode.backward = true;
-  mode.accurate = true;
+  mode.accurate = !fastSeek;
   mode.trickplay = false;
   mode.sync = true;
 

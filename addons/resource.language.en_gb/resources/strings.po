@@ -8826,7 +8826,19 @@ msgctxt "#14304"
 msgid "RDS Radio"
 msgstr ""
 
-#empty strings from id 14305 to 15010
+#. CoreELEC: Amlogic fast (keyframe-accurate) seek toggle
+#: system/settings/settings.xml
+msgctxt "#14305"
+msgid "Fast (keyframe-accurate) seeking"
+msgstr ""
+
+#. CoreELEC: Amlogic fast seek help
+#: system/settings/settings.xml
+msgctxt "#14306"
+msgid "Seek to the nearest video keyframe instead of the exact requested time. With hardware decoding, frame-accurate seeking has to decode a full GOP of pre-target frames before reaching the requested time, which is visible as a brief fast-forward or stutter after seek. Keyframe seeking lands up to one GOP-length earlier than requested but plays smoothly. Disable for frame-accurate seeking at the cost of post-seek catch-up artefacts."
+msgstr ""
+
+#empty strings from id 14307 to 15010
 
 #: xbmc/music/MusicDatabase.cpp
 #: xbmc/video/VideoDatabase.cpp

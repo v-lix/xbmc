@@ -6898,6 +6898,14 @@ msgctxt "#14304"
 msgid "RDS Radio"
 msgstr "RDS-Radio"
 
+msgctxt "#14305"
+msgid "Fast (keyframe-accurate) seeking"
+msgstr "Schnelles Spulen (Keyframe-genau)"
+
+msgctxt "#14306"
+msgid "Seek to the nearest video keyframe instead of the exact requested time. With hardware decoding, frame-accurate seeking has to decode a full GOP of pre-target frames before reaching the requested time, which is visible as a brief fast-forward or stutter after seek. Keyframe seeking lands up to one GOP-length earlier than requested but plays smoothly. Disable for frame-accurate seeking at the cost of post-seek catch-up artefacts."
+msgstr "Beim Spulen zum nächsten Video-Keyframe springen statt zur exakt angeforderten Zeit. Bei Hardware-Dekodierung muss bildgenaues Spulen ein vollständiges GOP an Frames vor dem Ziel dekodieren, bevor der gewünschte Punkt erreicht wird — sichtbar als kurzer Schnellvorlauf oder Ruckler nach dem Spulen. Keyframe-Spulen landet bis zu eine GOP-Länge früher als gewünscht, läuft aber flüssig. Deaktivieren für bildgenaues Spulen zum Preis von Aufhol-Artefakten nach dem Spulen."
+
 msgctxt "#14424"
 msgid "Dolby Vision Led mode"
 msgstr "Dolby Vision LED-Modus"
