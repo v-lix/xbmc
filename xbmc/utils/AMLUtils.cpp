@@ -2546,6 +2546,49 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
   return resolutions.size() > 0;
 }
 
+bool aml_display_mode_changing(const RESOLUTION_INFO &res)
+{
+  // Mirror aml_set_display_resolution()'s mode-string derivation so we can
+  // tell up-front whether it would actually write to /sys/class/display/mode
+  // (or flip frac_rate_policy). Used to skip the post-mode-switch reset
+  // delay when the HDMI mode isn't really changing (e.g. DV pipeline
+  // transitions on live-TV channel zaps with GUI already at the target rate).
+  std::string mode = res.strId.c_str();
+  std::vector<std::string> _mode = StringUtils::Split(mode, ' ');
+  if (_mode.size() > 1)
+    mode = _mode[0];
+
+  CSysfsPath amhdmitx0_custom_mode{"/sys/class/amhdmitx/amhdmitx0/custom_mode"};
+  if (amhdmitx0_custom_mode.Exists())
+  {
+    std::string custom_mode = amhdmitx0_custom_mode.Get<std::string>().value();
+    if (custom_mode == mode)
+      mode = "custombuilt";
+  }
+
+  CSysfsPath display_mode{"/sys/class/display/mode"};
+  if (!display_mode.Exists())
+    return true;
+
+  std::string cur_mode = display_mode.Get<std::string>().value();
+  if (cur_mode != mode)
+    return true;
+
+  if (aml_has_frac_rate_policy())
+  {
+    int fractional_rate = (res.fRefreshRate == floor(res.fRefreshRate)) ? 0 : 1;
+    CSysfsPath frac_rate_policy{"/sys/class/amhdmitx/amhdmitx0/frac_rate_policy"};
+    if (frac_rate_policy.Exists())
+    {
+      int cur_fractional_rate = frac_rate_policy.Get<int>().value();
+      if (cur_fractional_rate != fractional_rate)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuffer_name,
   bool force_mode_switch)
 {
