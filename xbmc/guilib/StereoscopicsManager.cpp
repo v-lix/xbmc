@@ -28,6 +28,7 @@
 #include "messaging/ApplicationMessenger.h"
 #include "rendering/RenderSystem.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/DisplaySettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "settings/lib/Setting.h"
@@ -37,6 +38,8 @@
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 #include "utils/log.h"
+#include "windowing/GraphicContext.h"
+#include "windowing/WinSystem.h"
 
 #include <stdlib.h>
 
@@ -642,7 +645,13 @@ void CStereoscopicsManager::OnPlaybackStopped(void)
   RENDER_STEREO_MODE mode = GetStereoMode();
 
   if (m_settings->GetBool(CSettings::SETTING_VIDEOPLAYER_QUITSTEREOMODEONSTOP) && mode != RENDER_STEREO_MODE_OFF)
+  {
     SetStereoMode(RENDER_STEREO_MODE_OFF);
+    // Force a window rebuild so platform stereo state (AMLogic kernel
+    // 3D flag, packed framebuffer height) follows the GUI mode change.
+    CServiceBroker::GetWinSystem()->GetGfxContext().SetVideoResolution(
+        CDisplaySettings::GetInstance().GetCurrentResolution(), true);
+  }
 
   // reset user modes on playback end to start over new on next playback and not end up in a probably unwanted mode
   if (m_stereoModeSetByUser != RENDER_STEREO_MODE_OFF)
