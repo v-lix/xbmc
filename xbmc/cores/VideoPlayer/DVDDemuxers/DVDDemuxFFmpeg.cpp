@@ -1725,8 +1725,11 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
             st->iFpsRate  = pStream->time_base.den;
             st->iFpsScale = pStream->time_base.num;
           }
-          else
+          else if (fps <= 30.5f)
             st->iFpsRate  *= 2;
+          // else: avg_frame_rate is already the field rate (e.g. HEVC 1080i
+          // reporting 50/1, some MBAFF H.264); doubling again would yield
+          // 100fps for 1080i25.
 
           st->bInterlaced = true;
         }

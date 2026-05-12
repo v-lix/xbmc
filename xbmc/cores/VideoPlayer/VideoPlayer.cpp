@@ -4112,12 +4112,16 @@ bool CVideoPlayer::OpenVideoStream(CDVDStreamInfo& hint, bool reset)
       // a per-field time_base (DVDDemuxFFmpeg.cpp), so multiplying again by
       // (interlaced ? 2 : 1) here produces 100fps for 1080i25 (any codec —
       // MPEG-2 DVB, HEVC, H.264 MBAFF/PAFF). Re-derive without the interlace
-      // factor when the result exceeds plausible interlaced refresh rates.
+      // factor when the result exceeds plausible interlaced refresh rates,
+      // and halve once more in the rare case fpsrate was over-doubled at the
+      // demuxer (avg_frame_rate already at field rate + non-per-field tbn).
       if (hint.interlaced && framerate > 61.0)
       {
         framerate = DVD_TIME_BASE / CDVDCodecUtils::NormalizeFrameduration(
                                                      (double)DVD_TIME_BASE * hint.fpsscale /
                                                      hint.fpsrate);
+        if (framerate > 61.0)
+          framerate /= 2.0;
         m_processInfo->SetVideoInterlaced(true);
       }
 
