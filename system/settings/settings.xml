@@ -3358,11 +3358,11 @@
         </setting>
         <setting id="audiooutput.volumesteps" type="integer" label="1302" help="36442">
           <level>1</level>
-          <default>90</default>
+          <default>100</default>
           <constraints>
             <minimum>10</minimum>
             <step>5</step>
-            <maximum>90</maximum>
+            <maximum>100</maximum>
           </constraints>
           <control type="list" format="integer" />
         </setting>
