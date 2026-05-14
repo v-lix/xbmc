@@ -4017,6 +4017,11 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
+        <setting id="coreelec.videoplayer.detectbrokenfiles" type="boolean" label="55007" help="55008">
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
       </group>
       <group id="2" label="60001">
         <setting id="coreelec.amlogic.dolbyvision.tv.preset" type="notifyint" label="60616" help="60617">

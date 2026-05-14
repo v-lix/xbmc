@@ -22,9 +22,11 @@
 #include "cores/VideoPlayer/Interface/TimingConstants.h" // for DVD_TIME_BASE
 #include "DVDCodecs/DVDCodecUtils.h"
 #include "DemuxMVC.h"
+#include "dialogs/GUIDialogKaiToast.h"
 #include "filesystem/CurlFile.h"
 #include "filesystem/Directory.h"
 #include "filesystem/File.h"
+#include "guilib/LocalizeStrings.h"
 #include "libavutil/intreadwrite.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
@@ -174,12 +176,21 @@ static int dvd_file_read(void* h, uint8_t* buf, int size)
   if (interrupt_cb(h))
     return AVERROR_EXIT;
 
-  std::shared_ptr<CDVDInputStream> pInputStream = static_cast<CDVDDemuxFFmpeg*>(h)->m_pInput;
+  CDVDDemuxFFmpeg* demuxer = static_cast<CDVDDemuxFFmpeg*>(h);
+  std::shared_ptr<CDVDInputStream> pInputStream = demuxer->m_pInput;
+
+  if (demuxer->m_brokenFileDetected)
+    return AVERROR_EOF;
+
   int len = pInputStream->Read(buf, size);
   if (len == 0)
     return AVERROR_EOF;
-  else
-    return len;
+  return len;
+}
+
+void CDVDDemuxFFmpeg::MarkBroken()
+{
+  m_brokenFileDetected = true;
 }
 /*
 static int dvd_file_write(URLContext* h, uint8_t* buf, int size)
@@ -249,6 +260,7 @@ bool CDVDDemuxFFmpeg::Open(const std::shared_ptr<CDVDInputStream>& pInput, bool 
   m_speed = DVD_PLAYSPEED_NORMAL;
   m_program = UINT_MAX;
   m_seekToKeyFrame = false;
+  m_brokenFileDetected = false;
 
   const AVIOInterruptCB int_cb = { interrupt_cb, this };
 
@@ -1004,6 +1016,8 @@ DemuxPacket* CDVDDemuxFFmpeg::ReadInternal(bool keep)
   // on some cases where the received packet is invalid we will need to return an empty packet (0 length) otherwise the main loop (in CVideoPlayer)
   // would consider this the end of stream and stop.
   bool bReturnEmpty = false;
+  if (m_brokenFileDetected)
+    return nullptr;
   {
     std::unique_lock<CCriticalSection> lock(m_critSection); // open lock scope
     if (m_pFormatContext)
@@ -1329,7 +1343,31 @@ bool CDVDDemuxFFmpeg::SeekTime(double time, bool backwards, double* startpts)
   int ret;
   {
     std::unique_lock<CCriticalSection> lock(m_critSection);
+    // Bound av_seek_frame via ffmpeg's interrupt callback (m_timeout). A
+    // corrupt mkv cue index or a seek target past actual EOF can wedge the
+    // matroska seek scanner for tens of seconds while this thread holds the
+    // demuxer lock - blocking the player from doing anything else. Healthy
+    // seeks return in well under 15s even on slow remote sources.
+    const bool brokenFileSetting =
+        CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+            CSettings::SETTING_COREELEC_VIDEOPLAYER_DETECT_BROKEN_FILES);
+    if (brokenFileSetting)
+      m_timeout.Set(15s);
     ret = av_seek_frame(m_pFormatContext, m_seekStream, seek_pts, backwards ? AVSEEK_FLAG_BACKWARD : 0);
+    if (brokenFileSetting)
+      m_timeout.SetInfinite();
+
+    if (ret == AVERROR_EXIT && brokenFileSetting)
+    {
+      CLog::Log(LOGERROR,
+                "CDVDDemuxFFmpeg::SeekTime - av_seek_frame did not return "
+                "within 15s; treating source as broken");
+      m_brokenFileDetected = true;
+      CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Warning,
+                                            g_localizeStrings.Get(55009),
+                                            g_localizeStrings.Get(55010),
+                                            TOAST_DISPLAY_TIME * 2);
+    }
 
     if (ret < 0)
     {

@@ -732,6 +732,8 @@ bool CVideoPlayer::OpenFile(const CFileItem& file, const CPlayerOptions &options
   m_bAbortRequest = false;
   m_error = false;
   m_bCloseRequest = false;
+  m_brokenFileNotified = false;
+  m_brokenFileStallStart = {};
   m_renderManager.PreInit();
 
   Create();
@@ -2081,6 +2083,51 @@ void CVideoPlayer::HandlePlaySpeed()
         }
       }
     }
+  }
+
+  // Broken-file gate: both A/V streams stalled for 5+ seconds while we
+  // expect normal forward playback. Corrupt mkv index / mid-stream cluster
+  // breakage manifests here -- the demuxer can't produce packets but isn't
+  // returning EOF either. On some Amlogic setups this leads the kernel codec
+  // into a stall or crash; we abort early instead.
+  //
+  // (Seek-wedge variant -- av_seek_frame stuck on the same kind of corrupt
+  //  source -- is handled separately inside CDVDDemuxFFmpeg::SeekTime, since
+  //  this thread is itself blocked during that case.)
+  const bool brokenFileSetting =
+      m_pDemuxer && m_pInputStream && !m_pInputStream->IsRealtime() &&
+      m_playSpeed == DVD_PLAYSPEED_NORMAL && !tolerateStall &&
+      m_CurrentAudio.inited && m_CurrentVideo.inited &&
+      m_VideoPlayerAudio->IsStalled() && m_VideoPlayerVideo->IsStalled() &&
+      CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+          CSettings::SETTING_COREELEC_VIDEOPLAYER_DETECT_BROKEN_FILES);
+  if (brokenFileSetting)
+  {
+    const auto now = std::chrono::steady_clock::now();
+    if (m_brokenFileStallStart == std::chrono::steady_clock::time_point{})
+    {
+      m_brokenFileStallStart = now;
+    }
+    else if (now - m_brokenFileStallStart >= std::chrono::seconds(5))
+    {
+      if (!m_brokenFileNotified)
+      {
+        m_brokenFileNotified = true;
+        CLog::Log(LOGERROR,
+                  "CVideoPlayer::HandlePlaySpeed - broken file: audio and "
+                  "video both stalled for 5+ seconds during normal playback "
+                  "- stopping playback");
+        CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Warning,
+                                              g_localizeStrings.Get(55009),
+                                              g_localizeStrings.Get(55010),
+                                              TOAST_DISPLAY_TIME * 2);
+      }
+      m_pDemuxer->MarkBroken();
+    }
+  }
+  else
+  {
+    m_brokenFileStallStart = {};
   }
 
   // sync streams to clock

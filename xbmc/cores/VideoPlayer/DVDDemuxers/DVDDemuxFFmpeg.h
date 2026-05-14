@@ -115,6 +115,9 @@ public:
 
   AVFormatContext* m_pFormatContext;
   std::shared_ptr<CDVDInputStream> m_pInput;
+  bool m_brokenFileDetected = false;
+
+  void MarkBroken() override;
 
 protected:
   friend class CDemuxStreamAudioFFmpeg;

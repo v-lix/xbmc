@@ -265,6 +265,12 @@ public:
   virtual void Abort() {}
 
   /*
+   * Mark this demuxer as having delivered a broken / truncated source.
+   * Subsequent Read() calls should return EOF so the player can wrap up.
+   */
+  virtual void MarkBroken() {}
+
+  /*
    * Flush the demuxer, if any data is kept in buffers, this should be freed now
    */
   virtual void Flush() = 0;

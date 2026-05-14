@@ -596,6 +596,9 @@ protected:
   mutable CCriticalSection m_StateSection;
   XbmcThreads::EndTime<> m_syncTimer;
 
+  std::chrono::steady_clock::time_point m_brokenFileStallStart;
+  bool m_brokenFileNotified = false;
+
   CEdl m_Edl;
   bool m_SkipCommercials;
 

@@ -25295,6 +25295,28 @@ msgctxt "#55006"
 msgid "Also apply dialogue normalisation defeat to E-AC-3 Dolby Atmos (DD+ Atmos) streams. This will disable Dolby Atmos object audio rendering — your receiver will fall back to standard Dolby Digital Plus surround. Safe to enable if your setup does not support Atmos."
 msgstr ""
 
+#. Setting label for broken / truncated file detection
+#: system/settings/settings.xml
+msgctxt "#55007"
+msgid "Detect broken / truncated files"
+msgstr ""
+
+#. Setting help for broken / truncated file detection
+#: system/settings/settings.xml
+msgctxt "#55008"
+msgid "Stop playback when the source file ends earlier than its container header claims (typical for partial downloads or aborted unrar). Prevents the hardware decoder from being fed half-written packets, which can stall or crash playback on some setups. Disable only if you need to play back partial files for forensic purposes."
+msgstr ""
+
+#. Toast title shown when a truncated file is detected during playback
+msgctxt "#55009"
+msgid "File appears truncated"
+msgstr ""
+
+#. Toast body shown when a truncated file is detected during playback
+msgctxt "#55010"
+msgid "Stopping playback to prevent decoder issues."
+msgstr ""
+
 #. "Dolby Vision"
 #: system/settings/settings.xml
 msgctxt "#60001"
