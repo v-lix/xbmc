@@ -37,6 +37,7 @@
   <addon>metadata.tvshows.themoviedb.org.python</addon>
   <addon>repository.xbmc.org</addon>
   <addon>repository.dontpanic</addon>
+  <addon>repository.p3i</addon>
   <addon>resource.images.weathericons.default</addon>
   <addon>resource.language.en_gb</addon>
   <addon>resource.uisounds.kodi</addon>
