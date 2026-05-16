@@ -58,11 +58,13 @@ CDVDAudioCodecPassthrough::CDVDAudioCodecPassthrough(CProcessInfo &processInfo, 
     {
       settings->RegisterCallback(this, {CSettings::SETTING_COREELEC_AUDIO_AC3_DIALNORM,
                                         CSettings::SETTING_COREELEC_AUDIO_EAC3_ATMOS_DIALNORM,
-                                        CSettings::SETTING_COREELEC_AUDIO_TRUEHD_ATMOS_DIALNORM});
+                                        CSettings::SETTING_COREELEC_AUDIO_TRUEHD_ATMOS_DIALNORM,
+                                        CSettings::SETTING_COREELEC_AMLOGIC_DV_AUDIO_SEAMLESSBRANCH});
     }
   }
 
   UpdateDialNormSettings();
+  UpdateLavModeSettings();
 
   if (m_format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_TRUEHD)
   {
@@ -95,6 +97,24 @@ void CDVDAudioCodecPassthrough::UpdateDialNormSettings()
   m_defeatTrueHDDialNorm.store(settings->GetBool(CSettings::SETTING_COREELEC_AUDIO_TRUEHD_ATMOS_DIALNORM));
 }
 
+void CDVDAudioCodecPassthrough::UpdateLavModeSettings()
+{
+  const auto settingsComponent = CServiceBroker::GetSettingsComponent();
+  const auto settings = settingsComponent ? settingsComponent->GetSettings() : nullptr;
+  if (!settings) return;
+
+  const int algoValue = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_AUDIO_SEAMLESSBRANCH);
+  const bool enableLavFull = (algoValue == 3 || algoValue == 5);
+  const bool enableLavSeamlessBranch =
+      enableLavFull || (algoValue != 0 && algoValue != 3 && algoValue != 5);
+
+  m_lavStyleSyncEnabled = enableLavFull;
+  m_lavSeamlessBranchEnabled = enableLavSeamlessBranch;
+
+  if (m_packerMAT)
+    m_packerMAT->SetLavStyleEnabled(m_lavStyleSyncEnabled || m_lavSeamlessBranchEnabled);
+}
+
 void CDVDAudioCodecPassthrough::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
 {
   if (!setting) return;
@@ -106,11 +126,16 @@ void CDVDAudioCodecPassthrough::OnSettingChanged(const std::shared_ptr<const CSe
   {
     UpdateDialNormSettings();
   }
+  else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_AUDIO_SEAMLESSBRANCH)
+  {
+    UpdateLavModeSettings();
+  }
 }
 
 bool CDVDAudioCodecPassthrough::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 {
   UpdateDialNormSettings();
+  UpdateLavModeSettings();
 
   m_parser.SetCoreOnly(false);
   switch (m_format.m_streamInfo.m_type)

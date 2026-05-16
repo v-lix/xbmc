@@ -65,6 +65,11 @@ public:
 
 private:
   void UpdateDialNormSettings();
+  // Read the LAV-mode Kodi setting and apply it to the codec's flags. Called
+  // from Open() and from OnSettingChanged() so a runtime change (e.g. from a
+  // service addon) takes effect on the next codec re-init even if the player
+  // didn't re-run CVideoPlayerAudio::OpenStream.
+  void UpdateLavModeSettings();
 
   int GetData(uint8_t** dst);
   unsigned int PackTrueHD();
