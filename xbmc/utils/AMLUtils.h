@@ -122,6 +122,11 @@ void aml_dv_wait_video_off(int timeout);
 int aml_blackout_policy(int new_blackout);
 unsigned int aml_dv_on(unsigned int mode);
 void aml_dv_off(bool skip_hdmi_update = false);
+// Push the L5-related sysfs flags from current Kodi settings. Called from
+// aml_dv_on() at playback start, and from CDolbyVisionAML::OnSettingChanged
+// so per-folder override.ini writes that mutate L5 settings take effect mid-
+// playback instead of waiting for the next aml_dv_on().
+void aml_dv_apply_l5_sysfs();
 void aml_get_dv_cap();
 struct xbmc_dv_cap
 {

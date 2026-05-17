@@ -962,6 +962,10 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
            settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS ||
            settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA)
   {
+    // Re-push the L5 sysfs flags so per-folder override.ini writes from
+    // service.p3i.sb take effect mid-playback. Without this, an L5 toggle
+    // from Python would only land on the next aml_dv_on().
+    aml_dv_apply_l5_sysfs();
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES)

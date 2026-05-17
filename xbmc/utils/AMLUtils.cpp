@@ -596,7 +596,7 @@ void set_vsvdb_payload_ver(enum DV_TYPE dv_type, int max_lum_nits_value, int sou
 // Static flag for kernel-side 422 forcing during DV/HDR10+ playback
 static bool aml_linux_force_422 = false;
 
-unsigned int aml_dv_on(unsigned int mode)
+void aml_dv_apply_l5_sysfs()
 {
   bool dv_level5_enabled(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5));
   bool dv_source_level_5(dv_level5_enabled && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5));
@@ -610,8 +610,14 @@ unsigned int aml_dv_on(unsigned int mode)
 
   bool dv_detect_active_area(dv_level5_enabled && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA));
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detect_active_area", dv_detect_active_area);
-  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_on - L5 detect: l5_enabled={} detect_setting={} → detect={}",
-            dv_level5_enabled, dv_detect_active_area, dv_detect_active_area);
+  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_sysfs - l5_enabled={} src_l5={} osdst={} subt_mode={} detect={}",
+            dv_level5_enabled, dv_source_level_5, dv_source_level_5_osdst,
+            dv_l5_subs_signal_mode, dv_detect_active_area);
+}
+
+unsigned int aml_dv_on(unsigned int mode)
+{
+  aml_dv_apply_l5_sysfs();
 
   unsigned int xbmc_dv_vsvdb_source_lum_limit_num = 0;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_source_lum_limit_num", xbmc_dv_vsvdb_source_lum_limit_num);
