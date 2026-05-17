@@ -141,6 +141,28 @@ public:
                       if (m_append_cmv40 != value) InvalidateDoViCache();
                       m_append_cmv40 = value;
                     }
+                    // L5 active-area override pushed from
+                    // CDVDVideoCodecAmlogic when the per-folder override.ini
+                    // sets coreelec.amlogic.dolbyvision.level5.override.
+                    // All-zero values mean "no override" (a stream with truly
+                    // zero offsets has nothing to override anyway). Substituted
+                    // into doviFrame/StreamMetadata during RPU parse so the
+                    // render thread's overlay-active-area calc and downstream
+                    // consumers see the override values.
+                    void SetLevel5Override(bool active, uint16_t top, uint16_t bottom,
+                                           uint16_t left, uint16_t right) {
+                      const bool changed = (m_l5_override_active != active) ||
+                                           (m_l5_override_top != top) ||
+                                           (m_l5_override_bottom != bottom) ||
+                                           (m_l5_override_left != left) ||
+                                           (m_l5_override_right != right);
+                      if (changed) InvalidateDoViCache();
+                      m_l5_override_active = active;
+                      m_l5_override_top = top;
+                      m_l5_override_bottom = bottom;
+                      m_l5_override_left = left;
+                      m_l5_override_right = right;
+                    }
   void              SetConvertHdr10Plus(bool value) { m_convert_Hdr10Plus = value; }
   void              SetPreferCovertHdr10Plus(bool value) { m_prefer_Hdr10Plus_conversion = value; }
   void              SetConvertHdr10PlusPeakBrightnessSource(enum PeakBrightnessSource value) { m_convert_Hdr10Plus_peak_brightness_source = value; };
@@ -228,6 +250,11 @@ protected:
   enum PeakBrightnessSource m_convert_Hdr10Plus_peak_brightness_source;
   bool              m_first_frame;
   enum DOVICMv40Mode m_append_cmv40;
+  bool              m_l5_override_active{false};
+  uint16_t          m_l5_override_top{0};
+  uint16_t          m_l5_override_bottom{0};
+  uint16_t          m_l5_override_left{0};
+  uint16_t          m_l5_override_right{0};
   HDRStaticMetadataInfo m_hdrStaticMetadataInfo;
   std::vector<uint8_t> m_cached_dovi_rpu_in_nal;
   std::vector<uint8_t> m_cached_dovi_rpu_out_nal;

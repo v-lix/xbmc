@@ -353,7 +353,12 @@ inline void PopulateDoviRpuInfo(DoviRpuOpaque* opaque,
                                 double pts,
                                 CDataCacheCore& dataCacheCore,
                                 bool isDualTrack = false,
-                                DOVIFrameMetadata* outDoViFrameMetadata = nullptr)
+                                DOVIFrameMetadata* outDoViFrameMetadata = nullptr,
+                                bool l5OverrideActive = false,
+                                uint16_t l5OverrideTop = 0,
+                                uint16_t l5OverrideBottom = 0,
+                                uint16_t l5OverrideLeft = 0,
+                                uint16_t l5OverrideRight = 0)
 {
   const DoviVdrDmData* vdrDmData = dovi_rpu_get_vdr_dm_data(opaque);
 
@@ -380,6 +385,19 @@ inline void PopulateDoviRpuInfo(DoviRpuOpaque* opaque,
           vdrDmData->dm_data.level5->active_area_top_offset;
       doviFrameMetadata.level5_active_area_bottom_offset =
           vdrDmData->dm_data.level5->active_area_bottom_offset;
+    }
+
+    // Per-folder override (via coreelec.amlogic.dolbyvision.level5.override,
+    // written by service.p3i.sb). Substitute the four offsets and force
+    // has_level5_metadata so the overlay-active-area calc treats this stream
+    // as if the RPU had explicit L5 with the override values.
+    if (l5OverrideActive)
+    {
+      doviFrameMetadata.has_level5_metadata = true;
+      doviFrameMetadata.level5_active_area_top_offset = l5OverrideTop;
+      doviFrameMetadata.level5_active_area_bottom_offset = l5OverrideBottom;
+      doviFrameMetadata.level5_active_area_left_offset = l5OverrideLeft;
+      doviFrameMetadata.level5_active_area_right_offset = l5OverrideRight;
     }
 
     dataCacheCore.SetVideoDoViFrameMetadata(doviFrameMetadata);
@@ -458,6 +476,16 @@ inline void PopulateDoviRpuInfo(DoviRpuOpaque* opaque,
           vdrDmData->dm_data.level5->active_area_bottom_offset;
     }
 
+    // Per-folder L5 override (see frame-level block above for context).
+    if (l5OverrideActive)
+    {
+      doviStreamMetadata.has_level5_metadata = true;
+      doviStreamMetadata.level5_active_area_top_offset = l5OverrideTop;
+      doviStreamMetadata.level5_active_area_bottom_offset = l5OverrideBottom;
+      doviStreamMetadata.level5_active_area_left_offset = l5OverrideLeft;
+      doviStreamMetadata.level5_active_area_right_offset = l5OverrideRight;
+    }
+
     dataCacheCore.SetVideoDoViStreamMetadata(doviStreamMetadata);
     aml_dv_send_md_levels();
 
@@ -496,10 +524,18 @@ void GetDoviRpuInfo(uint8_t* nalBuf,
                     DOVIELType& doviElType,
                     AVDOVIDecoderConfigurationRecord& dovi,
                     double pts,
-                    CDataCacheCore& dataCacheCore)
+                    CDataCacheCore& dataCacheCore,
+                    bool l5OverrideActive = false,
+                    uint16_t l5OverrideTop = 0,
+                    uint16_t l5OverrideBottom = 0,
+                    uint16_t l5OverrideLeft = 0,
+                    uint16_t l5OverrideRight = 0)
 {
   DoviRpuOpaque* opaque = dovi_parse_unspec62_nalu(nalBuf, nalSize);
-  PopulateDoviRpuInfo(opaque, firstFrame, doviElType, dovi, pts, dataCacheCore);
+  PopulateDoviRpuInfo(opaque, firstFrame, doviElType, dovi, pts, dataCacheCore,
+                      false, nullptr,
+                      l5OverrideActive, l5OverrideTop, l5OverrideBottom,
+                      l5OverrideLeft, l5OverrideRight);
   dovi_rpu_free(opaque);
 }
 
@@ -1421,7 +1457,9 @@ void CBitstreamConverter::AddDoViRpuNalu(const Hdr10PlusMetadata& meta, uint8_t 
     }
 
 #ifdef HAVE_LIBDOVI
-    GetDoviRpuInfo(nalu.data(), nalu.size(), m_first_frame, m_hints.dovi_el_type, m_hints.dovi, pts, m_dataCacheCore);
+    GetDoviRpuInfo(nalu.data(), nalu.size(), m_first_frame, m_hints.dovi_el_type, m_hints.dovi, pts, m_dataCacheCore,
+                   m_l5_override_active, m_l5_override_top, m_l5_override_bottom,
+                   m_l5_override_left, m_l5_override_right);
 #endif
 
     BitstreamAllocAndCopy(poutbuf, poutbuf_size, NULL, 0, nalu.data(), nalu.size(), HEVC_NAL_UNSPEC62);
@@ -1541,7 +1579,10 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
       PopulateDoviRpuInfo(opaque, m_first_frame, m_hints.dovi_el_type,
                           m_hints.dovi, pts, m_dataCacheCore,
                           m_hints.is_dual_track,
-                          &m_cached_dovi_frame_metadata);
+                          &m_cached_dovi_frame_metadata,
+                          m_l5_override_active, m_l5_override_top,
+                          m_l5_override_bottom, m_l5_override_left,
+                          m_l5_override_right);
     }
 
     if (appended)

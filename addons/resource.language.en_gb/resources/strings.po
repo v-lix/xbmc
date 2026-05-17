@@ -25979,6 +25979,16 @@ msgctxt "#60325"
 msgid "Auto"
 msgstr ""
 
+#. Level 5 active-area override channel (written by service.p3i.sb override.ini)
+#: system/settings/settings.xml
+msgctxt "#60326"
+msgid "Level 5 active-area override"
+msgstr ""
+
+msgctxt "#60327"
+msgid "Per-folder override channel written by the seamless-branching helper addon. Format: \"top,bottom,left,right\" (unsigned ints, RPU active-area space) or empty for no override."
+msgstr ""
+
 #. "Dolby Vision Display LL Dolby VSVDB Limit"
 #: system/settings/settings.xml
 msgctxt "#60500"

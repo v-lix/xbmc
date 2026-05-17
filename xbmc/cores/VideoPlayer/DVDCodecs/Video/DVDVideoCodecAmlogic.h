@@ -112,6 +112,7 @@ protected:
   std::unique_ptr<CBitstreamConverter> m_bitstream;
 private:
   void UpdateAppendCMv40SettingCache();
+  void UpdateLevel5OverrideSettingCache();
   void ApplyDynamicDoViSettings();
 
   std::shared_ptr<CAMLVideoBufferPool> m_videoBufferPool;
@@ -122,5 +123,10 @@ private:
 
   std::atomic<int> m_appendCMv40ModeSetting{static_cast<int>(DOVICMv40Mode::CMV40_NONE)};
   DOVICMv40Mode m_appendCMv40ModeApplied{DOVICMv40Mode::CMV40_NONE};
+  // L5 active-area override packed: [63:48]=top [47:32]=bottom [31:16]=left
+  // [15:0]=right. (0,0,0,0) = inactive. Single atomic so a per-packet read in
+  // ApplyDynamicDoViSettings() is lock-free and sees a consistent 4-tuple.
+  std::atomic<uint64_t> m_level5OverrideSetting{0};
+  uint64_t m_level5OverrideApplied{0};
   bool m_settingsCallbackRegistered{false};
 };

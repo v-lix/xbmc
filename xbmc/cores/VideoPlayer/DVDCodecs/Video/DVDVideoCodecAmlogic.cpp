@@ -6,6 +6,7 @@
  *  See LICENSES/README.md for more information.
  */
 
+#include <cstdio>
 #include <math.h>
 
 #include "DVDCodecs/DVDFactoryCodec.h"
@@ -80,12 +81,14 @@ CDVDVideoCodecAmlogic::CDVDVideoCodecAmlogic(CProcessInfo &processInfo)
     {
       settings->RegisterCallback(this, {
         CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND,
+        CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE,
         CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE
       });
       m_settingsCallbackRegistered = true;
     }
   }
   UpdateAppendCMv40SettingCache();
+  UpdateLevel5OverrideSettingCache();
 }
 
 CDVDVideoCodecAmlogic::~CDVDVideoCodecAmlogic()
@@ -119,23 +122,69 @@ void CDVDVideoCodecAmlogic::UpdateAppendCMv40SettingCache()
   }
 }
 
+void CDVDVideoCodecAmlogic::UpdateLevel5OverrideSettingCache()
+{
+  uint64_t packed = 0;
+  if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
+  {
+    if (const auto settings = settingsComponent->GetSettings())
+    {
+      const std::string value =
+          settings->GetString(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE);
+      if (!value.empty())
+      {
+        // Format: "top,bottom,left,right" — unsigned ints, RPU active-area
+        // space. Anything malformed or out-of-range is silently dropped (the
+        // helper addon is the only writer and validates input there).
+        unsigned int t = 0, b = 0, l = 0, r = 0;
+        if (std::sscanf(value.c_str(), "%u,%u,%u,%u", &t, &b, &l, &r) == 4 &&
+            t <= 0xFFFF && b <= 0xFFFF && l <= 0xFFFF && r <= 0xFFFF)
+        {
+          packed = (static_cast<uint64_t>(t) << 48) |
+                   (static_cast<uint64_t>(b) << 32) |
+                   (static_cast<uint64_t>(l) << 16) |
+                   static_cast<uint64_t>(r);
+        }
+      }
+    }
+  }
+  m_level5OverrideSetting.store(packed);
+}
+
 void CDVDVideoCodecAmlogic::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
 {
   const auto& id = setting->GetId();
   if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND ||
       id == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
     UpdateAppendCMv40SettingCache();
+  if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE)
+    UpdateLevel5OverrideSettingCache();
 }
 
 void CDVDVideoCodecAmlogic::ApplyDynamicDoViSettings()
 {
   if (!m_bitstream) return;
   const auto mode = static_cast<DOVICMv40Mode>(m_appendCMv40ModeSetting.load());
-  if (mode == m_appendCMv40ModeApplied) return;
+  if (mode != m_appendCMv40ModeApplied)
+  {
+    m_bitstream->SetAppendCMv40(mode);
+    m_appendCMv40ModeApplied = mode;
+    CLog::Log(LOGINFO, "{}::{} - CMv4.0 append mode changed to {}", __MODULE_NAME__, __FUNCTION__, static_cast<int>(mode));
+  }
 
-  m_bitstream->SetAppendCMv40(mode);
-  m_appendCMv40ModeApplied = mode;
-  CLog::Log(LOGINFO, "{}::{} - CMv4.0 append mode changed to {}", __MODULE_NAME__, __FUNCTION__, static_cast<int>(mode));
+  const uint64_t packed = m_level5OverrideSetting.load();
+  if (packed != m_level5OverrideApplied)
+  {
+    const uint16_t top    = static_cast<uint16_t>((packed >> 48) & 0xFFFF);
+    const uint16_t bottom = static_cast<uint16_t>((packed >> 32) & 0xFFFF);
+    const uint16_t left   = static_cast<uint16_t>((packed >> 16) & 0xFFFF);
+    const uint16_t right  = static_cast<uint16_t>(packed & 0xFFFF);
+    const bool active = (packed != 0);
+    m_bitstream->SetLevel5Override(active, top, bottom, left, right);
+    m_level5OverrideApplied = packed;
+    CLog::Log(LOGINFO, "{}::{} - L5 override changed to active={} t={} b={} l={} r={}",
+              __MODULE_NAME__, __FUNCTION__, active, top, bottom, left, right);
+  }
 }
 
 std::unique_ptr<CDVDVideoCodec> CDVDVideoCodecAmlogic::Create(CProcessInfo& processInfo)
