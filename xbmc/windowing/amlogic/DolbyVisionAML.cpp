@@ -974,17 +974,16 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   {
     // L5 active-area override engaged mid-playback (typically from
     // service.p3i.override writing at onAVStarted, ~1.1s after codec Open).
-    //   - Push values + force flag to the kernel module so the TV sees
-    //     the override in the outgoing RPU (not just Kodi-side overlay calc).
-    //   - Re-run the L5 sysfs apply so xbmc_detect_active_area picks up
-    //     override-active as one of its enablers.
-    //   - Stop detect if it was running — CalcOverlayActiveArea picks the
-    //     override branch and the kernel substitution path now uses
-    //     override values directly; detect would just burn cycles.
-    aml_dv_apply_l5_override_sysfs();
-    aml_dv_apply_l5_sysfs();
+    // ORDER MATTERS: aml_dv_detect_active_area_stop() zeroes all four
+    // xbmc_detected_l5_* sysfs paths (AMLUtils.cpp:2085-2088). If we push
+    // the override values first and then stop detect, the stop clobbers
+    // our values back to 0,0,0,0 — force flag stays Y but the kernel
+    // substitutes zeros instead of the override values. Stop detect FIRST
+    // so the override sysfs push is the last writer.
     if (aml_dv_l5_override_active())
       aml_dv_detect_active_area_stop();
+    aml_dv_apply_l5_override_sysfs();
+    aml_dv_apply_l5_sysfs();
     // Note: not auto-restarting detect when the override is cleared
     // mid-playback. Hidden setting, normally only the addon writes it, and
     // restart on clear is edge-case enough to defer.
