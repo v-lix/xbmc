@@ -4542,6 +4542,9 @@
           <visible>false</visible>
           <level>4</level>
           <default></default>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
           <control type="edit" format="string" />
         </setting>
         <setting id="coreelec.amlogic.dolbyvision.force.modes" type="boolean" label="60606" help="60607">
