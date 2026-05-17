@@ -4537,6 +4537,12 @@
         <!-- Per-folder override channel used by service.p3i.sb override.ini. Format:
              "top,bottom,left,right" (unsigned ints, RPU active-area space) or empty
              for no override. Hidden: only meant to be written by the helper addon. -->
+        <!-- Hidden from the UI: visible=false at cold start, runtime-promoted
+             to visible=true by CDolbyVisionAML::set_dv_settings_visible() on
+             DV-supported hardware (same pattern as LAV SB and CMv4 — required
+             so the addon's JSON-RPC SetSettingValue isn't rejected by the
+             IsVisible() gate in CSettingsOperations::SetSettingValue). level=4
+             (Internal) keeps it out of the UI tier list. -->
         <setting id="coreelec.amlogic.dolbyvision.level5.override" type="string" label="60326" help="60327" parent="coreelec.amlogic.dolbyvision.level5">
           <requirement>HAVE_AMCODEC</requirement>
           <visible>false</visible>
