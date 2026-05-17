@@ -796,6 +796,7 @@ bool CDolbyVisionAML::Setup()
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA);
+  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_THROTTLE);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
@@ -967,6 +968,19 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
     // from Python would only land on the next aml_dv_on().
     aml_dv_apply_l5_sysfs();
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
+  }
+  else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE)
+  {
+    // L5 active-area override engaged mid-playback (typically from
+    // service.p3i.override writing at onAVStarted, ~1.1s after codec Open).
+    // Stop detection if it was started — CalcOverlayActiveArea picks the
+    // override branch over the detect branch anyway, so leaving detect
+    // running would just burn cycles on values nothing reads.
+    if (aml_dv_l5_override_active())
+      aml_dv_detect_active_area_stop();
+    // Note: not auto-restarting detect when the override is cleared
+    // mid-playback. Hidden setting, normally only the addon writes it, and
+    // restart on clear is edge-case enough to defer.
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES)
   {

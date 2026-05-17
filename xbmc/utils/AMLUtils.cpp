@@ -1297,7 +1297,18 @@ bool aml_dv_detect_active_area_enabled()
 {
   return s_dvModeCached == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL &&
          settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5) &&
-         settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA);
+         settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA) &&
+         !aml_dv_l5_override_active();
+}
+
+bool aml_dv_l5_override_active()
+{
+  const std::string s =
+      settings()->GetString(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE);
+  if (s.empty()) return false;
+  unsigned int t = 0, b = 0, l = 0, r = 0;
+  if (std::sscanf(s.c_str(), "%u,%u,%u,%u", &t, &b, &l, &r) != 4) return false;
+  return (t | b | l | r) != 0;
 }
 
 /* Cached detected values — written by background detection thread,

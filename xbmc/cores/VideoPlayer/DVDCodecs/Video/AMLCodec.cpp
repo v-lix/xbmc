@@ -2102,11 +2102,17 @@ bool CAMLCodec::OpenDecoder()
 
   // L5 active area detection: only for native DV content (not VS10 SDR/HDR10/HLG
   // conversions) and not for Profile 9 (AVC-based, probe causes h264 decode errors).
+  // Also skipped when an L5 override is set — the override wins inside
+  // CalcOverlayActiveArea, so running detect would be background work for
+  // values nothing reads. (DolbyVisionAML::OnSettingChanged handles the
+  // mid-playback case where the override.ini addon writes the override at
+  // onAVStarted, after codec Open() has already passed this gate.)
   if (hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION && hints.dovi.dv_profile != 9)
   {
     const auto settingsComponent = CServiceBroker::GetSettingsComponent();
     if (settingsComponent->GetSettings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5) &&
-        settingsComponent->GetSettings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA))
+        settingsComponent->GetSettings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA) &&
+        !aml_dv_l5_override_active())
       aml_dv_detect_active_area_start();
   }
 

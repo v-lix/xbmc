@@ -171,6 +171,11 @@ int aml_dv_detect_active_area_state();
 void aml_dv_detect_set_file(const std::string& path);
 void aml_dv_detect_active_area_start();
 void aml_dv_detect_active_area_stop();
+// True when coreelec.amlogic.dolbyvision.level5.override is set to a non-zero
+// value tuple. Used to short-circuit the active-area detect path, since the
+// override wins inside CalcOverlayActiveArea anyway — leaving detect running
+// would just burn background cycles producing values nothing reads.
+bool aml_dv_l5_override_active();
 enum DV_MODE aml_dv_mode();
 enum DV_TYPE aml_dv_type();
 unsigned int aml_vs10_by_setting(const std::string setting);
