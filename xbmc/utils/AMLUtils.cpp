@@ -608,7 +608,13 @@ void aml_dv_apply_l5_sysfs()
   int dv_l5_subs_signal_mode = dv_source_level_5 ? settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS) : 0;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5_subt", dv_l5_subs_signal_mode > 0);
 
-  bool dv_detect_active_area(dv_level5_enabled && settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA));
+  /* xbmc_detect_active_area is the kernel-side master enable for the L5
+   * substitution path. The user's auto-detect setting is one source of
+   * substitution values; service.p3i.override is another. Either one
+   * needs the master enable on. */
+  bool dv_detect_active_area = dv_level5_enabled &&
+                               (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA) ||
+                                aml_dv_l5_override_active());
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detect_active_area", dv_detect_active_area);
   CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_sysfs - l5_enabled={} src_l5={} osdst={} subt_mode={} detect={}",
             dv_level5_enabled, dv_source_level_5, dv_source_level_5_osdst,
@@ -618,6 +624,7 @@ void aml_dv_apply_l5_sysfs()
 unsigned int aml_dv_on(unsigned int mode)
 {
   aml_dv_apply_l5_sysfs();
+  aml_dv_apply_l5_override_sysfs();
 
   unsigned int xbmc_dv_vsvdb_source_lum_limit_num = 0;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_source_lum_limit_num", xbmc_dv_vsvdb_source_lum_limit_num);
@@ -1301,14 +1308,45 @@ bool aml_dv_detect_active_area_enabled()
          !aml_dv_l5_override_active();
 }
 
-bool aml_dv_l5_override_active()
+/* Parse the override setting into (active, top, bottom, left, right).
+ * "active" means the user has set a value — including "0,0,0,0", which
+ * is a legitimate override meaning "treat the stream as having no bars".
+ * Empty / unparseable = inactive (use whatever the stream's L5 says). */
+static bool _l5_override_parse(uint16_t& top, uint16_t& bottom,
+                               uint16_t& left, uint16_t& right)
 {
   const std::string s =
       settings()->GetString(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE);
   if (s.empty()) return false;
   unsigned int t = 0, b = 0, l = 0, r = 0;
   if (std::sscanf(s.c_str(), "%u,%u,%u,%u", &t, &b, &l, &r) != 4) return false;
-  return (t | b | l | r) != 0;
+  if (t > 0xFFFF || b > 0xFFFF || l > 0xFFFF || r > 0xFFFF) return false;
+  top    = static_cast<uint16_t>(t);
+  bottom = static_cast<uint16_t>(b);
+  left   = static_cast<uint16_t>(l);
+  right  = static_cast<uint16_t>(r);
+  return true;
+}
+
+bool aml_dv_l5_override_active()
+{
+  uint16_t t = 0, b = 0, l = 0, r = 0;
+  return _l5_override_parse(t, b, l, r);
+}
+
+void aml_dv_apply_l5_override_sysfs()
+{
+  uint16_t top = 0, bottom = 0, left = 0, right = 0;
+  const bool active = _l5_override_parse(top, bottom, left, right);
+
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_top",    top);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_bottom", bottom);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_left",   left);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_right",  right);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_force_l5_override",  active);
+
+  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_override_sysfs - active={} t={} b={} l={} r={}",
+            active, top, bottom, left, right);
 }
 
 /* Cached detected values — written by background detection thread,

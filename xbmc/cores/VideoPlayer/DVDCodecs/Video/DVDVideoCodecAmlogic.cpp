@@ -124,6 +124,7 @@ void CDVDVideoCodecAmlogic::UpdateAppendCMv40SettingCache()
 
 void CDVDVideoCodecAmlogic::UpdateLevel5OverrideSettingCache()
 {
+  bool active = false;
   uint64_t packed = 0;
   if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
   {
@@ -134,12 +135,15 @@ void CDVDVideoCodecAmlogic::UpdateLevel5OverrideSettingCache()
       if (!value.empty())
       {
         // Format: "top,bottom,left,right" — unsigned ints, RPU active-area
-        // space. Anything malformed or out-of-range is silently dropped (the
-        // helper addon is the only writer and validates input there).
+        // space. Any successful parse counts as "active" (including 0,0,0,0
+        // which is the legitimate "treat stream as having no bars" override).
+        // Malformed / out-of-range silently dropped — the helper addon is
+        // the only writer and validates input there.
         unsigned int t = 0, b = 0, l = 0, r = 0;
         if (std::sscanf(value.c_str(), "%u,%u,%u,%u", &t, &b, &l, &r) == 4 &&
             t <= 0xFFFF && b <= 0xFFFF && l <= 0xFFFF && r <= 0xFFFF)
         {
+          active = true;
           packed = (static_cast<uint64_t>(t) << 48) |
                    (static_cast<uint64_t>(b) << 32) |
                    (static_cast<uint64_t>(l) << 16) |
@@ -148,7 +152,8 @@ void CDVDVideoCodecAmlogic::UpdateLevel5OverrideSettingCache()
       }
     }
   }
-  m_level5OverrideSetting.store(packed);
+  m_level5OverrideActiveSetting.store(active);
+  m_level5OverrideValuesSetting.store(packed);
 }
 
 void CDVDVideoCodecAmlogic::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
@@ -172,16 +177,17 @@ void CDVDVideoCodecAmlogic::ApplyDynamicDoViSettings()
     CLog::Log(LOGINFO, "{}::{} - CMv4.0 append mode changed to {}", __MODULE_NAME__, __FUNCTION__, static_cast<int>(mode));
   }
 
-  const uint64_t packed = m_level5OverrideSetting.load();
-  if (packed != m_level5OverrideApplied)
+  const bool active = m_level5OverrideActiveSetting.load();
+  const uint64_t packed = m_level5OverrideValuesSetting.load();
+  if (active != m_level5OverrideActiveApplied || packed != m_level5OverrideValuesApplied)
   {
     const uint16_t top    = static_cast<uint16_t>((packed >> 48) & 0xFFFF);
     const uint16_t bottom = static_cast<uint16_t>((packed >> 32) & 0xFFFF);
     const uint16_t left   = static_cast<uint16_t>((packed >> 16) & 0xFFFF);
     const uint16_t right  = static_cast<uint16_t>(packed & 0xFFFF);
-    const bool active = (packed != 0);
     m_bitstream->SetLevel5Override(active, top, bottom, left, right);
-    m_level5OverrideApplied = packed;
+    m_level5OverrideActiveApplied = active;
+    m_level5OverrideValuesApplied = packed;
     CLog::Log(LOGINFO, "{}::{} - L5 override changed to active={} t={} b={} l={} r={}",
               __MODULE_NAME__, __FUNCTION__, active, top, bottom, left, right);
   }

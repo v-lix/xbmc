@@ -123,10 +123,16 @@ private:
 
   std::atomic<int> m_appendCMv40ModeSetting{static_cast<int>(DOVICMv40Mode::CMV40_NONE)};
   DOVICMv40Mode m_appendCMv40ModeApplied{DOVICMv40Mode::CMV40_NONE};
-  // L5 active-area override packed: [63:48]=top [47:32]=bottom [31:16]=left
-  // [15:0]=right. (0,0,0,0) = inactive. Single atomic so a per-packet read in
-  // ApplyDynamicDoViSettings() is lock-free and sees a consistent 4-tuple.
-  std::atomic<uint64_t> m_level5OverrideSetting{0};
-  uint64_t m_level5OverrideApplied{0};
+  // L5 active-area override. Active is tracked separately from values so
+  // "0,0,0,0" (a legitimate override meaning "treat the stream as having no
+  // bars") is distinguished from "no override set" (empty string). Values
+  // packed: [63:48]=top [47:32]=bottom [31:16]=left [15:0]=right. Two atomics
+  // is racy across reads, but the worst case is one frame of mixed state
+  // (invisible) — and the alternative of compressing both into one uint64
+  // would require sub-16-bit offsets.
+  std::atomic<bool> m_level5OverrideActiveSetting{false};
+  std::atomic<uint64_t> m_level5OverrideValuesSetting{0};
+  bool m_level5OverrideActiveApplied{false};
+  uint64_t m_level5OverrideValuesApplied{0};
   bool m_settingsCallbackRegistered{false};
 };
