@@ -1339,10 +1339,13 @@ void aml_dv_apply_l5_override_sysfs()
   uint16_t top = 0, bottom = 0, left = 0, right = 0;
   const bool active = _l5_override_parse(top, bottom, left, right);
 
-  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_top",    top);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_bottom", bottom);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_left",   left);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detected_l5_right",  right);
+  // xbmc_override_l5_* is the override namespace (kernel commit 61aaaed51c52),
+  // separate from xbmc_detected_l5_* which is owned by the detect thread.
+  // No collision with aml_dv_detect_active_area_stop() zeroing detect paths.
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_top",    top);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_bottom", bottom);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_left",   left);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_right",  right);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_force_l5_override",  active);
 
   CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_override_sysfs - active={} t={} b={} l={} r={}",

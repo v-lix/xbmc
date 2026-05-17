@@ -974,16 +974,14 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   {
     // L5 active-area override engaged mid-playback (typically from
     // service.p3i.override writing at onAVStarted, ~1.1s after codec Open).
-    // ORDER MATTERS: aml_dv_detect_active_area_stop() zeroes all four
-    // xbmc_detected_l5_* sysfs paths (AMLUtils.cpp:2085-2088). If we push
-    // the override values first and then stop detect, the stop clobbers
-    // our values back to 0,0,0,0 — force flag stays Y but the kernel
-    // substitutes zeros instead of the override values. Stop detect FIRST
-    // so the override sysfs push is the last writer.
-    if (aml_dv_l5_override_active())
-      aml_dv_detect_active_area_stop();
+    // After kernel commit 61aaaed51c52 the override uses its own
+    // xbmc_override_l5_* sysfs namespace, so detect_stop() (which only
+    // zeroes xbmc_detected_l5_*) no longer clobbers our values — order
+    // here is therefore informational, not load-bearing.
     aml_dv_apply_l5_override_sysfs();
     aml_dv_apply_l5_sysfs();
+    if (aml_dv_l5_override_active())
+      aml_dv_detect_active_area_stop();
     // Note: not auto-restarting detect when the override is cleared
     // mid-playback. Hidden setting, normally only the addon writes it, and
     // restart on clear is edge-case enough to defer.
