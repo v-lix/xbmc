@@ -78,6 +78,11 @@ static unsigned int s_dvModeCached = DOLBY_VISION_OUTPUT_MODE_BYPASS;
 // Used by CreateNewWindow to avoid restoring IPT during playback-start mode switches.
 static bool s_dvPlaybackActive = false;
 
+// Diagnostic: dump full DV/HDMI kernel state and our cached state to debug log.
+// Forward-declared so it's callable from set_vs10_mode (defined before the
+// helper's body, which sits next to aml_dv_off where all statics are in scope).
+static void aml_dv_dump_state(const char* tag);
+
 static void aml_dv_reset_osd_max()
 {
   int max(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE));
@@ -139,6 +144,7 @@ void aml_reset_audio_from_vs10_change()
 
 void aml_dv_set_vs10_mode(unsigned int mode, StreamHdrType hdrType)
 {
+  aml_dv_dump_state("vs10_change/pre");
   enum DV_TYPE dv_type(static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
   if (dv_type == DV_TYPE_VS10_ONLY) return;
 
@@ -166,6 +172,7 @@ void aml_dv_set_vs10_mode(unsigned int mode, StreamHdrType hdrType)
     aml_dv_off();
 
   aml_reset_audio_from_vs10_change();
+  aml_dv_dump_state("vs10_change/post");
 }
 
 void aml_dv_wait_video_off(int timeout)
@@ -904,6 +911,7 @@ unsigned int aml_dv_on(unsigned int mode)
     }
   }
 
+  aml_dv_dump_state("dv_on/post");
   return mode;
 }
 
@@ -1027,6 +1035,68 @@ void aml_dv_reset_l5_signals()
   s_lastOsd = -1;
 }
 
+// Snapshot DV/HDMI kernel state + our cached state to one debug line.
+// Called at every state-transition site so multi-playback traces can be diffed.
+static void aml_dv_dump_state(const char* tag)
+{
+  auto rd = [](const char* path) -> std::string {
+    CSysfsPath p{path};
+    if (!p.Exists()) return "-";
+    auto v = p.Get<std::string>();
+    if (!v.has_value()) return "?";
+    std::string s = std::move(v.value());
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r' || s.back() == ' '))
+      s.pop_back();
+    return s;
+  };
+
+  CLog::Log(LOGDEBUG,
+    "AMLUtils::aml_dv_dump_state [{}] "
+    "k: mode={} en={} pol={} fl={} ll={} "
+    "vp={} vp_tm={} type={} prof={} non_ipt={} deep_c={} f422={} hdr10_ll={} vsvdb={} "
+    "gmax={} blend={} xosd={} subs={} attr=[{}] | "
+    "geom: fb_win=[{}] fb_fs=[{}] fb_fs_en={} vid_axis=[{}] vid_dis={} | "
+    "l5: meta5={} l5_osdst={} l5_subt={} detect={} ovr_t={} ovr_b={} ovr_l={} ovr_r={} ovr_force={} | "
+    "c: lastOsd={} lastSubs={} dvMode={} f422={} vs10conv={} dvActive={}",
+    tag,
+    rd("/sys/module/amdolby_vision/parameters/dolby_vision_mode"),
+    rd("/sys/module/amdolby_vision/parameters/dolby_vision_enable"),
+    rd("/sys/module/amdolby_vision/parameters/dolby_vision_policy"),
+    rd("/sys/module/amdolby_vision/parameters/dolby_vision_flags"),
+    rd("/sys/module/amdolby_vision/parameters/dolby_vision_ll_policy"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_vp"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_vp_tm"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_type"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_profile"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_non_ipt"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_deep_color"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_for_dv_ll"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_payload"),
+    rd("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"),
+    rd("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test"),
+    rd("/sys/module/amdolby_vision/parameters/dolby_vision_xbmc_osd"),
+    rd("/sys/module/amdolby_vision/parameters/dolby_vision_subtitles"),
+    rd("/sys/class/amhdmitx/amhdmitx0/attr"),
+    rd("/sys/class/graphics/fb0/window_axis"),
+    rd("/sys/class/graphics/fb0/free_scale_axis"),
+    rd("/sys/class/graphics/fb0/free_scale"),
+    rd("/sys/class/video/axis"),
+    rd("/sys/class/video/disable_video"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5_osdst"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5_subt"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_detect_active_area"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_override_l5_top"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_override_l5_bottom"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_override_l5_left"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_override_l5_right"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_force_l5_override"),
+    s_lastOsd, s_lastSubtitles, s_dvModeCached,
+    aml_linux_force_422 ? 1 : 0, vs10_conversion ? 1 : 0,
+    s_dvPlaybackActive ? 1 : 0);
+}
+
 void aml_dv_off(bool skip_hdmi_update)
 {
   aml_dv_detect_active_area_stop();
@@ -1105,6 +1175,8 @@ void aml_dv_off(bool skip_hdmi_update)
     if (display_mode.Exists())
       display_mode.Set(display_mode.Get<std::string>().value());
   }
+
+  aml_dv_dump_state("dv_off/post");
 }
 
 unsigned int aml_dv_dolby_vision_mode()
@@ -1115,6 +1187,7 @@ unsigned int aml_dv_dolby_vision_mode()
 
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries)
 {
+  aml_dv_dump_state("dv_open/pre");
   s_dvPlaybackActive = true;
 
   // Detect PM4K once at playback start for OSD visibility override.
@@ -1132,23 +1205,26 @@ void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries 
       CLog::Log(LOGINFO, "AMLUtils::{} - SDR BT.2020 detected, bypassing VS10 to preserve gamut", __FUNCTION__);
       if (aml_is_dv_enable())
         aml_dv_off();
+      aml_dv_dump_state("dv_open/post(sdr_bt2020_bypass)");
       return;
     }
 
-    unsigned int vs10_mode = aml_vs10_by_hdrtype(hdrType, bitDepth);    
+    unsigned int vs10_mode = aml_vs10_by_hdrtype(hdrType, bitDepth);
 
-    if (vs10_mode != DOLBY_VISION_OUTPUT_MODE_BYPASS) 
+    if (vs10_mode != DOLBY_VISION_OUTPUT_MODE_BYPASS)
       vs10_mode = aml_dv_on(vs10_mode);
     else if (aml_is_dv_enable()) // DV BYPASS, and it is on - then switch it off.
-      aml_dv_off(); 
+      aml_dv_off();
 
     bool content_is_dv(hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION);
     CLog::Log(LOGINFO, "AMLUtils::{} - DV is [{}], requested with vs10 mode: [{}], set for: [{}]",  __FUNCTION__, aml_is_dv_enable(), aml_dv_output_mode_to_string(vs10_mode), content_is_dv ? "content" : "mapping");
   }
+  aml_dv_dump_state("dv_open/post");
 }
 
 void aml_dv_close()
 {
+  aml_dv_dump_state("dv_close/pre");
   s_dvPlaybackActive = false;
   s_pm4kActive = false;
   s_pm4kHome = nullptr;
@@ -1159,10 +1235,14 @@ void aml_dv_close()
   // IPT is restored for the GUI by the Player.OnStop announcement handler
   // in CDolbyVisionAML when playback truly ends.
   if (aml_dv_mode() == DV_MODE_ON)
+  {
+    aml_dv_dump_state("dv_close/post(dv_mode_on_skip)");
     return;
+  }
 
   if (aml_is_dv_enable())
     aml_dv_off();
+  aml_dv_dump_state("dv_close/post");
 }
 
 bool aml_dv_playback_active()
@@ -1280,6 +1360,7 @@ void aml_dv_set_xbmc_osd()
   {
     CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_xbmc_osd", val);
     s_lastOsd = val;
+    aml_dv_dump_state(val ? "xbmc_osd/on" : "xbmc_osd/off");
   }
 }
 
