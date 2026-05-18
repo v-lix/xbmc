@@ -1147,6 +1147,17 @@ void aml_dv_off(bool skip_hdmi_update)
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_deep_color", false);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vp_tm", 0);
+  // Clear DV-LL HDR10/VSVDB InfoFrame injection flags. aml_dv_on sets these
+  // for Player-LED HDR/HDR2 output; without unwinding them, the kernel keeps
+  // these module-level enables hot after DV is otherwise off (verified via
+  // dv_dump_state across the Ted→Novocaine live-swap repro). Does not by
+  // itself flush the HDMI TX's own emit-state, but unblocks that as a next
+  // step and removes one source of contradictory signaling.
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_for_dv_ll", 'N');
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_for_dv_ll_inject_num", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_inject", false);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_inject_num", 0);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_payload", std::string{});
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_meta_level_5", false);
