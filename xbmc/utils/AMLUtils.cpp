@@ -1053,8 +1053,10 @@ static void aml_dv_dump_state(const char* tag)
   CLog::Log(LOGDEBUG,
     "AMLUtils::aml_dv_dump_state [{}] "
     "k: mode={} en={} pol={} fl={} ll={} "
-    "vp={} vp_tm={} type={} prof={} non_ipt={} deep_c={} f422={} hdr10_ll={} vsvdb={} "
-    "gmax={} blend={} xosd={} subs={} attr=[{}] | "
+    "vp={} vp_tm={} type={} prof={} non_ipt={} deep_c={} f422={} "
+    "hdr10_ll={} hdr10_ll_inj_n={} vsvdb_inj={} vsvdb_inj_n={} vsvdb=[{}] "
+    "tvled_bt2020={} tvled_no_col={} "
+    "gmax={} blend={} xosd={} subs={} attr=[{}] hdmi_cfg=[{}] | "
     "geom: fb_win=[{}] fb_fs=[{}] fb_fs_en={} vid_axis=[{}] vid_dis={} | "
     "l5: meta5={} l5_osdst={} l5_subt={} detect={} ovr_t={} ovr_b={} ovr_l={} ovr_r={} ovr_force={} | "
     "c: lastOsd={} lastSubs={} dvMode={} f422={} vs10conv={} dvActive={}",
@@ -1072,12 +1074,18 @@ static void aml_dv_dump_state(const char* tag)
     rd("/sys/module/amdolby_vision/parameters/xbmc_dv_deep_color"),
     rd("/sys/module/amdolby_vision/parameters/xbmc_aml_linux_force_422"),
     rd("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_for_dv_ll"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_hdr10_for_dv_ll_inject_num"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_inject"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_inject_num"),
     rd("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_payload"),
+    rd("/sys/module/hdmitx20/parameters/dovi_tv_led_bt2020"),
+    rd("/sys/module/hdmitx20/parameters/dovi_tv_led_no_colorimetry"),
     rd("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"),
     rd("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test"),
     rd("/sys/module/amdolby_vision/parameters/dolby_vision_xbmc_osd"),
     rd("/sys/module/amdolby_vision/parameters/dolby_vision_subtitles"),
     rd("/sys/class/amhdmitx/amhdmitx0/attr"),
+    rd("/sys/class/amhdmitx/amhdmitx0/config"),
     rd("/sys/class/graphics/fb0/window_axis"),
     rd("/sys/class/graphics/fb0/free_scale_axis"),
     rd("/sys/class/graphics/fb0/free_scale"),
