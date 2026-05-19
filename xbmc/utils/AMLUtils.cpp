@@ -1138,6 +1138,20 @@ void aml_dv_off(bool skip_hdmi_update)
   {
     dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~(FLAG_FORCE_RGB_OUTPUT));
     dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~(FLAG_FORCE_DOVI_LL));
+    // FLAG_TOGGLE_FRAME (0x80000000) is a pending-toggle request the kernel
+    // sets via dolby_vision_set_toggle_flag(1) and clears once the toggle is
+    // consumed in the per-frame processing loop (amdolby_vision.c:7256/7325).
+    // If new_dovi_setting.video_width/height stay 0 because frames never
+    // started flowing during the prior DV session (typical of stop-then-
+    // re-play with HDR10+→DV / VS10 conversions), the consume path never
+    // fires and the flag survives across dv_off into the next dv_on. That
+    // stuck flag then blocks the next playback's frame-toggle, manifests
+    // as FBIO_WAITFORVSYNC_64 returning stale timestamps, and produces the
+    // "audio works, picture frozen / HDMI requires power-cycle" symptom
+    // reported by multiple testers (see kodi.log signature: fl=2147500037
+    // and fl=2147483653 = 0x80000005). Force-clear here so each playback
+    // starts with a clean state machine.
+    dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~FLAG_TOGGLE_FRAME);
     dolby_vision_ll_policy.Set(DOLBY_VISION_LL_DISABLE);
   }
 
