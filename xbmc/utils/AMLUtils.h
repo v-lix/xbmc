@@ -127,6 +127,12 @@ void aml_dv_off(bool skip_hdmi_update = false);
 // so per-folder override.ini writes that mutate L5 settings take effect mid-
 // playback instead of waiting for the next aml_dv_on().
 void aml_dv_apply_l5_sysfs();
+// Diagnostic: snapshot full DV/HDMI/fb0 kernel state + Kodi cached state to
+// debug log. Already called at every DV state transition (dv_on, dv_off,
+// dv_open, dv_close, set_vs10_mode, xbmc_osd). Exposed so CVideoSyncAML can
+// also trigger one when it detects a vsync ioctl stall — that captures
+// post-transition drift the existing transition snapshots can't see.
+void aml_dv_dump_state(const char* tag);
 void aml_get_dv_cap();
 struct xbmc_dv_cap
 {

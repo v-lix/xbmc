@@ -27,4 +27,11 @@ private:
   volatile bool m_abort;
   int m_fbFd{-1};
   int64_t m_lastKernelTs{0};
+  // Stall detection on FBIO_WAITFORVSYNC_64. Counts consecutive "ts unchanged"
+  // returns; when the count crosses a threshold we trigger one diagnostic dump
+  // (via aml_dv_dump_state) so the blackout-class symptom — kernel stops
+  // generating vsync after a mode switch — has captured state at the failure
+  // point, not just at the prior DV transition. Latched so we don't spam.
+  int m_staleTsCount{0};
+  bool m_staleStallLogged{false};
 };

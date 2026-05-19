@@ -81,7 +81,9 @@ static bool s_dvPlaybackActive = false;
 // Diagnostic: dump full DV/HDMI kernel state and our cached state to debug log.
 // Forward-declared so it's callable from set_vs10_mode (defined before the
 // helper's body, which sits next to aml_dv_off where all statics are in scope).
-static void aml_dv_dump_state(const char* tag);
+// Externally visible (declared in AMLUtils.h) so CVideoSyncAML can trigger a
+// snapshot when it detects a stall on FBIO_WAITFORVSYNC_64.
+void aml_dv_dump_state(const char* tag);
 
 static void aml_dv_reset_osd_max()
 {
@@ -1037,7 +1039,7 @@ void aml_dv_reset_l5_signals()
 
 // Snapshot DV/HDMI kernel state + our cached state to one debug line.
 // Called at every state-transition site so multi-playback traces can be diffed.
-static void aml_dv_dump_state(const char* tag)
+void aml_dv_dump_state(const char* tag)
 {
   auto rd = [](const char* path) -> std::string {
     CSysfsPath p{path};
@@ -1057,6 +1059,7 @@ static void aml_dv_dump_state(const char* tag)
     "hdr10_ll={} hdr10_ll_inj_n={} vsvdb_inj={} vsvdb_inj_n={} vsvdb=[{}] "
     "tvled_bt2020={} tvled_no_col={} "
     "gmax={} blend={} xosd={} subs={} attr=[{}] hdmi_cfg=[{}] | "
+    "tx: hpd={} rxsense={} rhpd={} used={} disp_mode={} sink_type={} | "
     "geom: fb_win=[{}] fb_fs=[{}] fb_fs_en={} vid_axis=[{}] vid_dis={} | "
     "l5: meta5={} l5_osdst={} l5_subt={} detect={} ovr_t={} ovr_b={} ovr_l={} ovr_r={} ovr_force={} | "
     "c: lastOsd={} lastSubs={} dvMode={} f422={} vs10conv={} dvActive={}",
@@ -1086,6 +1089,16 @@ static void aml_dv_dump_state(const char* tag)
     rd("/sys/module/amdolby_vision/parameters/dolby_vision_subtitles"),
     rd("/sys/class/amhdmitx/amhdmitx0/attr"),
     rd("/sys/class/amhdmitx/amhdmitx0/config"),
+    // HDMI TX link-state — useful for diagnosing the "audio works, video frozen"
+    // class. hpd_state / rhpd_state flag sink disconnect; rxsense_state shows
+    // whether the sink's R-term is sensed back (link up); hdmi_used / disp_mode
+    // / sink_type catch cases where the kernel thinks HDMI isn't active anymore.
+    rd("/sys/class/amhdmitx/amhdmitx0/hpd_state"),
+    rd("/sys/class/amhdmitx/amhdmitx0/rxsense_state"),
+    rd("/sys/class/amhdmitx/amhdmitx0/rhpd_state"),
+    rd("/sys/class/amhdmitx/amhdmitx0/hdmi_used"),
+    rd("/sys/class/amhdmitx/amhdmitx0/disp_mode"),
+    rd("/sys/class/amhdmitx/amhdmitx0/sink_type"),
     rd("/sys/class/graphics/fb0/window_axis"),
     rd("/sys/class/graphics/fb0/free_scale_axis"),
     rd("/sys/class/graphics/fb0/free_scale"),

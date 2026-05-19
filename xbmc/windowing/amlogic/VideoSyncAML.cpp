@@ -10,6 +10,7 @@
 #include "ServiceBroker.h"
 #include "windowing/GraphicContext.h"
 #include "cores/VideoPlayer/VideoReferenceClock.h"
+#include "utils/AMLUtils.h"
 #include "utils/TimeUtils.h"
 #include "utils/log.h"
 #include "threads/Thread.h"
@@ -46,6 +47,8 @@ bool CVideoSyncAML::Setup()
 {
   m_abort = false;
   m_lastKernelTs = 0;
+  m_staleTsCount = 0;
+  m_staleStallLogged = false;
 
   CServiceBroker::GetWinSystem()->Register(this);
   CLog::Log(LOGDEBUG, "CVideoReferenceClock: setting up AML");
@@ -102,6 +105,8 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
       startTs = std::chrono::steady_clock::now();
       numVBlanks = 0;
       m_lastKernelTs = 0;
+      m_staleTsCount = 0;
+      m_staleStallLogged = false;
       if (last_fps > 0.0)
       {
         CLog::Log(LOGDEBUG,
@@ -144,6 +149,9 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
           m_lastKernelTs = kernelTs;
           numVBlanks += static_cast<uint64_t>(countVSyncs);
           m_refClock->UpdateClock(countVSyncs, CurrentHostCounter());
+          // Fresh valid ts → recover from any stall state.
+          m_staleTsCount = 0;
+          m_staleStallLogged = false;
           continue;
         }
         // kernelTs == 0 when VD1 is powered down (HDMI mode-switch settle,
@@ -162,6 +170,21 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
         else
           CLog::Log(LOGDEBUG, "CVideoSyncAML: ioctl ts unchanged ({}), legacy fallback", kernelTs);
         m_lastKernelTs = 0;
+        // Stall detection: count consecutive non-progressing returns. Short
+        // bursts during mode switches / VPP reconfig are normal — only log if
+        // the stall sustains. Threshold ~24 iterations is ~1s at 24Hz; far
+        // above any legitimate transient (mode-switch settle is ~100-300ms).
+        // Latched so we only dump once per stall episode.
+        ++m_staleTsCount;
+        if (!m_staleStallLogged && m_staleTsCount >= 24)
+        {
+          CLog::Log(LOGWARNING,
+                    "CVideoSyncAML: vsync stalled ({} consecutive stale ioctl "
+                    "returns) — capturing kernel state for diagnosis",
+                    m_staleTsCount);
+          aml_dv_dump_state("vsync_stall");
+          m_staleStallLogged = true;
+        }
       }
       else
       {
