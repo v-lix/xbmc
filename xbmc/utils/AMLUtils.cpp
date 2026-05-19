@@ -78,6 +78,38 @@ static unsigned int s_dvModeCached = DOLBY_VISION_OUTPUT_MODE_BYPASS;
 // Used by CreateNewWindow to avoid restoring IPT during playback-start mode switches.
 static bool s_dvPlaybackActive = false;
 
+// Last canonical /sys/class/display/mode value we wrote.
+//
+// aml_set_display_resolution does a "null then target" sequence (line ~2884
+// writes "null" deliberately to force the kernel display driver to drop the
+// current mode, then immediately writes the new target). Other code paths
+// (aml_dv_off line ~1281, aml_dv_display_trigger ~1385) round-trip the
+// current value through sysfs to nudge the driver — Get-then-Set the same
+// string. If those round-trips happen to read during the brief intermediate
+// "null" window of aml_set_display_resolution, they write "null" BACK,
+// re-asserting the modeless state that aml_set_display_resolution was about
+// to recover from. The display engine then sits modeless: vsync stalls,
+// decoder backpressures, video frozen / audio continuing — the "vlix bug"
+// (BACK→replay on same-resolution DV content). See test1 trace at 21:02:59:
+// mode goes null at .162 (Kodi intermediate), recovers to 2160p24hz at .285,
+// then null again at .536 — this second null is the round-trip site catching
+// the brief window between .162 and .285 in a different thread.
+//
+// To make "stuck at null" structurally impossible: track the last-known-good
+// mode that was actually written, and have a single helper that round-trips
+// through sysfs but recovers via s_lastDisplayMode if the read came back as
+// "null". The intermediate-null write inside aml_set_display_resolution
+// itself is preserved (it's the legitimate kernel-drop step), but the value
+// of s_lastDisplayMode is updated only when we write a real target — so the
+// helper always has a non-null value to fall back to once the system has
+// ever set a real mode.
+static std::mutex s_lastDisplayModeMutex;
+static std::string s_lastDisplayMode;
+// Forward-declared: defined below near aml_dv_display_trigger, called from
+// aml_dv_off (above) too. Round-trips display/mode through sysfs but recovers
+// to last-known-good if the read returned "null".
+static void aml_display_mode_round_trip(const char* fn);
+
 // Diagnostic: dump full DV/HDMI kernel state and our cached state to debug log.
 // Forward-declared so it's callable from set_vs10_mode (defined before the
 // helper's body, which sits next to aml_dv_off where all statics are in scope).
@@ -1228,9 +1260,7 @@ void aml_dv_off(bool skip_hdmi_update)
   // trigger in CreateNewWindow handles VPP reset for that path.
   if (modeChange && !skip_hdmi_update)
   {
-    CSysfsPath display_mode{"/sys/class/display/mode"};
-    if (display_mode.Exists())
-      display_mode.Set(display_mode.Get<std::string>().value());
+    aml_display_mode_round_trip(__FUNCTION__);
   }
 
   aml_dv_dump_state("dv_off/post");
@@ -1330,11 +1360,47 @@ bool aml_is_dv_enable()
   return (dolby_vision_enable.Exists() && StringUtils::EqualsNoCase(dolby_vision_enable.Get<std::string>().value(), "Y"));
 }
 
+// Round-trip /sys/class/display/mode through sysfs to nudge the kernel
+// display driver (re-applying the current mode re-asserts driver state).
+// CRITICAL: if the read returns "null" — we landed in the brief window
+// between aml_set_display_resolution's intermediate "null" write and its
+// target write — never write "null" BACK. That re-assertion is what
+// locks the display engine modeless and produces the vlix-class freeze.
+// Recover via s_lastDisplayMode (the last canonical target we wrote)
+// instead. If we have nothing to recover to (first call before any
+// target was ever written), skip the write entirely.
+static void aml_display_mode_round_trip(const char* fn)
+{
+  CSysfsPath display_mode{"/sys/class/display/mode"};
+  if (!display_mode.Exists()) return;
+  const std::string cur = display_mode.Get<std::string>().value_or("");
+  if (cur != "null" && !cur.empty())
+  {
+    display_mode.Set(cur);
+    return;
+  }
+  std::lock_guard<std::mutex> lk(s_lastDisplayModeMutex);
+  if (!s_lastDisplayMode.empty() && s_lastDisplayMode != "null")
+  {
+    CLog::Log(LOGWARNING,
+              "AMLUtils::{} - display/mode read as '{}' during round-trip, "
+              "recovering to last-known [{}] instead of re-asserting null",
+              fn, cur.empty() ? "(empty)" : cur, s_lastDisplayMode);
+    display_mode.Set(s_lastDisplayMode);
+  }
+  else
+  {
+    CLog::Log(LOGWARNING,
+              "AMLUtils::{} - display/mode read as '{}' during round-trip, "
+              "no last-known mode to recover to; skipping write",
+              fn, cur.empty() ? "(empty)" : cur);
+  }
+}
+
 void aml_dv_display_trigger()
 {
   if (aml_is_dv_enable()) {
-    CSysfsPath display_mode{"/sys/class/display/mode"};
-    if (display_mode.Exists()) display_mode.Set(display_mode.Get<std::string>().value());
+    aml_display_mode_round_trip(__FUNCTION__);
   }
 }
 
@@ -2845,6 +2911,16 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
   {
     if (display_mode.Exists())
       display_mode.Set(mode);
+  }
+
+  // Record last canonical mode actually written so aml_display_mode_round_trip
+  // has a non-null value to recover to if a subsequent read lands on the
+  // intermediate "null" window (line ~2949). Skip recording "null" itself —
+  // that's the wedge state we want to recover FROM, not TO.
+  if (mode != "null" && !mode.empty())
+  {
+    std::lock_guard<std::mutex> lk(s_lastDisplayModeMutex);
+    s_lastDisplayMode = mode;
   }
 
   aml_set_framebuffer_resolution(res, framebuffer_name);
