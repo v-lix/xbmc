@@ -94,20 +94,31 @@ static void aml_dv_reset_osd_max()
 static void aml_dv_toggle_frame(unsigned int mode)
 {
   CSysfsPath dolby_vision_flags{"/sys/module/amdolby_vision/parameters/dolby_vision_flags"};
-  if (dolby_vision_flags.Exists()) 
+  if (dolby_vision_flags.Exists())
   {
     dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() | FLAG_TOGGLE_FRAME);
     CLog::Log(LOGINFO, "AMLUtils::{} - Toggle Frame - start - for mode [{}]", __FUNCTION__, aml_dv_output_mode_to_string(mode));
     std::chrono::time_point<std::chrono::system_clock> now(std::chrono::system_clock::now());
-    while(true) { 
+    while(true) {
       if ((dolby_vision_flags.Get<unsigned int>().value() & FLAG_TOGGLE_FRAME) == 0) {
         CLog::Log(LOGINFO, "AMLUtils::{} - Toggle Frame - done - for mode [{}]", __FUNCTION__, aml_dv_output_mode_to_string(mode));
         break;
       }
       if ((std::chrono::system_clock::now() - now) >= std::chrono::milliseconds(3000)) {
         CLog::Log(LOGINFO, "AMLUtils::{} - Toggle Frame - wait time elapsed - for mode [{}]", __FUNCTION__, aml_dv_output_mode_to_string(mode));
+        // Timed out without the kernel consuming the toggle request. Happens
+        // when the consume path in amdolby_vision.c:7256/7325 can't run (no
+        // frames yet → new_dovi_setting.video_width/height stay 0). Leaving
+        // FLAG_TOGGLE_FRAME asserted lets the stuck request bleed into
+        // subsequent code paths, where the kernel keeps treating it as
+        // pending — manifests as FBIO_WAITFORVSYNC_64 returning stale
+        // timestamps and the testers' "audio works, picture frozen / HDMI
+        // requires power-cycle" symptom. Force-clear here so the
+        // user-space request doesn't dangle.
+        dolby_vision_flags.Set(dolby_vision_flags.Get<unsigned int>().value() & ~FLAG_TOGGLE_FRAME);
+        CLog::Log(LOGWARNING, "AMLUtils::{} - Toggle Frame - force-cleared stuck FLAG_TOGGLE_FRAME after timeout", __FUNCTION__);
         break;
-      } 
+      }
       usleep(10000); // wait 10ms
     }
   }
