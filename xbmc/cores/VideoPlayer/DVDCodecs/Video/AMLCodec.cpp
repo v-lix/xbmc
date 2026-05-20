@@ -2125,6 +2125,12 @@ bool CAMLCodec::OpenDecoder()
   if ((hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION) && aml_is_dv_enable())
   {
     am_private->gcodec.dv_enable = 1;
+
+    // Minimal BL vfm pipeline for progressive DV: strip ppmgr/deinterlace nodes
+    // to reduce buffering/latency and improve pacing. Interlaced keeps deinterlace.
+    if (!hints.interlaced)
+      SetVfmMap("dvblpath", "dvbldec amlvideo amvideo");
+
     if (((hints.dovi.dv_profile == 4) || (hints.dovi.dv_profile == 7)) && (hints.dovi_el_type != DOVIELType::TYPE_MEL))
     {
       aml_dv_enable_fel();                              // Make sure enable fel is set.
@@ -2286,6 +2292,7 @@ bool CAMLCodec::OpenAmlVideo(const CDVDStreamInfo &hints)
 
   m_amlVideoFile = amlVideoFile;
   m_defaultVfmMap = GetVfmMap("default");
+  m_dvblpathVfmMap = GetVfmMap("dvblpath");
 
   return true;
 }
@@ -2371,8 +2378,10 @@ void CAMLCodec::CloseAmlVideo()
 {
   m_amlVideoFile.reset();
 
-  if (am_private->vcodec.dec_mode == STREAM_TYPE_SINGLE)
-    SetVfmMap("default", m_defaultVfmMap);
+  // Restore both maps unconditionally: the dvblpath override above is gated only
+  // on !interlaced (not dec_mode), so FEL/stream DV also modifies it and must restore.
+  SetVfmMap("default", m_defaultVfmMap);
+  SetVfmMap("dvblpath", m_dvblpathVfmMap);
 
   m_amlVideoFile = NULL;
 }
