@@ -26621,7 +26621,7 @@ msgstr ""
 #. Help text for Reset PTS offset on seek setting
 #: system/settings/settings.xml
 msgctxt "#60605"
-msgid "Reset the PTS timestamp correction offset when seeking. Fixes subtitle desync after multiple seeks, but introduces a slightly \"jumpy\" A/V sync behaviour after seeking, which is not a big issue and usually desirable over subtitle desync."
+msgid "Reset the PTS timestamp correction offset when seeking, but only while an external subtitle file is loaded. Fixes external subtitle desync after multiple seeks. It can introduce a slightly \"jumpy\" A/V sync after a seek on files with timestamp discontinuities, which is usually preferable to drifting subtitles. Embedded subtitles and playback without external subtitles are unaffected."
 msgstr ""
 
 msgctxt "#60606"

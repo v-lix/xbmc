@@ -19570,7 +19570,7 @@ msgstr "PTS-Offset beim Seeken zurücksetzen"
 
 msgctxt "#60605"
 msgid "Reset the PTS timestamp correction offset when seeking. Fixes subtitle desync after multiple seeks, but introduces a slightly \"jumpy\" A/V sync behaviour after seeking, which is not a big issue and usually desirable over subtitle desync."
-msgstr "Setzt den PTS-Zeitstempel-Korrektur-Offset beim Seeken zurück. Behebt die Desynchronisation von Untertiteln nach mehreren Suchvorgängen, führt aber ein leicht \"sprunghaftes\" A/V-Synchronisationsverhalten nach dem Seekvorgang ein, was kein großes Problem darstellt und in der Regel gegenüber der Desynchronisation von Untertiteln wünschenswert ist."
+msgstr "Setzt den PTS-Zeitstempel-Korrektur-Offset beim Seeken zurück, jedoch nur, solange eine externe Untertiteldatei geladen ist. Behebt die Desynchronisation externer Untertitel nach mehreren Suchvorgängen. Kann auf Dateien mit Zeitstempel-Unstetigkeiten ein leicht \"sprunghaftes\" A/V-Synchronisationsverhalten nach dem Seekvorgang verursachen, was in der Regel gegenüber driftenden Untertiteln vorzuziehen ist. Eingebettete Untertitel sowie die Wiedergabe ohne externe Untertitel sind nicht betroffen."
 
 msgctxt "#60606"
 msgid "Force all display modes"
