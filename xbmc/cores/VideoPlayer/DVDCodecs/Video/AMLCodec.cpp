@@ -2094,10 +2094,16 @@ bool CAMLCodec::OpenDecoder()
 
   // Skip DV compositor activation for windowed playback to avoid HDMI handshakes
   // (e.g. trailer previews in skins toggling DV on/off for each clip).
-  m_fullscreen = m_processInfo.IsFullscreen();
+  // options.fullscreen is the *request* to enter fullscreen — false on auto-play
+  // queued items even though VideoFullScreen is still up, so also consult the
+  // current GfxContext state. Persist the decision so close mirrors it exactly,
+  // even if the setting or fullscreen state changes mid-playback.
   bool skipWindowed = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
       CSettings::SETTING_COREELEC_AMLOGIC_DV_SKIP_WINDOWED);
-  if (m_fullscreen || !skipWindowed)
+  bool isFullscreen = m_processInfo.IsFullscreen() ||
+                      CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo();
+  m_dvOpened = (isFullscreen || !skipWindowed);
+  if (m_dvOpened)
     aml_dv_open(hints.hdrType, hints.bitdepth, hints.colorPrimaries);
 
   // L5 active area detection: only for native DV content (not VS10 SDR/HDR10/HLG
@@ -2369,8 +2375,7 @@ void CAMLCodec::CloseDecoder()
 
   CloseAmlVideo();
 
-  if (m_fullscreen || !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
-          CSettings::SETTING_COREELEC_AMLOGIC_DV_SKIP_WINDOWED))
+  if (m_dvOpened)
     aml_dv_close();
 }
 
