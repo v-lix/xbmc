@@ -2899,11 +2899,20 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
 
     if ((cur_fractional_rate != fractional_rate) || force_mode_switch)
     {
-      cur_mode = "null";
-      if (display_mode.Exists())
-        display_mode.Set(cur_mode);
-      if (amhdmitx0_frac_rate_policy.Exists())
-        amhdmitx0_frac_rate_policy.Set(fractional_rate);
+      // Skip the null→target HDMI re-init dance when neither the display
+      // mode nor the fractional rate is actually changing — i.e.
+      // force_mode_switch was set purely for HDR/DV signaling that the
+      // kernel already handles via attr writes. Avoids an extra sink
+      // renegotiation on mid-playback VS10 transitions where the user
+      // cycles DV output modes while the file's native rate stays put.
+      if ((cur_fractional_rate != fractional_rate) || (cur_mode != mode))
+      {
+        cur_mode = "null";
+        if (display_mode.Exists())
+          display_mode.Set(cur_mode);
+        if (amhdmitx0_frac_rate_policy.Exists())
+          amhdmitx0_frac_rate_policy.Set(fractional_rate);
+      }
     }
   }
 
