@@ -117,6 +117,12 @@ static void aml_display_mode_round_trip(const char* fn);
 // snapshot when it detects a stall on FBIO_WAITFORVSYNC_64.
 void aml_dv_dump_state(const char* tag);
 
+// Forward-declared so aml_dv_on can call it (definition sits next to
+// aml_dv_display_auto_now further down). Writes the kernel one-shot
+// xbmc_next_eotf hint before an attr write that will trigger
+// set_disp_mode_auto.
+static void aml_dv_hint_next_eotf(unsigned int eotf);
+
 static void aml_dv_reset_osd_max()
 {
   int max(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE));
@@ -915,7 +921,7 @@ unsigned int aml_dv_on(unsigned int mode)
 
     if ((mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL) || (mode == DOLBY_VISION_OUTPUT_MODE_IPT)) {
       aml_dv_trigger_update_resolution(StreamHdrType::HDR_TYPE_DOLBYVISION); // Required for 60Hz VS10 > DV.
-      aml_dv_display_auto_now();
+      aml_dv_display_auto_now(AML_EOTF_DOLBYVISION);
     }
     else if (dv_non_ipt) {
       // Any transition into a VS10 non-IPT output mode needs the HDMI TX
@@ -952,6 +958,10 @@ unsigned int aml_dv_on(unsigned int mode)
       }
       if (!fmt_attr.empty()) fmt_attr += ",";
       fmt_attr += "now";
+      // Hint the kernel which eotf the AVI should be built for, so the
+      // multi-step VS10 transition doesn't paint the AVI with the previous
+      // mode's eotf. HDR10 mode signals HDR10 EOTF; SDR* modes signal SDR.
+      aml_dv_hint_next_eotf(mode == DOLBY_VISION_OUTPUT_MODE_HDR10 ? AML_EOTF_HDR10 : AML_EOTF_SDR);
       CSysfsPath("/sys/class/amhdmitx/amhdmitx0/attr", fmt_attr);
     }
   }
@@ -1244,7 +1254,10 @@ void aml_dv_off(bool skip_hdmi_update)
   // corrupts the HDMI TX color-space state on some displays.
   if (modeChange && !skip_hdmi_update)
   {
-    aml_dv_display_auto_now();
+    // Going to non-DV (Bypass/SDR) output — hint SDR eotf so the kernel
+    // doesn't carry over the previous DV mode's eotf into the AVI built
+    // by set_disp_mode_auto.
+    aml_dv_display_auto_now(AML_EOTF_SDR);
     const RESOLUTION_INFO res_info = CDisplaySettings::GetInstance().GetResolutionInfo(CDisplaySettings::GetInstance().GetCurrentResolution());
     write_resolution_ini(res_info);
   }
@@ -1411,9 +1424,28 @@ void aml_hdr10plus_vsif_hold(bool hold)
     p.Set(hold ? 1 : 0);
 }
 
-void aml_dv_display_auto_now()
+// One-shot hint to the HDMI TX kernel driver for the eotf the next
+// set_disp_mode_auto should build the AVI from. Without this, the kernel
+// reads hdmi_current_eotf_type which is only updated by the per-frame DV
+// pipeline path (hdmitx_set_vsif_pkt) — so an attr write during a VS10
+// mode transition builds the AVI for the previous mode's eotf, leaving a
+// gap of inconsistent metadata between AVMUTE-clear and the first new VSIF.
+// Marginal sink chains (AVR repeaters) wedge on that gap during rapid
+// cycling. The kernel consumes and zeros the param on the next attr write
+// that triggers set_disp_mode_auto. 0 = no hint (legacy behavior).
+static void aml_dv_hint_next_eotf(unsigned int eotf)
 {
-  // hdmi tx store attr "now" - will trigger set_disp_mode_auto. 
+  CSysfsPath p{"/sys/module/hdmitx20/parameters/xbmc_next_eotf"};
+  if (p.Exists()) {
+    p.Set(eotf);
+    CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_hint_next_eotf - eotf=[{}]", eotf);
+  }
+}
+
+void aml_dv_display_auto_now(unsigned int eotf_hint)
+{
+  // hdmi tx store attr "now" - will trigger set_disp_mode_auto.
+  if (eotf_hint != AML_EOTF_NULL) aml_dv_hint_next_eotf(eotf_hint);
   CSysfsPath attr{"/sys/class/amhdmitx/amhdmitx0/attr"};
   if (attr.Exists()) attr.Set("now");
 }
