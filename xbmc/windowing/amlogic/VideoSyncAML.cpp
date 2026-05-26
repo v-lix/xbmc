@@ -8,8 +8,12 @@
 
 #include "VideoSyncAML.h"
 #include "ServiceBroker.h"
+#include "dialogs/GUIDialogKaiToast.h"
+#include "guilib/LocalizeStrings.h"
 #include "windowing/GraphicContext.h"
 #include "cores/VideoPlayer/VideoReferenceClock.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/AMLUtils.h"
 #include "utils/TimeUtils.h"
 #include "utils/log.h"
@@ -49,6 +53,12 @@ bool CVideoSyncAML::Setup()
   m_lastKernelTs = 0;
   m_staleTsCount = 0;
   m_staleStallLogged = false;
+
+  // Cache opt-in fallback setting once per Setup so the per-iteration hot
+  // path doesn't touch the settings system. Re-evaluated on next playback.
+  const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  m_fallbackOnStall = settings &&
+    settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_VIDEOSYNC_FALLBACK_ON_STALL);
 
   CServiceBroker::GetWinSystem()->Register(this);
   CLog::Log(LOGDEBUG, "CVideoReferenceClock: setting up AML");
@@ -184,6 +194,24 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
                     m_staleTsCount);
           aml_dv_dump_state("vsync_stall");
           m_staleStallLogged = true;
+
+          if (m_fallbackOnStall)
+          {
+            // Permanent (per-session) fallback to legacy timing. Close the
+            // fb to make the next loop iterations skip the ioctl entirely.
+            // Reset on next Setup() so a fresh playback gets another shot
+            // at the kernel vsync path.
+            CLog::Log(LOGWARNING,
+                      "CVideoSyncAML: stall-fallback enabled — closing "
+                      "/dev/fb0 and staying on legacy timing for this session");
+            close(m_fbFd);
+            m_fbFd = -1;
+            CGUIDialogKaiToast::QueueNotification(
+              CGUIDialogKaiToast::Warning,
+              g_localizeStrings.Get(14307),
+              "Switched to legacy timing",
+              8000);
+          }
         }
       }
       else
