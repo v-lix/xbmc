@@ -921,7 +921,19 @@ unsigned int aml_dv_on(unsigned int mode)
 
     if ((mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL) || (mode == DOLBY_VISION_OUTPUT_MODE_IPT)) {
       aml_dv_trigger_update_resolution(StreamHdrType::HDR_TYPE_DOLBYVISION); // Required for 60Hz VS10 > DV.
-      aml_dv_display_auto_now(AML_EOTF_DOLBYVISION);
+      // Match the hint to what actually appears on the wire — depends on
+      // dv_type. Display-LED (IPT_TUNNEL) sends a DV VSIF (DOLBYVISION);
+      // Player-LED LLDV sends a DV LL VSIF (LL_MODE); Player-LED HDR/HDR2
+      // sends an HDR10 DRM packet (HDR10). Hinting the wrong eotf made
+      // the kernel build the AVI for one format while the sink saw a
+      // different paired packet, and the AVMUTE-hold then waited for a
+      // VSIF that never came in the HDR paths.
+      unsigned int eotf_hint = AML_EOTF_DOLBYVISION;
+      if (dv_type == DV_TYPE_PLAYER_LED_LLDV)
+        eotf_hint = AML_EOTF_LL_MODE;
+      else if (dv_type == DV_TYPE_PLAYER_LED_HDR || dv_type == DV_TYPE_PLAYER_LED_HDR2)
+        eotf_hint = AML_EOTF_HDR10;
+      aml_dv_display_auto_now(eotf_hint);
     }
     else if (dv_non_ipt) {
       // Any transition into a VS10 non-IPT output mode needs the HDMI TX
