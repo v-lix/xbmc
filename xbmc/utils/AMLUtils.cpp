@@ -2751,8 +2751,14 @@ bool aml_set_native_resolution(const RESOLUTION_INFO &res, std::string framebuff
 {
   bool result = false;
 
-  aml_handle_display_stereo_mode(stereo_mode);
-  result = aml_set_display_resolution(res, framebuffer_name, force_mode_switch);
+  // Capture whether stereo actually changed so aml_set_display_resolution
+  // can force the null→target HDMI re-init even when the resolution and
+  // refresh rate are unchanged — stereo-only transitions (e.g. 1080p24
+  // SBS → 1080p24 mono on 3D teardown) still need the kernel to re-train
+  // HDMI for the new packing.
+  const bool stereo_changing = aml_handle_display_stereo_mode(stereo_mode);
+
+  result = aml_set_display_resolution(res, framebuffer_name, force_mode_switch, stereo_changing);
   if (stereo_mode != RENDER_STEREO_MODE_OFF)
     CSysfsPath("/sys/class/amhdmitx/amhdmitx0/phy", 1);
 
@@ -2896,7 +2902,7 @@ bool aml_display_mode_changing(const RESOLUTION_INFO &res)
 }
 
 bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuffer_name,
-  bool force_mode_switch)
+  bool force_mode_switch, bool stereo_changing)
 {
   std::string mode = res.strId.c_str();
   std::string cur_mode;
@@ -2949,7 +2955,11 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
       // kernel already handles via attr writes. Avoids an extra sink
       // renegotiation on mid-playback VS10 transitions where the user
       // cycles DV output modes while the file's native rate stays put.
-      if ((cur_fractional_rate != fractional_rate) || (cur_mode != mode))
+      // Stereo transitions still need the dance — the resolution string
+      // matches but the HDMI packing actually changed (FramePacking, SBS,
+      // TopBottom flags in res.dwFlags), and without the kernel re-train
+      // sinks stay on the old 3D format → blank on 3D teardown.
+      if ((cur_fractional_rate != fractional_rate) || (cur_mode != mode) || stereo_changing)
       {
         cur_mode = "null";
         if (display_mode.Exists())
@@ -2989,7 +2999,7 @@ void aml_handle_scale(const RESOLUTION_INFO &res)
     aml_disable_freeScale();
 }
 
-void aml_handle_display_stereo_mode(const int stereo_mode)
+bool aml_handle_display_stereo_mode(const int stereo_mode)
 {
   static int kernel_stereo_mode = -1;
 
@@ -3022,7 +3032,9 @@ void aml_handle_display_stereo_mode(const int stereo_mode)
     CLog::Log(LOGDEBUG, "AMLUtils::{} setting new mode: {}", __FUNCTION__, command);
     CSysfsPath("/sys/class/amhdmitx/amhdmitx0/config", command);
     kernel_stereo_mode = stereo_mode;
+    return true;
   }
+  return false;
 }
 
 void aml_enable_freeScale(const RESOLUTION_INFO &res)
