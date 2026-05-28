@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <mutex>
 
 using namespace KODI::SUBTITLES::STYLE;
@@ -39,6 +40,20 @@ constexpr int ASS_BORDER_STYLE_SQUARE_BOX = 4; // Square box + outline
 COLOR::Color ConvColor(COLOR::Color argbColor, int opacity = 100)
 {
   return COLOR::ConvertToRGBA(COLOR::ChangeOpacity(argbColor, (100.0f - opacity) / 100.0f));
+}
+
+// Compare every render option that influences libass output, so the static
+// overlay cache only reuses a previous render when nothing visible changed.
+bool RenderOptsEqual(const renderOpts& a, const renderOpts& b)
+{
+  return a.frameWidth == b.frameWidth && a.frameHeight == b.frameHeight &&
+         a.videoWidth == b.videoWidth && a.videoHeight == b.videoHeight &&
+         a.sourceWidth == b.sourceWidth && a.sourceHeight == b.sourceHeight &&
+         a.m_par == b.m_par && a.marginsMode == b.marginsMode && a.position == b.position &&
+         a.horizontalAlignment == b.horizontalAlignment &&
+         a.activeAreaTopMargin == b.activeAreaTopMargin &&
+         a.activeAreaBottomMargin == b.activeAreaBottomMargin &&
+         a.activeAreaApplyUserPos == b.activeAreaApplyUserPos;
 }
 
 } // namespace
@@ -164,6 +179,7 @@ bool CDVDSubtitlesLibass::DecodeHeader(char* data, int size)
 
   CLog::Log(LOGINFO, "CDVDSubtitlesLibass: Creating new ASS track");
   m_track = ass_new_track(m_library);
+  InvalidateRenderCache();
 
   ass_process_codec_private(m_track, data, size);
 
@@ -188,6 +204,14 @@ bool CDVDSubtitlesLibass::DecodeDemuxPkt(const char* data, int size, double star
   //! @bug libass isn't const correct
   ass_process_chunk(m_track, const_cast<char*>(data), size, DVD_TIME_TO_MSEC(start),
                     DVD_TIME_TO_MSEC(duration));
+
+  // A newly added event that begins before the current cached interval ends
+  // can change the visible set within it, so the cache must be dropped. Events
+  // that start later than the interval are picked up by the re-render at the
+  // interval boundary, so they can be ignored to keep the cache effective.
+  if (m_renderCacheValid && DVD_TIME_TO_MSEC(start) < m_cacheValidUntil)
+    InvalidateRenderCache();
+
   return true;
 }
 
@@ -207,6 +231,7 @@ bool CDVDSubtitlesLibass::CreateTrack()
     CLog::Log(LOGERROR, "{} - Failed to allocate ASS track.", __FUNCTION__);
     return false;
   }
+  InvalidateRenderCache();
 
   m_track->track_type = m_track->TRACK_TYPE_ASS;
   m_track->Timer = 100.;
@@ -255,6 +280,7 @@ bool CDVDSubtitlesLibass::CreateTrack(char* buf, size_t size)
   m_track = ass_read_memory(m_library, buf, size, 0);
   if (m_track == NULL)
     return false;
+  InvalidateRenderCache();
 
   return true;
 }
@@ -278,7 +304,24 @@ ASS_Image* CDVDSubtitlesLibass::RenderImage(double pts,
     return nullptr;
   }
 
-  if (updateStyle || m_currentDefaultStyleId == ASS_NO_ID)
+  const int64_t ptsMs = DVD_TIME_TO_MSEC(pts);
+  const bool styleChanged = updateStyle || m_currentDefaultStyleId == ASS_NO_ID;
+
+  // Fast path: if the render options are unchanged, the style was not
+  // re-applied, and we are still inside a precomputed interval over which the
+  // visible set is constant (no event starts/ends, no animated event active),
+  // the output is provably identical to the previous render. Reuse the cached
+  // image list and skip ass_render_frame(), which can take hundreds of ms for
+  // heavy static signs and would otherwise stall the render thread every frame.
+  if (!styleChanged && m_renderCacheValid && RenderOptsEqual(opts, m_lastOpts) &&
+      ptsMs >= m_cacheValidFrom && ptsMs < m_cacheValidUntil)
+  {
+    if (changes)
+      *changes = 0;
+    return m_lastImages;
+  }
+
+  if (styleChanged)
   {
     ApplyStyle(subStyle, opts);
   }
@@ -339,7 +382,103 @@ ASS_Image* CDVDSubtitlesLibass::RenderImage(double pts,
   // if the playback occurs in sequence (without seeks) the overlapped subtitles lines will be rendered in right order
   // if you seek forward/backward the video, the overlapped subtitles lines could be rendered in the wrong order
   // this is a known side effect from libass devs and not a bug from our part
-  return ass_render_frame(m_renderer, m_track, DVD_TIME_TO_MSEC(pts), changes);
+  int localChanges = 0;
+  m_lastImages = ass_render_frame(m_renderer, m_track, ptsMs, &localChanges);
+  if (changes)
+    *changes = localChanges;
+
+  // The returned image list stays valid until the next ass_render_frame() or
+  // track mutation; cache it together with the interval over which it holds.
+  m_lastOpts = opts;
+  UpdateRenderCache(ptsMs);
+
+  return m_lastImages;
+}
+
+bool CDVDSubtitlesLibass::IsDynamicEvent(const ASS_Event* assEvent) const
+{
+  // Scroll/banner effects move the text continuously over the event lifetime.
+  if (assEvent->Effect && assEvent->Effect[0])
+  {
+    std::string effect = assEvent->Effect;
+    StringUtils::ToLower(effect);
+    if (effect.find("scroll") != std::string::npos || effect.find("banner") != std::string::npos)
+      return true;
+  }
+
+  // Override tags whose output depends on the timestamp within the event:
+  // \t (animated transform), \move, \fad/\fade, \k/\K/\kf/\ko/\kt (karaoke).
+  // Matching is intentionally conservative: a false positive only costs a
+  // per-frame re-render, never correctness.
+  const char* text = assEvent->Text;
+  if (!text)
+    return false;
+
+  return std::strstr(text, "\\t") || std::strstr(text, "\\move") ||
+         std::strstr(text, "\\fad") || std::strstr(text, "\\k") || std::strstr(text, "\\K");
+}
+
+void CDVDSubtitlesLibass::UpdateRenderCache(int64_t ptsMs)
+{
+  if (!m_track)
+  {
+    m_renderCacheValid = false;
+    return;
+  }
+
+  // Find the largest interval [from, until) containing ptsMs over which the
+  // set of active events does not change. Event Start and (Start+Duration)
+  // times are the only boundaries. If any active event is dynamic, the output
+  // changes every frame and we must not cache.
+  int64_t from = std::numeric_limits<int64_t>::min();
+  int64_t until = std::numeric_limits<int64_t>::max();
+  bool dynamic = false;
+
+  for (int i = 0; i < m_track->n_events; i++)
+  {
+    const ASS_Event* assEvent = m_track->events + i;
+    const int64_t start = assEvent->Start;
+    const int64_t end = assEvent->Start + assEvent->Duration;
+    if (end <= start)
+      continue; // zero/negative duration, never visible
+
+    if (start <= ptsMs && end > ptsMs) // active now
+    {
+      if (end < until)
+        until = end;
+      if (start > from)
+        from = start;
+      if (IsDynamicEvent(assEvent))
+        dynamic = true;
+    }
+    else if (start > ptsMs) // starts in the future -> upper boundary
+    {
+      if (start < until)
+        until = start;
+    }
+    else // already ended (end <= ptsMs) -> lower boundary
+    {
+      if (end > from)
+        from = end;
+    }
+  }
+
+  if (dynamic || until <= ptsMs)
+  {
+    m_renderCacheValid = false;
+  }
+  else
+  {
+    m_cacheValidFrom = from;
+    m_cacheValidUntil = until;
+    m_renderCacheValid = true;
+  }
+}
+
+void CDVDSubtitlesLibass::InvalidateRenderCache()
+{
+  m_renderCacheValid = false;
+  m_lastImages = nullptr;
 }
 
 void CDVDSubtitlesLibass::ApplyStyle(const std::shared_ptr<struct style>& subStyle, renderOpts opts)
@@ -720,6 +859,7 @@ int CDVDSubtitlesLibass::AddEvent(const char* text,
       event->MarginR = opts->marginRight;
       event->MarginV = opts->marginVertical;
     }
+    InvalidateRenderCache();
     return eventId;
   }
   else
@@ -756,6 +896,7 @@ void CDVDSubtitlesLibass::AppendTextToEvent(int eventId, const char* text)
     free(assEvent->Text);
     assEvent->Text = strdup(appendedText);
     delete[] appendedText;
+    InvalidateRenderCache();
   }
 }
 
@@ -780,7 +921,10 @@ void CDVDSubtitlesLibass::ChangeEventStopTime(int eventId, double stopTime)
 
   ASS_Event* assEvent = (assEvents + eventId);
   if (assEvent)
+  {
     assEvent->Duration = (DVD_TIME_TO_MSEC(stopTime) - assEvent->Start);
+    InvalidateRenderCache();
+  }
 }
 
 void CDVDSubtitlesLibass::FlushEvents()
@@ -793,6 +937,7 @@ void CDVDSubtitlesLibass::FlushEvents()
   }
 
   ass_flush_events(m_track);
+  InvalidateRenderCache();
 }
 
 int CDVDSubtitlesLibass::DeleteEvents(int nEvents, int threshold)
@@ -811,6 +956,7 @@ int CDVDSubtitlesLibass::DeleteEvents(int nEvents, int threshold)
 
   // Currently LibAss do not have delete event method we have to free the events
   // and reassign all events starting with the first empty position
+  InvalidateRenderCache();
   int n = 0;
   for (; n < nEvents; n++)
   {
