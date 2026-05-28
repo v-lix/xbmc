@@ -4623,7 +4623,13 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
-        <setting id="coreelec.amlogic.videosync.fallback.on.stall" type="boolean" parent="coreelec.amlogic.usedisplayasclock" label="14307" help="14308">
+        <setting id="coreelec.amlogic.fastseek" type="boolean" label="14305" help="14306">
+          <requirement>HAVE_AMCODEC</requirement>
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="coreelec.amlogic.videosync.fallback.on.stall" type="boolean" label="14307" help="14308">
           <requirement>HAVE_AMCODEC</requirement>
           <level>2</level>
           <default>false</default>
@@ -4632,12 +4638,6 @@
               <condition setting="coreelec.amlogic.usedisplayasclock" operator="is">true</condition>
             </dependency>
           </dependencies>
-          <control type="toggle" />
-        </setting>
-        <setting id="coreelec.amlogic.fastseek" type="boolean" label="14305" help="14306">
-          <requirement>HAVE_AMCODEC</requirement>
-          <level>2</level>
-          <default>true</default>
           <control type="toggle" />
         </setting>
       </group>
