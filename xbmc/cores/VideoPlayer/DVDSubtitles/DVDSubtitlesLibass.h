@@ -161,43 +161,11 @@ private:
   void ApplyStyle(const std::shared_ptr<struct KODI::SUBTITLES::STYLE::style>& subStyle,
                   KODI::SUBTITLES::STYLE::renderOpts opts);
 
-  /*!
-  * \brief Whether an event's appearance changes over time (animation tags or
-  * scroll/banner effects), meaning it must be re-rendered every frame.
-  */
-  bool IsDynamicEvent(const ASS_Event* assEvent) const;
-
-  /*!
-  * \brief Recompute the time interval [m_cacheValidFrom, m_cacheValidUntil)
-  * over which the rendered output is provably constant, based on the active
-  * event set at the given pts (ms). Disables the cache if any active event is
-  * dynamic. Must be called with m_section held, right after a real render.
-  */
-  void UpdateRenderCache(int64_t ptsMs);
-
-  /*!
-  * \brief Invalidate the static-overlay render cache (call whenever events
-  * are added/removed/modified). Must be called with m_section held.
-  */
-  void InvalidateRenderCache();
-
   ASS_Library* m_library = nullptr;
   ASS_Track* m_track = nullptr;
   ASS_Renderer* m_renderer = nullptr;
   mutable CCriticalSection m_section;
   ASSSubType m_subtitleType{NATIVE};
-
-  // Static-overlay render cache: lets RenderImage skip the (potentially very
-  // expensive) ass_render_frame() call on frames whose output is provably
-  // identical to the previous one. Without this, heavy static signs
-  // (typesetting with hundreds of \p drawing events) re-rasterize on every
-  // video frame on the render thread, starving video buffer recycling and
-  // collapsing playback to a few fps.
-  ASS_Image* m_lastImages{nullptr};
-  KODI::SUBTITLES::STYLE::renderOpts m_lastOpts{};
-  bool m_renderCacheValid{false};
-  int64_t m_cacheValidFrom{0};
-  int64_t m_cacheValidUntil{0};
 
   // current default style ID of the ASS track
   int m_currentDefaultStyleId{ASS_NO_ID};
