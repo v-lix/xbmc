@@ -38,17 +38,6 @@ enum AML_DISPLAY_AXIS_PARAM
   AML_DISPLAY_AXIS_PARAM_HEIGHT
 };
 
-// Mirror of kernel's enum eotf_type (drivers/.../vinfo.h), for the
-// /sys/module/hdmitx20/parameters/xbmc_next_eotf one-shot hint.
-enum AML_EOTF_HINT
-{
-  AML_EOTF_NULL = 0,
-  AML_EOTF_DOLBYVISION = 1,
-  AML_EOTF_HDR10 = 2,
-  AML_EOTF_SDR = 3,
-  AML_EOTF_LL_MODE = 4,
-};
-
 enum AML_SUPPORT_H264_4K2K
 {
   AML_SUPPORT_H264_4K2K_UNINIT = -1,
@@ -170,7 +159,7 @@ void aml_dv_set_hdr10_osd_brightness(int nits);
 bool aml_is_dv_enable();
 void aml_dv_display_trigger();
 void aml_hdr10plus_vsif_hold(bool hold);
-void aml_dv_display_auto_now(unsigned int eotf_hint = 0);
+void aml_dv_display_auto_now();
 void aml_dv_start();
 void aml_dv_wait_for_pipeline();
 void aml_dv_set_subtitles(bool visible);
