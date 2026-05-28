@@ -154,22 +154,6 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
     return true;
   }
 
-  // Bracket the DV+resolution renegotiation pair behind AVMUTE when the
-  // sink is an AVR repeater. The dv_off (already happened on the player
-  // thread by the time we get here) plus the upcoming mode change at
-  // CWinSystemAmlogic::CreateNewWindow are two HDMI events close together;
-  // some AVRs lose lock when they see both as live signal changes and
-  // require a manual input toggle to recover. AVMUTE makes the AVR see a
-  // single clean blank instead of two consecutive renegotiations. A
-  // detached worker clears AVMUTE after the resolution change settles
-  // (~OnResetDisplay window). Direct-to-TV sinks skip the entire path.
-  const bool avr_bracket = force_mode_switch_by_dv && aml_is_hdmi_repeater();
-  if (avr_bracket)
-  {
-    CLog::Log(LOGDEBUG, "CWinSystemAmlogicGLESContext::{}: AVR bracket — AVMUTE on for DV+mode-change", __FUNCTION__);
-    aml_avmute_set();
-  }
-
   // destroy old window, then create a new one
   DestroyWindow();
 
@@ -192,15 +176,7 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
 
   if (!CWinSystemAmlogic::CreateNewWindow(name, fullScreen, res))
   {
-    if (avr_bracket) aml_avmute_clear();
     return false;
-  }
-
-  if (avr_bracket)
-  {
-    // 1500ms ≈ observed OnResetDisplay gap on this hardware family for a
-    // DV→GUI mode change. Detached so we don't block the GUI thread.
-    aml_avmute_clear_after(1500);
   }
 
   // Wait for any in-progress DV pipeline restoration to complete before

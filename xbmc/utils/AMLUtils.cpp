@@ -19,7 +19,6 @@
 #include <cmath>
 #include <algorithm>
 #include <mutex>
-#include <thread>
 
 #include "AMLUtils.h"
 
@@ -2990,52 +2989,6 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
   aml_set_framebuffer_resolution(res, framebuffer_name);
 
   return true;
-}
-
-// Cached sink_type read — the EDID is only re-parsed on HPD events, so the
-// repeater/sink classification is stable for the duration of a session and
-// we don't want to hit sysfs on every CreateNewWindow.
-static std::mutex s_sinkTypeMutex;
-static int s_sinkTypeIsRepeater = -1; // -1 = unknown, 0 = direct sink, 1 = repeater
-bool aml_is_hdmi_repeater()
-{
-  {
-    std::lock_guard<std::mutex> lk(s_sinkTypeMutex);
-    if (s_sinkTypeIsRepeater != -1)
-      return s_sinkTypeIsRepeater == 1;
-  }
-  CSysfsPath sink_type{"/sys/class/amhdmitx/amhdmitx0/sink_type"};
-  bool repeater = false;
-  if (sink_type.Exists())
-  {
-    std::string s = sink_type.Get<std::string>().value_or("");
-    // Kernel emits "sink_type: sink" or "sink_type: repeater" (or just
-    // "repeater"/"sink" depending on version). Match either form.
-    repeater = s.find("repeater") != std::string::npos;
-  }
-  std::lock_guard<std::mutex> lk(s_sinkTypeMutex);
-  s_sinkTypeIsRepeater = repeater ? 1 : 0;
-  return repeater;
-}
-
-void aml_avmute_set()
-{
-  CSysfsPath p{"/sys/class/amhdmitx/amhdmitx0/avmute"};
-  if (p.Exists()) p.Set("1");
-}
-
-void aml_avmute_clear()
-{
-  CSysfsPath p{"/sys/class/amhdmitx/amhdmitx0/avmute"};
-  if (p.Exists()) p.Set("-1");
-}
-
-void aml_avmute_clear_after(int delayMs)
-{
-  std::thread([delayMs]() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
-    aml_avmute_clear();
-  }).detach();
 }
 
 void aml_handle_scale(const RESOLUTION_INFO &res)
