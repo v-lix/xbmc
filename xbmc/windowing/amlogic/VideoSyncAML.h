@@ -34,9 +34,4 @@ private:
   // point, not just at the prior DV transition. Latched so we don't spam.
   int m_staleTsCount{0};
   bool m_staleStallLogged{false};
-  // Opt-in (coreelec.amlogic.videosync.fallback.on.stall): when the stall
-  // detector trips, close /dev/fb0 so the loop stops trying the kernel vsync
-  // ioctl for the rest of the session and stays on the legacy elapsed-time
-  // path. Avoids busy-retrying a wedged HDMI engine.
-  bool m_fallbackOnStall{false};
 };

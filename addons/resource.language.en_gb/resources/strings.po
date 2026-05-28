@@ -8838,19 +8838,7 @@ msgctxt "#14306"
 msgid "Seek to the nearest video keyframe instead of the exact requested time. With hardware decoding, frame-accurate seeking has to decode a full GOP of pre-target frames before reaching the requested time, which is visible as a brief fast-forward or stutter after seek. Keyframe seeking lands up to one GOP-length earlier than requested but plays smoothly. Disable for frame-accurate seeking at the cost of post-seek catch-up artefacts."
 msgstr ""
 
-#. CoreELEC: Amlogic videosync fallback-on-stall label
-#: system/settings/settings.xml
-msgctxt "#14307"
-msgid "Fall back to legacy timing on HDMI vsync stall"
-msgstr ""
-
-#. CoreELEC: Amlogic videosync fallback-on-stall help
-#: system/settings/settings.xml
-msgctxt "#14308"
-msgid "When the HDMI vsync clock (FBIO_WAITFORVSYNC_64) stops progressing for ~1 second the reference clock falls back to legacy elapsed-time timing for the rest of the playback session and a notification is shown. Useful on AVR/repeater chains where the HDMI engine can briefly stall after rapid mode changes. Default off — most setups should stay on the kernel vsync."
-msgstr ""
-
-#empty strings from id 14309 to 15010
+#empty strings from id 14307 to 15010
 
 #: xbmc/music/MusicDatabase.cpp
 #: xbmc/video/VideoDatabase.cpp

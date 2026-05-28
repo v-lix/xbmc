@@ -4629,17 +4629,6 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
-        <setting id="coreelec.amlogic.videosync.fallback.on.stall" type="boolean" label="14307" help="14308">
-          <requirement>HAVE_AMCODEC</requirement>
-          <level>2</level>
-          <default>false</default>
-          <dependencies>
-            <dependency type="enable">
-              <condition setting="coreelec.amlogic.usedisplayasclock" operator="is">true</condition>
-            </dependency>
-          </dependencies>
-          <control type="toggle" />
-        </setting>
       </group>
     </category>
     <category id="cache" label="439" help="36399">

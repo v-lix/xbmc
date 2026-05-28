@@ -6906,14 +6906,6 @@ msgctxt "#14306"
 msgid "Seek to the nearest video keyframe instead of the exact requested time. With hardware decoding, frame-accurate seeking has to decode a full GOP of pre-target frames before reaching the requested time, which is visible as a brief fast-forward or stutter after seek. Keyframe seeking lands up to one GOP-length earlier than requested but plays smoothly. Disable for frame-accurate seeking at the cost of post-seek catch-up artefacts."
 msgstr "Beim Spulen zum nächsten Video-Keyframe springen statt zur exakt angeforderten Zeit. Bei Hardware-Dekodierung muss bildgenaues Spulen ein vollständiges GOP an Frames vor dem Ziel dekodieren, bevor der gewünschte Punkt erreicht wird — sichtbar als kurzer Schnellvorlauf oder Ruckler nach dem Spulen. Keyframe-Spulen landet bis zu eine GOP-Länge früher als gewünscht, läuft aber flüssig. Deaktivieren für bildgenaues Spulen zum Preis von Aufhol-Artefakten nach dem Spulen."
 
-msgctxt "#14307"
-msgid "Fall back to legacy timing on HDMI vsync stall"
-msgstr "Bei HDMI-VSync-Hänger auf alte Zeitsteuerung zurückfallen"
-
-msgctxt "#14308"
-msgid "When the HDMI vsync clock (FBIO_WAITFORVSYNC_64) stops progressing for ~1 second the reference clock falls back to legacy elapsed-time timing for the rest of the playback session and a notification is shown. Useful on AVR/repeater chains where the HDMI engine can briefly stall after rapid mode changes. Default off — most setups should stay on the kernel vsync."
-msgstr "Wenn der HDMI-VSync-Takt (FBIO_WAITFORVSYNC_64) für ca. 1 Sekunde nicht mehr fortschreitet, fällt die Referenzuhr für den Rest der Wiedergabesitzung auf die alte verstrichene-Zeit-Steuerung zurück und eine Benachrichtigung wird angezeigt. Nützlich bei AVR-/Repeater-Ketten, wo die HDMI-Engine nach schnellen Moduswechseln kurz hängen kann. Standardmäßig aus — die meisten Setups sollten beim Kernel-VSync bleiben."
-
 msgctxt "#14424"
 msgid "Dolby Vision Led mode"
 msgstr "Dolby Vision LED-Modus"
