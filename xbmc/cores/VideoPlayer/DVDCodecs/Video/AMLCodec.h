@@ -152,6 +152,6 @@ private:
 
   bool            m_buffer_level_ready;
   float           m_minimum_buffer_level;
-  bool            m_dvOpened = false;
+  bool            m_fullscreen = false;
   std::atomic_bool m_abort{false};
 };
