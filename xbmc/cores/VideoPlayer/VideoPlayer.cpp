@@ -4398,16 +4398,8 @@ void CVideoPlayer::FlushBuffers(double pts, bool accurate, bool sync)
     m_CurrentRadioRDS.inited  = false;
 
     // Reset offset_pts to prevent accumulation of timestamp corrections across seeks
-    // This fixes desync issues with external subtitles after multiple seeks (issue #26647).
-    // Gated on an external (separate-demuxer) subtitle being loaded: m_offset_pts is the
-    // global timeline-renormalisation offset subtracted from every packet, so the clock runs
-    // on the (raw - offset) timeline while a seek's startpts is the raw demuxer dts. Zeroing
-    // it on flush shifts the clock domain across the seek, which the renderer resyncs as a
-    // one-time discontinuity (judder after seek on files with real DTS discontinuities). Only
-    // external subs come from a separate clean timeline that the accumulated offset corrupts,
-    // so restrict the reset to that case and leave embedded-sub / no-sub playback untouched.
-    if (m_pSubtitleDemuxer &&
-        CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+    // This fixes desync issues with external subtitles after multiple seeks (issue #26647)
+    if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
             CSettings::SETTING_COREELEC_RESET_PTS_ON_SEEK))
       m_offset_pts = 0.0;
   }
