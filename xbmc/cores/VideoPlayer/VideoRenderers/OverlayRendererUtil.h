@@ -52,6 +52,17 @@ void convert_rgba(const CDVDOverlaySpu& o,
                   int& max_y,
                   std::vector<uint32_t>& rgba);
 bool convert_quad(ASS_Image* images, SQuads& quads, int max_x);
+
+/*!
+ * \brief Like convert_quad, but splits the glyph bitmaps across as many atlas
+ * pages as needed so that no page exceeds maxTextureSize in either dimension.
+ * Required for heavy typesetting signs whose combined bitmap area would
+ * overflow a single GPU texture. Images are packed in list order, so the
+ * painter's-algorithm blend order is preserved within and across pages
+ * (page 0 must be drawn before page 1, etc.).
+ * \return True if at least one visible glyph was packed.
+ */
+bool convert_quads(ASS_Image* images, std::vector<SQuads>& pages, int maxTextureSize);
 int GetStereoscopicDepth(bool isPgs, int subtitleDepth);
 
 } // namespace OVERLAY
