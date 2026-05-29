@@ -57,11 +57,18 @@ public:
     GLfloat x, y, z;
   };
 
-  std::vector<VERTEX> m_vertex;
+private:
+  // A single subtitle frame can produce more glyph bitmap data than one GPU
+  // texture can hold (heavy typesetting signs). The glyphs are split across
+  // one or more atlas pages, each within GL_MAX_TEXTURE_SIZE, drawn in order
+  // to preserve libass' blending. Most subtitles use a single page.
+  struct Page
+  {
+    GLuint texture{0};
+    std::vector<VERTEX> vertex;
+  };
 
-  GLuint m_texture = 0;
-  float m_u;
-  float m_v;
+  std::vector<Page> m_pages;
 };
 
 } // namespace OVERLAY
