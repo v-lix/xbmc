@@ -587,6 +587,7 @@ static void set_dv_settings_visible(bool show)
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR_TM, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_REASSERT_AFTER_MODESWITCH, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_INJECT, show);
   set_vsvdb_children_visible(show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5, show);

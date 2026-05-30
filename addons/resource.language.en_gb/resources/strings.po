@@ -26728,6 +26728,18 @@ msgctxt "#60625"
 msgid "TCL"
 msgstr ""
 
+#. Label for Dolby Vision re-assert HDR/VS10 output after resolution switch setting
+#: system/settings/settings.xml
+msgctxt "#60626"
+msgid "Re-assert HDR output after resolution change"
+msgstr ""
+
+#. Help text for setting "Re-assert HDR output after resolution change" of label #60626
+#: system/settings/settings.xml
+msgctxt "#60627"
+msgid "For Player-Led output on projectors whose automatic dynamic-range detection flip-flops between SDR and HDR. Re-applies the Dolby Vision / VS10 output after the resolution switches at playback start (the same effect as manually toggling the VS10 mode). May cause a brief blip at playback start, so leave this off unless you actually see SDR/HDR flickering."
+msgstr ""
+
 #. Title of Dolby Vision RPU conversion setting
 #: system/settings/settings.xml
 msgctxt "#69196"

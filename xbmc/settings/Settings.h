@@ -493,6 +493,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS = "coreelec.amlogic.dolbyvision.vs10.hdr10.osd.brightness";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10PLUS = "coreelec.amlogic.dolbyvision.vs10.hdr10plus";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_HDRHLG = "coreelec.amlogic.dolbyvision.vs10.hdrhlg";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_DV_REASSERT_AFTER_MODESWITCH = "coreelec.amlogic.dolbyvision.reassert.after.modeswitch";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_VS10_DV = "coreelec.amlogic.dolbyvision.vs10.dv";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT = "coreelec.amlogic.dolbyvision.hdr10plus.convert";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PREFER_CONVERT = "coreelec.amlogic.dolbyvision.hdr10plus.prefer.convert";
