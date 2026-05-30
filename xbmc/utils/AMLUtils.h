@@ -131,7 +131,7 @@ std::string aml_dv_type_to_string(enum DV_TYPE type);
 void aml_dv_set_vs10_mode(unsigned int mode, StreamHdrType hdrType);
 void aml_dv_wait_video_off(int timeout);
 int aml_blackout_policy(int new_blackout);
-unsigned int aml_dv_on(unsigned int mode);
+unsigned int aml_dv_on(unsigned int mode, bool force_hdmi = false);
 void aml_dv_off(bool skip_hdmi_update = false);
 // Push the L5-related sysfs flags from current Kodi settings. Called from
 // aml_dv_on() at playback start, and from CDolbyVisionAML::OnSettingChanged
