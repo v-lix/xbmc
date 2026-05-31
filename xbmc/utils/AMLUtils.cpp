@@ -926,7 +926,11 @@ unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
       aml_dv_wait_dv_std_vsif_packet();
 
     if ((mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL) || (mode == DOLBY_VISION_OUTPUT_MODE_IPT)) {
-      aml_dv_trigger_update_resolution(StreamHdrType::HDR_TYPE_DOLBYVISION); // Required for 60Hz VS10 > DV.
+      // Skip on a forced re-assert: we're already at the final resolution, so
+      // the update is redundant — and re-triggering it from the post-switch
+      // hook (aml_dv_display_trigger) would re-enter CreateNewWindow and loop.
+      if (!force_hdmi)
+        aml_dv_trigger_update_resolution(StreamHdrType::HDR_TYPE_DOLBYVISION); // Required for 60Hz VS10 > DV.
       // Match the hint to what actually appears on the wire — depends on
       // dv_type. Display-LED (IPT_TUNNEL) sends a DV VSIF (DOLBYVISION);
       // Player-LED LLDV sends a DV LL VSIF (LL_MODE); Player-LED HDR/HDR2
@@ -1440,12 +1444,17 @@ void aml_dv_display_trigger()
     // at the final mode, leaving the HDR signaling (AVI/DRM/VSIF) inconsistent.
     // Some projectors with auto dynamic-range detection then flip-flop SDR<->HDR
     // continuously. Re-asserting here reproduces what a manual VS10 mode toggle
-    // does (which is the known on-device workaround). Limited to non-IPT VS10
-    // output (HDR10/SDR10/SDR8) — native DV (IPT/IPT_TUNNEL) is unaffected.
+    // does (which is the known on-device workaround). Covers the Player-LED
+    // output modes that get configured at the GUI resolution: IPT (DoVi) and
+    // HDR10/SDR10/SDR8 (VS10 conversion). Excludes native-DV tunnel
+    // (IPT_TUNNEL = Display-LED) — a DV TV handles DV signaling robustly and
+    // doesn't exhibit the projector auto-DR flip, so it neither needs nor
+    // should get an extra DV re-assert. (The setting is also only visible for
+    // Player-LED, so this is belt-and-suspenders for a Player-LED->Display-LED
+    // switch with the value left enabled.)
     if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_REASSERT_AFTER_MODESWITCH)) {
       unsigned int mode = aml_dv_dolby_vision_mode();
       if (mode != DOLBY_VISION_OUTPUT_MODE_BYPASS &&
-          mode != DOLBY_VISION_OUTPUT_MODE_IPT &&
           mode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
       {
         CLog::Log(LOGDEBUG, "AMLUtils::{} - reassert-after-modeswitch: re-asserting VS10/HDR output [{}] at final resolution",
