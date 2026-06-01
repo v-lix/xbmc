@@ -2876,13 +2876,19 @@ void CVideoPlayer::HandleMessages()
       }
 
       // skip seeks if player has not finished the last seek
+      // Coalesce only in-flight FF/RW trickplay scans during startup; never
+      // drop a deliberate seek. Previously gated on !GetAccurate(), which was
+      // a safe proxy only while SeekTime was hardcoded accurate=true. The
+      // fastseek toggle made deliberate SeekTime/resume seeks accurate=false,
+      // so this guard began discarding PKC-style resume seeks issued before
+      // SYNC_INSYNC -> playback started from 0. trickplay is the real signal.
       if (m_CurrentVideo.id >= 0 &&
           m_CurrentVideo.syncState != IDVDStreamPlayer::SYNC_INSYNC)
       {
         double now = m_clock.GetAbsoluteClock();
         if (m_playSpeed == DVD_PLAYSPEED_NORMAL &&
             (now - m_State.lastSeek)/1000 < 2000 &&
-            !msg.GetAccurate())
+            msg.GetTrickPlay())
         {
           m_processInfo->SetStateSeeking(false);
           continue;
