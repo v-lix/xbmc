@@ -2142,7 +2142,7 @@ msgstr ""
 
 #: system/settings/settings.xml
 msgctxt "#448"
-msgid "Dolby Digital Plus (E-AC3) capable receiver"
+msgid "Dolby Digital Plus (EAC3) capable receiver"
 msgstr ""
 
 #: system/settings/settings.xml
@@ -21283,7 +21283,7 @@ msgstr ""
 #. Description of setting with label #667 "Enable Dolby Digital transcoding"
 #: system/settings/settings.xml
 msgctxt "#36429"
-msgid "Select this if the audio out connection only supports multichannel audio as Dolby Digital 5.1 (AC-3), such as a S/PDIF connection. When E-AC3 passthrough is also enabled, Dolby Digital Plus (E-AC3) is used for higher quality. If your system supports PCM multichannel audio via HDMI, leave this disabled."
+msgid "Select this if the audio out connection only supports multichannel audio as Dolby Digital 5.1 (AC3), such as a S/PDIF connection. When EAC3 passthrough is also enabled, Dolby Digital Plus (EAC3) is used for higher quality. If your system supports PCM multichannel audio via HDMI, leave this disabled."
 msgstr ""
 
 #. Description for setting category #14101: "Video Acceleration"
@@ -22319,10 +22319,10 @@ msgctxt "#37015"
 msgid "Browse into"
 msgstr ""
 
-#. Description of setting with label #448 "Dolby Digital Plus (E-AC3) capable receiver"
+#. Description of setting with label #448 "Dolby Digital Plus (EAC3) capable receiver"
 #: system/settings/settings.xml
 msgctxt "#37016"
-msgid "Select this option if your receiver is capable of decoding Dolby Digital Plus (E-AC3) streams."
+msgid "Select this option if your receiver is capable of decoding Dolby Digital Plus (EAC3) streams."
 msgstr ""
 
 #empty strings from id 37017 to 37020
@@ -22758,7 +22758,7 @@ msgstr ""
 #. Description for the setting with label #38027 "Ignore stream downmix metadata"
 #: system/settings/settings.xml
 msgctxt "#38028"
-msgid "Ignore centre and surround mix levels provided by AC3/E-AC3/DTS streams when downmixing. Fixed default levels (-3 dB, 0.7071) are used instead. Helpful when stream-provided values produce a poor downmix."
+msgid "Ignore centre and surround mix levels provided by AC3/EAC3/DTS streams when downmixing. Fixed default levels (-3 dB, 0.7071) are used instead. Helpful when stream-provided values produce a poor downmix."
 msgstr ""
 
 #. Used for the rating selection
@@ -25283,28 +25283,28 @@ msgctxt "#55002"
 msgid "Force the dialogue normalisation value to (0 dB) in TrueHD Atmos bitstreams. This disables receiver-side dialogue normalisation for the Atmos presentation, preventing unwanted volume reduction during passthrough playback."
 msgstr ""
 
-#. Setting label for AC-3/E-AC-3 dialogue normalisation defeat
+#. Setting label for AC3/EAC3 dialogue normalisation defeat
 #: system/settings/settings.xml
 msgctxt "#55003"
-msgid "AC-3 / E-AC-3 dialogue normalisation defeat (0 dB)"
+msgid "AC3 / EAC3 dialogue normalisation defeat (0 dB)"
 msgstr ""
 
-#. Setting help for AC-3/E-AC-3 dialogue normalisation defeat
+#. Setting help for AC3/EAC3 dialogue normalisation defeat
 #: system/settings/settings.xml
 msgctxt "#55004"
-msgid "Force the dialogue normalisation value to (0 dB) in AC-3 and E-AC-3 bitstreams. This disables receiver-side dialogue normalisation, preventing unwanted volume reduction during passthrough playback."
+msgid "Force the dialogue normalisation value to (0 dB) in AC3 and EAC3 bitstreams. This disables receiver-side dialogue normalisation, preventing unwanted volume reduction during passthrough playback."
 msgstr ""
 
-#. Setting label for E-AC-3 Atmos dialogue normalisation defeat
+#. Setting label for EAC3 Atmos dialogue normalisation defeat
 #: system/settings/settings.xml
 msgctxt "#55005"
-msgid "Include E-AC-3 Atmos (breaks Atmos)"
+msgid "Include EAC3 Atmos (breaks Atmos)"
 msgstr ""
 
-#. Setting help for E-AC-3 Atmos dialogue normalisation defeat
+#. Setting help for EAC3 Atmos dialogue normalisation defeat
 #: system/settings/settings.xml
 msgctxt "#55006"
-msgid "Also apply dialogue normalisation defeat to E-AC-3 Dolby Atmos (DD+ Atmos) streams. This will disable Dolby Atmos object audio rendering — your receiver will fall back to standard Dolby Digital Plus surround. Safe to enable if your setup does not support Atmos."
+msgid "Also apply dialogue normalisation defeat to EAC3 Dolby Atmos (DD+ Atmos) streams. This will disable Dolby Atmos object audio rendering — your receiver will fall back to standard Dolby Digital Plus surround. Safe to enable if your setup does not support Atmos."
 msgstr ""
 
 #. Setting label for broken / truncated file detection
