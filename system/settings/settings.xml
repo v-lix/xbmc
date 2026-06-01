@@ -4501,7 +4501,7 @@
           <requirement>HAVE_AMCODEC</requirement>
           <visible>true</visible>
           <level>3</level>
-          <default>false</default>
+          <default>true</default>
           <dependencies>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.detect.active.area" operator="is">true</dependency>
