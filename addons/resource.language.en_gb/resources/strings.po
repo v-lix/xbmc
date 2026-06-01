@@ -25914,7 +25914,7 @@ msgstr ""
 #. "Dolby Vision Detect Active Area Throttle Help"
 #: system/settings/settings.xml
 msgctxt "#60197"
-msgid "Reduce I/O impact of active area detection on playback. Adds a short delay before detection starts and yields between scan positions, preventing the detection thread from starving the player of network bandwidth. Enable this if detection causes stuttering on slow network shares (e.g. SMB)."
+msgid "Reduce the I/O impact of active area detection on playback. Detection waits for the player's cache to build up before each scan position so its reads don't starve playback, and skips entirely if the source is too slow to scan without stalling. Recommended; disable only to force detection to run immediately regardless of buffer state. Helps with stuttering on slow network shares (e.g. SMB) or USB storage."
 msgstr ""
 
 #. "Dolby Vision Display LL Dolby VSVDB Limit"

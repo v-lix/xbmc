@@ -1655,17 +1655,41 @@ static bool detect_throttle_enabled()
   return settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_THROTTLE);
 }
 
-/* Sleep in small increments, checking cancel flag.  Returns true if cancelled. */
-static bool detect_sleep_ms(int ms)
+/* Playback-cache thresholds for the cache-aware detect throttle (percent). */
+static constexpr int kDetectCacheTargetPct = 80; /* only seek when the buffer is this full */
+static constexpr int kDetectCacheFloorPct  = 50; /* still below this after waiting = too slow */
+
+/* Cache-aware throttle: block until the player's buffer reaches targetPct so
+ * our competing reads don't starve playback.  Returns the cache level reached
+ * [0..100], or -1 if cancelled.  Caps at maxWaitMs so a marginal source can't
+ * hang detection forever.
+ *
+ * The old fixed inter-seek sleep was tuned for *network* bandwidth contention
+ * and does nothing when the bottleneck is a slow/shared local device thrashed
+ * by two concurrent seeking readers (e.g. a USB-2.0 enclosure): a single
+ * far-offset keyframe read can take 5-10s and drain a shallow cache to empty,
+ * producing a multi-second playback stall.  Gating each seek on the actual
+ * playback cache level lets the device refill the player's buffer between
+ * samples instead. */
+static int detect_wait_for_cache(int targetPct, int maxWaitMs)
 {
+  auto& components = CServiceBroker::GetAppComponents();
+  const auto appPlayer = components.GetComponent<CApplicationPlayer>();
   const int step = 100;
-  for (int elapsed = 0; elapsed < ms; elapsed += step)
+  int waited = 0;
+  for (;;)
   {
     if (s_detectCancel.load())
-      return true;
-    std::this_thread::sleep_for(std::chrono::milliseconds(std::min(step, ms - elapsed)));
+      return -1;
+    /* No active playback to protect (stopped / never started) — proceed. */
+    if (!appPlayer || !appPlayer->IsPlaying())
+      return 100;
+    const int level = appPlayer->GetCacheLevel();
+    if (level >= targetPct || waited >= maxWaitMs)
+      return level;
+    std::this_thread::sleep_for(std::chrono::milliseconds(step));
+    waited += step;
   }
-  return s_detectCancel.load();
 }
 
 static void DetectActiveAreaFromFile(const std::string& filePath)
@@ -1682,7 +1706,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
   uint16_t detTop = 0, detBottom = 0, detLeft = 0, detRight = 0;
   const bool throttle = detect_throttle_enabled();
   if (throttle)
-    CLog::Log(LOGDEBUG, "DetectActiveArea: I/O throttle enabled, delaying 3s");
+    CLog::Log(LOGDEBUG, "DetectActiveArea: cache-aware I/O throttle enabled");
 
   /* BDMV/DVD: the file path is a bluray:// or dvd:// playlist URL that
    * our AVIO wrapper can't resolve — the VFS handler needs the full Kodi
@@ -1696,10 +1720,24 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     goto cleanup;
   }
 
-  /* Throttle: let playback establish its I/O pipeline before we start
-   * competing for network bandwidth. */
-  if (throttle && detect_sleep_ms(3000))
-    goto cleanup;
+  /* Cache-aware throttle: wait for playback to build a safety margin before we
+   * start competing for the device.  If the cache can't even reach the floor
+   * within the cap, the device is too slow to scan without starving playback —
+   * skip rather than cause a stall. */
+  if (throttle)
+  {
+    const int lvl = detect_wait_for_cache(kDetectCacheTargetPct, 12000);
+    if (lvl < 0)
+      goto cleanup; /* cancelled */
+    if (lvl < kDetectCacheFloorPct)
+    {
+      CLog::Log(LOGINFO, "DetectActiveArea: playback cache stuck at {}% after wait — "
+                "device too slow to scan without starving playback, skipping", lvl);
+      s_detectState.store(DV_DETECT_SKIPPED);
+      goto cleanup;
+    }
+    CLog::Log(LOGDEBUG, "DetectActiveArea: throttle — playback cache at {}%, starting scan", lvl);
+  }
 
   /* Open through Kodi VFS — supports nfs://, smb://, local paths, etc. */
   if (!file.Open(filePath, XFILE::READ_NO_CACHE))
@@ -1878,9 +1916,12 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       if (s_detectCancel.load())
         break;
 
-      /* Throttle: yield between seek positions to let playback I/O breathe */
-      if (throttle && s > 0 && detect_sleep_ms(500))
-        break;
+      /* Cache-aware throttle: before each seek, wait for the player buffer to
+       * refill so our reads don't drain it below empty.  Replaces the old fixed
+       * 500ms yield, which was far shorter than a single far-offset keyframe
+       * read and so never prevented starvation on slow local devices. */
+      if (throttle && s > 0 && detect_wait_for_cache(kDetectCacheTargetPct, 8000) < 0)
+        break; /* cancelled */
 
       bool usable = false;
 
