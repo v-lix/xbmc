@@ -1633,6 +1633,90 @@ void CDVDDemuxFFmpeg::CreateStreams(unsigned int program)
     for (unsigned int i = 0; i < m_pFormatContext->nb_streams; i++)
       AddStream(i);
   }
+
+  // Now that every stream is known, decide which video stream to prefer. Doing
+  // it in a single pass (instead of incrementally per AddStream) lets the
+  // container's default flag win among streams of the same format rather than
+  // "last DV stream added wins".
+  ComputePreferredVideoStream();
+}
+
+// Decide which video stream to prefer when a file carries more than one.
+//
+// The override exists purely to steer playback toward the HDR format the user
+// wants — Dolby Vision by default, or HDR10+ when configured — in files that
+// pair, say, a DV track with an SDR/HDR10 track and mark the non-DV one as
+// default for compatibility. It must NOT pick between several streams of the
+// *same* preferred format: a file carrying two Dolby Vision video tracks (e.g.
+// "Color" + "B&W" graded variants) has to keep honouring the container's
+// default/forced flags via PredicateVideoFilter. -1 means "no preference".
+void CDVDDemuxFFmpeg::ComputePreferredVideoStream()
+{
+  m_dv_preferred_video_stream = -1;
+
+  // BL+EL dependency layers are merged into one logical stream — nothing to pick.
+  if (m_dv_dual_stream || !aml_dolby_vision_enabled())
+    return;
+
+  const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  const bool hdr10PlusPrio =
+      settings && settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_DUAL_PRIORITY) == 1;
+  const bool convertEnabled =
+      settings && settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT);
+  const bool preferConvert = convertEnabled && settings &&
+      settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PREFER_CONVERT);
+  // HDR10+ wins when the user set HDR10+ priority, or when conversion is both
+  // enabled and preferred (overrides DV priority).
+  const bool preferHdr10Plus = hdr10PlusPrio || preferConvert;
+
+  // Does this video stream end up in the format we want to play?
+  auto matchesPreferred = [&](AVStream* st) -> bool {
+    const bool isDovi = DetermineHdrType(st) == StreamHdrType::HDR_TYPE_DOLBYVISION;
+    if (!preferHdr10Plus)
+      return isDovi;
+    // Preferring HDR10+: a non-DV (HDR10+/SDR/HLG) stream qualifies, as does a
+    // DV stream that can be converted to HDR10+ (cross-compatible bl signal).
+    if (!isDovi)
+      return true;
+    const auto* dovi = av_packet_side_data_get(st->codecpar->coded_side_data,
+                                               st->codecpar->nb_coded_side_data,
+                                               AV_PKT_DATA_DOVI_CONF);
+    return dovi && dovi->size &&
+           reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(dovi->data)
+               ->dv_bl_signal_compatibility_id > 0;
+  };
+
+  int videoStreams = 0;
+  int firstMatch = -1;
+  for (unsigned int i = 0; i < m_pFormatContext->nb_streams; ++i)
+  {
+    AVStream* st = m_pFormatContext->streams[i];
+    if (!st || st->discard == AVDISCARD_ALL ||
+        st->codecpar->codec_type != AVMEDIA_TYPE_VIDEO ||
+        (st->disposition & AV_DISPOSITION_ATTACHED_PIC) != 0)
+      continue;
+
+    ++videoStreams;
+    if (!matchesPreferred(st))
+      continue;
+    if (firstMatch < 0)
+      firstMatch = static_cast<int>(i);
+    // The container's default video stream is already the right format — let
+    // the default/forced flags pick the stream, no override needed.
+    if ((st->disposition & AV_DISPOSITION_DEFAULT) != 0)
+      return;
+  }
+
+  // Only override when there is an actual choice to make and the stream the
+  // container would otherwise land on is a different format than we want.
+  if (videoStreams >= 2 && firstMatch >= 0)
+  {
+    m_dv_preferred_video_stream = firstMatch;
+    CLog::Log(LOGDEBUG,
+              "CDVDDemuxFFmpeg::ComputePreferredVideoStream - preferring video stream {} for the "
+              "configured HDR format",
+              m_dv_preferred_video_stream);
+  }
 }
 
 void CDVDDemuxFFmpeg::DisposeStreams()
@@ -1823,76 +1907,13 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
           // That is the only case where dual-stream BL+EL combining is needed.
           // MKV dual-layer DV uses BlockAddition instead of separate tracks.
           // Any other DV track (with its own dvcC) is an independent stream —
-          // never combine layers between independent streams.
-          if (streamIdx > 0 && !m_dv_dual_stream)
+          // never combine layers between independent streams. Which of several
+          // independent video streams to actually play is decided once, after
+          // every stream is known, in ComputePreferredVideoStream().
+          if (streamIdx > 0 && !m_dv_dual_stream && pStream->id == 0x1015)
           {
-            if (pStream->id == 0x1015)
-            {
-              m_dv_dual_stream = true;
-              CLog::Log(LOGDEBUG, "DVDDemuxFFmpeg::AddStream - UHD BD DV EL (PID 0x1015), combining BL+EL");
-            }
-            else
-            {
-              // Independent DV stream — determine preferred video stream based on:
-              // - DUAL_PRIORITY: 0 = prefer DV, 1 = prefer HDR10+
-              // - HDR10PLUS_CONVERT + PREFER_CONVERT: overrides DV priority
-              bool preferThisStream = aml_dolby_vision_enabled();
-              if (preferThisStream)
-              {
-                auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-                bool hdr10PlusPrio = settings && settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_DUAL_PRIORITY) == 1;
-                bool convertEnabled = settings && settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_CONVERT);
-                bool preferConvert = convertEnabled && settings &&
-                    settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PREFER_CONVERT);
-
-                // HDR10+ wins when user set HDR10+ priority, or when conversion
-                // is both enabled and preferred (overrides DV priority).
-                bool preferHdr10Plus = hdr10PlusPrio || preferConvert;
-
-                if (preferHdr10Plus)
-                {
-                  if (preferConvert && sideData && sideData->size &&
-                      reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(sideData->data)
-                          ->dv_bl_signal_compatibility_id > 0)
-                  {
-                    // This DV stream can do HDR10+ conversion — prefer it
-                  }
-                  else
-                  {
-                    // Look for an HDR10+ capable alternative among preceding streams
-                    for (unsigned int i = 0; i < static_cast<unsigned int>(streamIdx); ++i)
-                    {
-                      AVStream* prev = m_pFormatContext->streams[i];
-                      if (!prev || prev->codecpar->codec_type != AVMEDIA_TYPE_VIDEO)
-                        continue;
-
-                      const auto* prevDovi = av_packet_side_data_get(
-                          prev->codecpar->coded_side_data, prev->codecpar->nb_coded_side_data,
-                          AV_PKT_DATA_DOVI_CONF);
-                      if (!prevDovi || !prevDovi->size)
-                      {
-                        preferThisStream = false;
-                        m_dv_preferred_video_stream = i;
-                        break;
-                      }
-                      auto* prevConf = reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(prevDovi->data);
-                      if (prevConf->dv_bl_signal_compatibility_id > 0)
-                      {
-                        preferThisStream = false;
-                        m_dv_preferred_video_stream = i;
-                        break;
-                      }
-                    }
-                  }
-                }
-              }
-
-              if (preferThisStream)
-                m_dv_preferred_video_stream = streamIdx;
-
-              CLog::Log(LOGDEBUG, "DVDDemuxFFmpeg::AddStream - independent DV stream (not combining), preferred video stream: {}",
-                m_dv_preferred_video_stream);
-            }
+            m_dv_dual_stream = true;
+            CLog::Log(LOGDEBUG, "DVDDemuxFFmpeg::AddStream - UHD BD DV EL (PID 0x1015), combining BL+EL");
           }
 
           if (!m_dv_dual_stream)

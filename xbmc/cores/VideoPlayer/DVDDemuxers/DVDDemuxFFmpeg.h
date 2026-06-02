@@ -146,6 +146,7 @@ protected:
 
   bool IsDoViP7DualLayer() const;
   StreamHdrType DetermineHdrType(AVStream* pStream);
+  void ComputePreferredVideoStream();
 
   CCriticalSection m_critSection;
   std::map<int, CDemuxStream*> m_streams;
