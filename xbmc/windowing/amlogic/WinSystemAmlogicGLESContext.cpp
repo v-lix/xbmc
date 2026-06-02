@@ -154,16 +154,6 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
     return true;
   }
 
-  // NOTE: AVMUTE bracketing of the DV+mode-change is no longer done here.
-  // It previously asserted AVMUTE from this (main) thread and cleared it via
-  // a detached 1500ms worker — a second, uncoordinated owner of the single
-  // GCP AVMUTE bit that raced the kernel's own hold (which clears at ~100ms),
-  // truncating the intended blank. The blank is now owned solely by the
-  // kernel, driven per-transition via xbmc_avmute_hold_ms from the serialized
-  // funnel in aml_dv_attr_now_locked() (gated by the AVR-modeswitch-AVMUTE
-  // setting). The mode switch itself is still AVMUTE-bracketed internally by
-  // set_disp_mode_auto.
-
   // destroy old window, then create a new one
   DestroyWindow();
 
@@ -183,6 +173,16 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
   m_hdrType = hdrType;
   m_stereo_mode = stereo_mode;
   m_bFullScreen = fullScreen;
+
+  // When this is a DV-driven mode switch on an AVR repeater, ask the kernel to
+  // hold AVMUTE across the switch (single owner; no-op unless the setting is on
+  // and the sink is a repeater). Requested HERE, right before the display/mode
+  // write, so the blank lands on the disruptive resolution/refresh change — not
+  // on the earlier GUI-resolution DV-signalling write (which is what the
+  // previous placement mistakenly blanked). DestroyWindow() above has already
+  // run, so its mode handling can't consume this one-shot request early.
+  if (force_mode_switch_by_dv)
+    aml_dv_avmute_hold_for_modeswitch();
 
   if (!CWinSystemAmlogic::CreateNewWindow(name, fullScreen, res))
   {

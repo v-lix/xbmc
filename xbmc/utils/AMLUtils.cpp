@@ -1495,9 +1495,10 @@ static void aml_dv_hint_next_eotf(unsigned int eotf)
   }
 }
 
-// Request a one-shot kernel AVMUTE hold (ms) consumed by the next attr-"now"
-// write. 0 clears any stale request. The kernel is the single owner of the
-// blank; this just tells it how long. See xbmc_avmute_hold_ms in hdmitx20.
+// Request a one-shot kernel AVMUTE hold (ms), consumed at entry by the next
+// set_disp_mode_auto (whichever attr/mode write triggers it). 0 clears any
+// stale request. The kernel is the single owner of the blank; this just tells
+// it how long. See xbmc_avmute_hold_ms in hdmitx20.
 static void aml_dv_hint_avmute_hold(unsigned int ms)
 {
   CSysfsPath p{"/sys/module/hdmitx20/parameters/xbmc_avmute_hold_ms"};
@@ -1508,16 +1509,16 @@ static void aml_dv_hint_avmute_hold(unsigned int ms)
   }
 }
 
-// AVMUTE hold (ms) the kernel re-asserts across a paired-packet DV/HDR
-// transition on an AVR repeater. ~2 vsyncs at 24Hz worst case.
+// AVMUTE hold (ms) the kernel re-asserts across the mode switch on an AVR
+// repeater. ~2 vsyncs at 24Hz worst case.
 static const unsigned int AML_AVMUTE_HOLD_MS = 100;
 
-// Serializes the (eotf-hint + avmute-hold + attr-"now") triple. Without this
-// the hint write and the attr write are two non-atomic sysfs operations, and
-// concurrent transitions (player thread aml_dv_on vs main-thread mode change)
-// can interleave so one transition's attr-"now" consumes another's one-shot
-// hint. Holding this mutex across the whole triple makes each attr write see
-// exactly the hint/hold its own caller set.
+// Serializes the (eotf-hint + attr-"now") pair. Without this the hint write
+// and the attr write are two non-atomic sysfs operations, and concurrent
+// transitions (player thread aml_dv_on vs main-thread mode change) can
+// interleave so one transition's attr-"now" consumes another's one-shot hint.
+// Holding this mutex across the pair makes each attr write see exactly the
+// hint its own caller set.
 static std::mutex s_dvAttrNowMutex;
 
 static void aml_dv_attr_now_locked(const std::string& attr, unsigned int eotf_hint)
@@ -1533,19 +1534,6 @@ static void aml_dv_attr_now_locked(const std::string& attr, unsigned int eotf_hi
   else
     aml_dv_hint_next_eotf(AML_EOTF_NULL);
 
-  // AVMUTE hold — single owner (kernel). Only for transitions that put a
-  // paired packet on the wire (DV / DV-LL / HDR10), only on AVR repeater
-  // chains, and only when opted in (default off). ALWAYS written (0 clears a
-  // stale request) so it can't leak into an unrelated transition.
-  unsigned int hold_ms = 0;
-  if ((eotf_hint == AML_EOTF_DOLBYVISION || eotf_hint == AML_EOTF_LL_MODE ||
-       eotf_hint == AML_EOTF_HDR10) &&
-      settings() &&
-      settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_AVR_MODESWITCH_AVMUTE) &&
-      aml_is_hdmi_repeater())
-    hold_ms = AML_AVMUTE_HOLD_MS;
-  aml_dv_hint_avmute_hold(hold_ms);
-
   CSysfsPath p{"/sys/class/amhdmitx/amhdmitx0/attr"};
   if (p.Exists()) p.Set(attr);
 }
@@ -1554,6 +1542,21 @@ void aml_dv_display_auto_now(unsigned int eotf_hint)
 {
   // hdmi tx store attr "now" - will trigger set_disp_mode_auto.
   aml_dv_attr_now_locked("now", eotf_hint);
+}
+
+// Request the kernel AVMUTE blank to bracket an imminent DV-driven mode switch
+// (resolution/refresh change). Call this immediately before the display/mode
+// write that performs the switch, so the switch's own set_disp_mode_auto
+// re-asserts AVMUTE across it — keeping a marginal AVR repeater blanked through
+// the renegotiation instead of seeing a live signal change. The blank lands on
+// the actual mode set, NOT on an earlier GUI-resolution DV-signaling write.
+// Gated by the AVR-modeswitch-AVMUTE setting + repeater sink (no-op otherwise);
+// the caller decides the switch is DV-driven. Single owner = the kernel.
+void aml_dv_avmute_hold_for_modeswitch()
+{
+  if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_AVR_MODESWITCH_AVMUTE) &&
+      aml_is_hdmi_repeater())
+    aml_dv_hint_avmute_hold(AML_AVMUTE_HOLD_MS);
 }
 
 // Serializes aml_dv_start() and aml_dv_wait_for_pipeline() so EGL context
