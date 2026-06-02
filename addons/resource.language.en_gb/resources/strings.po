@@ -26749,7 +26749,7 @@ msgstr ""
 #. Help text for setting "Hint EOTF on mode change" of label #60628
 #: system/settings/settings.xml
 msgctxt "#60629"
-msgid "Tells the HDMI driver which transfer function (Dolby Vision / HDR10 / SDR) the AVI InfoFrame should be built for at a mode switch, instead of letting it lag a frame behind. Keeps the AVI coherent with the Dolby Vision / HDR packet on the wire, which marginal AVR chains can otherwise trip over. Recommended on; turn off only to revert to the legacy lagging behaviour for testing."
+msgid "Signals the correct HDR transfer function (Dolby Vision, HDR10 or SDR) in the HDMI AVI InfoFrame the instant the mode switches, instead of letting it lag a frame behind the picture. Keeps the AVI consistent with the Dolby Vision / HDR packet on the wire. Most displays don't care, but some HDMI chains glitch on the brief mismatch. Applies to all displays and is safe to leave on; turn it off only to fall back to the legacy behaviour for troubleshooting."
 msgstr ""
 
 #. Label for Dolby Vision AVR mode-switch AVMUTE setting
@@ -26761,7 +26761,7 @@ msgstr ""
 #. Help text for setting "AVMUTE through DV mode change (AVR)" of label #60630
 #: system/settings/settings.xml
 msgctxt "#60631"
-msgid "Briefly blanks the HDMI signal (AVMUTE) across a Dolby Vision / HDR mode switch so the display does not see the new picture format before its matching metadata packet arrives. Only takes effect when the sink is an AV receiver (repeater) chain, which is where this back-to-back signalling can make the receiver lose lock. On by default; if your AVR drops to a no-signal / black screen on Dolby Vision playback start, try turning this off (and toggling the EOTF hint) to see which helps."
+msgid "Briefly mutes the HDMI signal (AVMUTE) across the actual Dolby Vision / HDR mode switch so the sink re-locks on the new format cleanly instead of seeing it change live. This is on top of the mute the driver already does during the mode set, and bridges the short gap until the matching Dolby Vision / HDR metadata packet is on the wire. Only applies to AV receiver (repeater) chains, where that gap can make the receiver lose lock — direct-to-TV connections handle the switch fine and are skipped so they don't get an unnecessary extra blank (~0.1s). On by default; if an AV receiver still drops to a no-signal / black screen at Dolby Vision playback start, turn this off to remove the added blank."
 msgstr ""
 
 #. Title of Dolby Vision RPU conversion setting
