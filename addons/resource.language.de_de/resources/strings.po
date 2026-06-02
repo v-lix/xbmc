@@ -19664,6 +19664,30 @@ msgctxt "#60627"
 msgid "For Player-Led output on projectors whose automatic dynamic-range detection flip-flops between SDR and HDR. Re-applies the Dolby Vision / VS10 output after the resolution switches at playback start (the same effect as manually toggling the VS10 mode). May cause a brief blip at playback start, so leave this off unless you actually see SDR/HDR flickering."
 msgstr "Für Player-Led-Ausgabe an Projektoren, deren automatische Dynamikumfang-Erkennung zwischen SDR und HDR hin- und herspringt. Wendet die Dolby Vision-/VS10-Ausgabe nach dem Auflösungswechsel beim Wiedergabestart erneut an (gleicher Effekt wie das manuelle Umschalten des VS10-Modus). Kann zu einem kurzen Aussetzer beim Wiedergabestart führen – nur aktivieren, wenn tatsächlich SDR/HDR-Flackern auftritt."
 
+#. Label for Dolby Vision EOTF AVI hint setting
+#: system/settings/settings.xml
+msgctxt "#60628"
+msgid "Hint EOTF on mode change"
+msgstr "EOTF bei Moduswechsel vorgeben"
+
+#. Help text for setting "Hint EOTF on mode change" of label #60628
+#: system/settings/settings.xml
+msgctxt "#60629"
+msgid "Tells the HDMI driver which transfer function (Dolby Vision / HDR10 / SDR) the AVI InfoFrame should be built for at a mode switch, instead of letting it lag a frame behind. Keeps the AVI coherent with the Dolby Vision / HDR packet on the wire, which marginal AVR chains can otherwise trip over. Recommended on; turn off only to revert to the legacy lagging behaviour for testing."
+msgstr "Teilt dem HDMI-Treiber mit, für welche Übertragungsfunktion (Dolby Vision / HDR10 / SDR) das AVI-InfoFrame bei einem Moduswechsel aufgebaut werden soll, anstatt es ein Bild hinterherhinken zu lassen. Hält das AVI mit dem auf der Leitung gesendeten Dolby-Vision-/HDR-Paket konsistent, woran sich grenzwertige AV-Receiver-Ketten sonst verschlucken können. Empfohlen aktiviert; nur zum Testen deaktivieren, um zum alten, nachhinkenden Verhalten zurückzukehren."
+
+#. Label for Dolby Vision AVR mode-switch AVMUTE setting
+#: system/settings/settings.xml
+msgctxt "#60630"
+msgid "AVMUTE through DV mode change (AVR)"
+msgstr "AVMUTE bei DV-Moduswechsel (AVR)"
+
+#. Help text for setting "AVMUTE through DV mode change (AVR)" of label #60630
+#: system/settings/settings.xml
+msgctxt "#60631"
+msgid "Briefly blanks the HDMI signal (AVMUTE) across a Dolby Vision / HDR mode switch so the display does not see the new picture format before its matching metadata packet arrives. Only takes effect when the sink is an AV receiver (repeater) chain, which is where this back-to-back signalling can make the receiver lose lock. On by default; if your AVR drops to a no-signal / black screen on Dolby Vision playback start, try turning this off (and toggling the EOTF hint) to see which helps."
+msgstr "Blendet das HDMI-Signal beim Dolby-Vision-/HDR-Moduswechsel kurz aus (AVMUTE), damit das Anzeigegerät das neue Bildformat nicht sieht, bevor das passende Metadaten-Paket eintrifft. Wirkt nur, wenn die Senke eine AV-Receiver-Kette (Repeater) ist – dort kann diese unmittelbar aufeinanderfolgende Signalisierung dazu führen, dass der Receiver die Synchronisation verliert. Standardmäßig aktiviert; falls Ihr AVR beim Start der Dolby-Vision-Wiedergabe auf ein Kein-Signal-/Schwarzbild springt, deaktivieren Sie diese Option (und schalten Sie ggf. den EOTF-Hinweis um), um zu sehen, was hilft."
+
 msgctxt "#69196"
 msgid "Convert DV Profile 7 FEL to MEL or to Profile 8.1"
 msgstr "DV Profil 7 umwandeln"

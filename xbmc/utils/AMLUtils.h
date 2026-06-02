@@ -229,15 +229,6 @@ void aml_handle_scale(const RESOLUTION_INFO &res);
 // True if the HDMI sink is a repeater (AVR), false for direct TV. Cached
 // per HPD because EDID re-reads happen on hotplug; cheap on subsequent calls.
 bool aml_is_hdmi_repeater();
-// Assert / clear AVMUTE on the HDMI TX. Used to bracket the dv_off +
-// resolution-change pair at stop so AVR repeaters see one clean blank
-// instead of two consecutive renegotiations they can't track.
-void aml_avmute_set();
-void aml_avmute_clear();
-// Schedule an AVMUTE clear after delayMs. Spawns a detached worker; safe
-// to call without coordination — if the worker outlives the original
-// assert window it just re-clears (idempotent).
-void aml_avmute_clear_after(int delayMs);
 bool aml_handle_display_stereo_mode(const int stereo_mode);
 void aml_enable_freeScale(const RESOLUTION_INFO &res);
 void aml_disable_freeScale();

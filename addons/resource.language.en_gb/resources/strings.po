@@ -26740,6 +26740,30 @@ msgctxt "#60627"
 msgid "For Player-Led output on projectors whose automatic dynamic-range detection flip-flops between SDR and HDR. Re-applies the Dolby Vision / VS10 output after the resolution switches at playback start (the same effect as manually toggling the VS10 mode). May cause a brief blip at playback start, so leave this off unless you actually see SDR/HDR flickering."
 msgstr ""
 
+#. Label for Dolby Vision EOTF AVI hint setting
+#: system/settings/settings.xml
+msgctxt "#60628"
+msgid "Hint EOTF on mode change"
+msgstr ""
+
+#. Help text for setting "Hint EOTF on mode change" of label #60628
+#: system/settings/settings.xml
+msgctxt "#60629"
+msgid "Tells the HDMI driver which transfer function (Dolby Vision / HDR10 / SDR) the AVI InfoFrame should be built for at a mode switch, instead of letting it lag a frame behind. Keeps the AVI coherent with the Dolby Vision / HDR packet on the wire, which marginal AVR chains can otherwise trip over. Recommended on; turn off only to revert to the legacy lagging behaviour for testing."
+msgstr ""
+
+#. Label for Dolby Vision AVR mode-switch AVMUTE setting
+#: system/settings/settings.xml
+msgctxt "#60630"
+msgid "AVMUTE through DV mode change (AVR)"
+msgstr ""
+
+#. Help text for setting "AVMUTE through DV mode change (AVR)" of label #60630
+#: system/settings/settings.xml
+msgctxt "#60631"
+msgid "Briefly blanks the HDMI signal (AVMUTE) across a Dolby Vision / HDR mode switch so the display does not see the new picture format before its matching metadata packet arrives. Only takes effect when the sink is an AV receiver (repeater) chain, which is where this back-to-back signalling can make the receiver lose lock. On by default; if your AVR drops to a no-signal / black screen on Dolby Vision playback start, try turning this off (and toggling the EOTF hint) to see which helps."
+msgstr ""
+
 #. Title of Dolby Vision RPU conversion setting
 #: system/settings/settings.xml
 msgctxt "#69196"

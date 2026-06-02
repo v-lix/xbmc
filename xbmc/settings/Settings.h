@@ -510,6 +510,8 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_RESTRICT_SUBS_USER_POS = "coreelec.amlogic.dolbyvision.restrict.subs.user.pos";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA = "coreelec.amlogic.dolbyvision.detect.active.area";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_DETECT_THROTTLE = "coreelec.amlogic.dolbyvision.detect.throttle";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_DV_EOTF_HINT = "coreelec.amlogic.dolbyvision.eotf.hint";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_DV_AVR_MODESWITCH_AVMUTE = "coreelec.amlogic.dolbyvision.avr.modeswitch.avmute";
   static constexpr auto SETTING_COREELEC_RESET_PTS_ON_SEEK = "coreelec.resetptsonseek";
   static constexpr auto SETTING_COREELEC_AUDIO_AC3_DIALNORM = "coreelec.audio.ac3.dialnorm";
   static constexpr auto SETTING_COREELEC_AUDIO_EAC3_ATMOS_DIALNORM = "coreelec.audio.eac3.atmos.dialnorm";

@@ -4165,6 +4165,26 @@
           </dependencies>
           <control type="toggle" />
         </setting>
+        <setting id="coreelec.amlogic.dolbyvision.eotf.hint" type="boolean" label="60628" help="60629" parent="coreelec.amlogic.dolbyvision.type">
+          <requirement>HAVE_AMCODEC</requirement>
+          <visible>true</visible>
+          <level>3</level>
+          <default>true</default>
+          <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
+        <setting id="coreelec.amlogic.dolbyvision.avr.modeswitch.avmute" type="boolean" label="60630" help="60631" parent="coreelec.amlogic.dolbyvision.type">
+          <requirement>HAVE_AMCODEC</requirement>
+          <visible>true</visible>
+          <level>3</level>
+          <default>true</default>
+          <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
         <setting id="coreelec.amlogic.dolbyvision.vsvdb.inject" type="boolean" label="60031" help="60032" parent="coreelec.amlogic.dolbyvision.type">
           <requirement>HAVE_AMCODEC</requirement>
           <visible>false</visible>

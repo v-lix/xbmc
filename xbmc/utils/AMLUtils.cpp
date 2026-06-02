@@ -124,6 +124,11 @@ void aml_dv_dump_state(const char* tag);
 // set_disp_mode_auto.
 static void aml_dv_hint_next_eotf(unsigned int eotf);
 
+// Single serialized funnel for every attr-"now" write that drives a DV/HDMI
+// transition. Forward-declared so the VS10 non-IPT path in aml_dv_on can
+// route through it. See the definition next to aml_dv_display_auto_now.
+static void aml_dv_attr_now_locked(const std::string& attr, unsigned int eotf_hint);
+
 static void aml_dv_reset_osd_max()
 {
   int max(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE_ON_LUMINANCE));
@@ -980,11 +985,11 @@ unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
       }
       if (!fmt_attr.empty()) fmt_attr += ",";
       fmt_attr += "now";
-      // Hint the kernel which eotf the AVI should be built for, so the
-      // multi-step VS10 transition doesn't paint the AVI with the previous
-      // mode's eotf. HDR10 mode signals HDR10 EOTF; SDR* modes signal SDR.
-      aml_dv_hint_next_eotf(mode == DOLBY_VISION_OUTPUT_MODE_HDR10 ? AML_EOTF_HDR10 : AML_EOTF_SDR);
-      CSysfsPath("/sys/class/amhdmitx/amhdmitx0/attr", fmt_attr);
+      // Route through the serialized funnel so the eotf hint (telling the
+      // kernel which eotf to build the AVI from) and the attr-"now" write
+      // can't be interleaved by a concurrent transition on another thread.
+      // HDR10 mode signals HDR10 EOTF; SDR* modes signal SDR.
+      aml_dv_attr_now_locked(fmt_attr, mode == DOLBY_VISION_OUTPUT_MODE_HDR10 ? AML_EOTF_HDR10 : AML_EOTF_SDR);
     }
   }
 
@@ -1490,12 +1495,65 @@ static void aml_dv_hint_next_eotf(unsigned int eotf)
   }
 }
 
+// Request a one-shot kernel AVMUTE hold (ms) consumed by the next attr-"now"
+// write. 0 clears any stale request. The kernel is the single owner of the
+// blank; this just tells it how long. See xbmc_avmute_hold_ms in hdmitx20.
+static void aml_dv_hint_avmute_hold(unsigned int ms)
+{
+  CSysfsPath p{"/sys/module/hdmitx20/parameters/xbmc_avmute_hold_ms"};
+  if (p.Exists()) {
+    p.Set(ms);
+    if (ms)
+      CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_hint_avmute_hold - ms=[{}]", ms);
+  }
+}
+
+// AVMUTE hold (ms) the kernel re-asserts across a paired-packet DV/HDR
+// transition on an AVR repeater. ~2 vsyncs at 24Hz worst case.
+static const unsigned int AML_AVMUTE_HOLD_MS = 100;
+
+// Serializes the (eotf-hint + avmute-hold + attr-"now") triple. Without this
+// the hint write and the attr write are two non-atomic sysfs operations, and
+// concurrent transitions (player thread aml_dv_on vs main-thread mode change)
+// can interleave so one transition's attr-"now" consumes another's one-shot
+// hint. Holding this mutex across the whole triple makes each attr write see
+// exactly the hint/hold its own caller set.
+static std::mutex s_dvAttrNowMutex;
+
+static void aml_dv_attr_now_locked(const std::string& attr, unsigned int eotf_hint)
+{
+  std::lock_guard<std::mutex> lk(s_dvAttrNowMutex);
+
+  // EOTF AVI hint — gated by the EOTF-hint setting (default on; it removes the
+  // per-frame self-correction, so it's separately revertable). ALWAYS write
+  // the param (intended value, or 0 to clear) so a stale hint from a prior
+  // transition can never be consumed by this write.
+  if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_EOTF_HINT))
+    aml_dv_hint_next_eotf(eotf_hint);
+  else
+    aml_dv_hint_next_eotf(AML_EOTF_NULL);
+
+  // AVMUTE hold — single owner (kernel). Only for transitions that put a
+  // paired packet on the wire (DV / DV-LL / HDR10), only on AVR repeater
+  // chains, and only when opted in (default off). ALWAYS written (0 clears a
+  // stale request) so it can't leak into an unrelated transition.
+  unsigned int hold_ms = 0;
+  if ((eotf_hint == AML_EOTF_DOLBYVISION || eotf_hint == AML_EOTF_LL_MODE ||
+       eotf_hint == AML_EOTF_HDR10) &&
+      settings() &&
+      settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_AVR_MODESWITCH_AVMUTE) &&
+      aml_is_hdmi_repeater())
+    hold_ms = AML_AVMUTE_HOLD_MS;
+  aml_dv_hint_avmute_hold(hold_ms);
+
+  CSysfsPath p{"/sys/class/amhdmitx/amhdmitx0/attr"};
+  if (p.Exists()) p.Set(attr);
+}
+
 void aml_dv_display_auto_now(unsigned int eotf_hint)
 {
   // hdmi tx store attr "now" - will trigger set_disp_mode_auto.
-  if (eotf_hint != AML_EOTF_NULL) aml_dv_hint_next_eotf(eotf_hint);
-  CSysfsPath attr{"/sys/class/amhdmitx/amhdmitx0/attr"};
-  if (attr.Exists()) attr.Set("now");
+  aml_dv_attr_now_locked("now", eotf_hint);
 }
 
 // Serializes aml_dv_start() and aml_dv_wait_for_pipeline() so EGL context
@@ -3092,26 +3150,6 @@ bool aml_is_hdmi_repeater()
   std::lock_guard<std::mutex> lk(s_sinkTypeMutex);
   s_sinkTypeIsRepeater = repeater ? 1 : 0;
   return repeater;
-}
-
-void aml_avmute_set()
-{
-  CSysfsPath p{"/sys/class/amhdmitx/amhdmitx0/avmute"};
-  if (p.Exists()) p.Set("1");
-}
-
-void aml_avmute_clear()
-{
-  CSysfsPath p{"/sys/class/amhdmitx/amhdmitx0/avmute"};
-  if (p.Exists()) p.Set("-1");
-}
-
-void aml_avmute_clear_after(int delayMs)
-{
-  std::thread([delayMs]() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
-    aml_avmute_clear();
-  }).detach();
 }
 
 void aml_handle_scale(const RESOLUTION_INFO &res)
