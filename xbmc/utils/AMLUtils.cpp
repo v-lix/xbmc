@@ -1629,9 +1629,48 @@ static const uint32_t s_commonAR[] = {
  * between seek positions.  Allows clean abort of slow network I/O. */
 static std::atomic<bool> s_detectCancel{false};
 
+/* Mid-read cache guard.  The between-seek wait (detect_wait_for_cache) can't
+ * interrupt a single in-flight read: on a slow device one far-offset keyframe
+ * read can take tens of seconds and drain a shallow buffer to underrun, stalling
+ * playback before the next seek is even reached.  So while a scan is reading,
+ * the ffmpeg interrupt callback watches the player's buffer and aborts the read
+ * the moment it falls below this level — detection becomes best-effort and never
+ * starves playback on hardware too slow to scan concurrently. */
+static constexpr int kDetectCacheCriticalPct = 40;
+static std::atomic<bool> s_detectThrottleActive{false}; /* scan reading w/ throttle on */
+static std::atomic<bool> s_detectCacheStarved{false};   /* interrupt fired on low cache */
+static std::atomic<int64_t> s_detectLastCacheCheckMs{0};
+
+static int64_t detect_steady_ms()
+{
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 static int detect_interrupt_cb(void *opaque)
 {
-  return s_detectCancel.load() ? 1 : 0;
+  if (s_detectCancel.load())
+    return 1;
+  /* Abort the in-flight read if playback's buffer goes critical.  Rate-limited:
+   * the interrupt callback is polled in tight I/O loops, and the cache query
+   * takes a (brief) player lock. */
+  if (s_detectThrottleActive.load())
+  {
+    const int64_t now = detect_steady_ms();
+    if (now - s_detectLastCacheCheckMs.load() >= 150)
+    {
+      s_detectLastCacheCheckMs.store(now);
+      auto& components = CServiceBroker::GetAppComponents();
+      const auto appPlayer = components.GetComponent<CApplicationPlayer>();
+      if (appPlayer && appPlayer->IsPlaying() &&
+          appPlayer->GetCacheLevel() < kDetectCacheCriticalPct)
+      {
+        s_detectCacheStarved.store(true);
+        return 1;
+      }
+    }
+  }
+  return 0;
 }
 
 /* AVIO callbacks for reading through Kodi's VFS (handles nfs://, smb://, etc.) */
@@ -1738,6 +1777,11 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     }
     CLog::Log(LOGDEBUG, "DetectActiveArea: throttle — playback cache at {}%, starting scan", lvl);
   }
+
+  /* Arm the mid-read cache guard for everything from here on (open, find-stream,
+   * and the per-seek reads) so detect_interrupt_cb can abort an in-flight read
+   * that drains playback's buffer. */
+  s_detectThrottleActive.store(throttle);
 
   /* Open through Kodi VFS — supports nfs://, smb://, local paths, etc. */
   if (!file.Open(filePath, XFILE::READ_NO_CACHE))
@@ -1913,7 +1957,7 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
 
     for (int s = 0; s < numSeeks && validSamples < numSeeks; s++)
     {
-      if (s_detectCancel.load())
+      if (s_detectCancel.load() || s_detectCacheStarved.load())
         break;
 
       /* Cache-aware throttle: before each seek, wait for the player buffer to
@@ -1927,6 +1971,10 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
 
       for (int retry = 0; retry <= maxRetries && !usable; retry++)
       {
+        /* detect_interrupt_cb aborts an in-flight read on critical cache; stop
+         * retrying immediately rather than re-seek and thrash the device more. */
+        if (s_detectCacheStarved.load())
+          break;
         int seekPct = seekPercents[s] + retry;
         if (seekPct > 90) break;
 
@@ -2157,6 +2205,14 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
       }
     }
 
+    if (s_detectCacheStarved.load())
+    {
+      CLog::Log(LOGINFO, "DetectActiveArea: aborted mid-scan — playback buffer went "
+                "critical; device too slow to scan concurrently, skipping");
+      s_detectState.store(DV_DETECT_SKIPPED);
+      goto cleanup;
+    }
+
     if (validSamples == 0)
     {
       CLog::Log(LOGWARNING, "DetectActiveArea: no usable frames decoded from {}x{} "
@@ -2369,6 +2425,14 @@ static void DetectActiveAreaFromFile(const std::string& filePath)
     CLog::Log(LOGDEBUG, "DetectActiveArea: no borders found");
 
 cleanup:
+  s_detectThrottleActive.store(false); /* disarm the mid-read guard */
+
+  /* A read aborted because playback's buffer went critical (e.g. during open or
+   * find-stream-info) lands here with state still RUNNING — classify as skipped
+   * (device too slow), not a hard failure. */
+  if (s_detectCacheStarved.load() && s_detectState.load() == DV_DETECT_RUNNING)
+    s_detectState.store(DV_DETECT_SKIPPED);
+
   /* Any exit path that didn't set a specific state leaves RUNNING — fall
    * back to FAILED so the skin doesn't show a perpetual spinner. */
   if (s_detectState.load() == DV_DETECT_RUNNING)
@@ -2396,6 +2460,8 @@ void aml_dv_detect_active_area_start()
 {
   /* Reset state */
   s_detectCancel.store(false);
+  s_detectThrottleActive.store(false);
+  s_detectCacheStarved.store(false);
   s_detectStable.store(false);
   s_detectState.store(DV_DETECT_FAILED);
   s_detectedTop.store(0);
