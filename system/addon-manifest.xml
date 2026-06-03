@@ -47,6 +47,7 @@
   <addon>script.module.pycryptodome</addon>
   <addon>service.p3i.sb</addon>
   <addon>skin.estuary</addon>
+  <addon>skin.p3i.estuary</addon>
   <addon>webinterface.default</addon>
   <addon>xbmc.addon</addon>
   <addon>xbmc.core</addon>
