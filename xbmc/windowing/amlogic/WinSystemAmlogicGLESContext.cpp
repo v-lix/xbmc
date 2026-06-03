@@ -174,15 +174,16 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
   m_stereo_mode = stereo_mode;
   m_bFullScreen = fullScreen;
 
-  // When this is a DV-driven mode switch on an AVR repeater, ask the kernel to
-  // hold AVMUTE across the switch (single owner; no-op unless the setting is on
-  // and the sink is a repeater). Requested HERE, right before the display/mode
-  // write, so the blank lands on the disruptive resolution/refresh change — not
-  // on the earlier GUI-resolution DV-signalling write (which is what the
-  // previous placement mistakenly blanked). DestroyWindow() above has already
+  // When this is a DV-driven mode switch, ask the kernel to emit the matching
+  // DV VSIF as the switch's set_disp_mode_auto completes, so the AVI comes back
+  // up paired with its VSIF (coherent at PHY-on) instead of AVI-without-VSIF —
+  // no AVMUTE; the mode set's own PHY-disable/enable hides the transition.
+  // Requested HERE, right before the display/mode write, so it lands on the
+  // disruptive resolution/refresh switch. DestroyWindow() above has already
   // run, so its mode handling can't consume this one-shot request early.
+  // No-op unless the EOTF-hint setting is on (which it needs to know the eotf).
   if (force_mode_switch_by_dv)
-    aml_dv_avmute_hold_for_modeswitch();
+    aml_dv_emit_paired_pkt_for_modeswitch();
 
   if (!CWinSystemAmlogic::CreateNewWindow(name, fullScreen, res))
   {

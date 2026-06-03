@@ -171,11 +171,11 @@ bool aml_is_dv_enable();
 void aml_dv_display_trigger();
 void aml_hdr10plus_vsif_hold(bool hold);
 void aml_dv_display_auto_now(unsigned int eotf_hint = 0);
-// Bracket an imminent DV-driven mode switch behind a kernel-owned AVMUTE blank
-// (AVR repeater chains only; gated by the AVR-modeswitch-AVMUTE setting). Call
-// immediately before the resolution/refresh switch so the blank lands on the
-// actual mode set rather than an earlier GUI-resolution signalling write.
-void aml_dv_avmute_hold_for_modeswitch();
+// Make an imminent DV-driven mode switch come up coherent: the switch's own
+// set_disp_mode_auto emits the matching DV VSIF as it completes, so the AVI is
+// paired with its VSIF at PHY-on (no AVMUTE). Call immediately before the
+// resolution/refresh switch. Gated by the EOTF-hint setting (no-op otherwise).
+void aml_dv_emit_paired_pkt_for_modeswitch();
 void aml_dv_start();
 void aml_dv_wait_for_pipeline();
 void aml_dv_set_subtitles(bool visible);

@@ -1495,23 +1495,18 @@ static void aml_dv_hint_next_eotf(unsigned int eotf)
   }
 }
 
-// Request a one-shot kernel AVMUTE hold (ms), consumed at entry by the next
-// set_disp_mode_auto (whichever attr/mode write triggers it). 0 clears any
-// stale request. The kernel is the single owner of the blank; this just tells
-// it how long. See xbmc_avmute_hold_ms in hdmitx20.
-static void aml_dv_hint_avmute_hold(unsigned int ms)
+// Request a one-shot coherent paired-packet emit, consumed at the end of the
+// next set_disp_mode_auto. The kernel emits the DV VSIF for the current eotf so
+// the rebuilt AVI comes up paired with its VSIF (no AVMUTE). Replaces the old
+// AVMUTE hold. See xbmc_emit_paired_pkt in hdmitx20.
+static void aml_dv_request_paired_pkt()
 {
-  CSysfsPath p{"/sys/module/hdmitx20/parameters/xbmc_avmute_hold_ms"};
+  CSysfsPath p{"/sys/module/hdmitx20/parameters/xbmc_emit_paired_pkt"};
   if (p.Exists()) {
-    p.Set(ms);
-    if (ms)
-      CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_hint_avmute_hold - ms=[{}]", ms);
+    p.Set(1);
+    CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_request_paired_pkt - requested");
   }
 }
-
-// AVMUTE hold (ms) the kernel re-asserts across the mode switch on an AVR
-// repeater. ~2 vsyncs at 24Hz worst case.
-static const unsigned int AML_AVMUTE_HOLD_MS = 100;
 
 // Serializes the (eotf-hint + attr-"now") pair. Without this the hint write
 // and the attr write are two non-atomic sysfs operations, and concurrent
@@ -1525,12 +1520,19 @@ static void aml_dv_attr_now_locked(const std::string& attr, unsigned int eotf_hi
 {
   std::lock_guard<std::mutex> lk(s_dvAttrNowMutex);
 
-  // EOTF AVI hint — gated by the EOTF-hint setting (default on; it removes the
-  // per-frame self-correction, so it's separately revertable). ALWAYS write
-  // the param (intended value, or 0 to clear) so a stale hint from a prior
-  // transition can never be consumed by this write.
-  if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_EOTF_HINT))
+  // Coherent DV signalling — gated by the coherent-signalling setting. ALWAYS
+  // write the eotf param (intended value, or 0 to clear) so a stale hint from
+  // a prior transition can never be consumed by this write.
+  if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_COHERENT_SIGNALLING))
+  {
     aml_dv_hint_next_eotf(eotf_hint);
+    // For a DV-Std transition, also request the matching VSIF be emitted as
+    // THIS attr-now's set_disp_mode_auto completes, so the eotf-hinted AVI
+    // comes up paired with its VSIF (coherent) — including the GUI-resolution
+    // signalling write, not just the later resolution switch.
+    if (eotf_hint == AML_EOTF_DOLBYVISION)
+      aml_dv_request_paired_pkt();
+  }
   else
     aml_dv_hint_next_eotf(AML_EOTF_NULL);
 
@@ -1546,17 +1548,18 @@ void aml_dv_display_auto_now(unsigned int eotf_hint)
 
 // Request the kernel AVMUTE blank to bracket an imminent DV-driven mode switch
 // (resolution/refresh change). Call this immediately before the display/mode
-// write that performs the switch, so the switch's own set_disp_mode_auto
-// re-asserts AVMUTE across it — keeping a marginal AVR repeater blanked through
-// the renegotiation instead of seeing a live signal change. The blank lands on
-// the actual mode set, NOT on an earlier GUI-resolution DV-signaling write.
-// Gated by the AVR-modeswitch-AVMUTE setting + repeater sink (no-op otherwise);
-// the caller decides the switch is DV-driven. Single owner = the kernel.
-void aml_dv_avmute_hold_for_modeswitch()
+// write that performs the switch, so the switch's own set_disp_mode_auto emits
+// the matching DV VSIF as it completes — the AVI comes back up paired with its
+// VSIF (coherent at PHY-on) instead of AVI-without-VSIF, with no AVMUTE. The
+// mode set's own PHY-disable/enable already hides the transition.
+//
+// Part of coherent DV signalling: the eotf hint makes the switch's AVI carry
+// the DV eotf, and this makes the matching VSIF land with it — gated on the
+// same coherent-signalling setting (no-op otherwise). DV-Std only for now.
+void aml_dv_emit_paired_pkt_for_modeswitch()
 {
-  if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_AVR_MODESWITCH_AVMUTE) &&
-      aml_is_hdmi_repeater())
-    aml_dv_hint_avmute_hold(AML_AVMUTE_HOLD_MS);
+  if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_COHERENT_SIGNALLING))
+    aml_dv_request_paired_pkt();
 }
 
 // Serializes aml_dv_start() and aml_dv_wait_for_pipeline() so EGL context

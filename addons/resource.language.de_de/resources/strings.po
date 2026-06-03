@@ -19664,29 +19664,17 @@ msgctxt "#60627"
 msgid "For Player-Led output on projectors whose automatic dynamic-range detection flip-flops between SDR and HDR. Re-applies the Dolby Vision / VS10 output after the resolution switches at playback start (the same effect as manually toggling the VS10 mode). May cause a brief blip at playback start, so leave this off unless you actually see SDR/HDR flickering."
 msgstr "Für Player-Led-Ausgabe an Projektoren, deren automatische Dynamikumfang-Erkennung zwischen SDR und HDR hin- und herspringt. Wendet die Dolby Vision-/VS10-Ausgabe nach dem Auflösungswechsel beim Wiedergabestart erneut an (gleicher Effekt wie das manuelle Umschalten des VS10-Modus). Kann zu einem kurzen Aussetzer beim Wiedergabestart führen – nur aktivieren, wenn tatsächlich SDR/HDR-Flackern auftritt."
 
-#. Label for Dolby Vision EOTF AVI hint setting
+#. Label for Dolby Vision coherent mode-switch signalling setting
 #: system/settings/settings.xml
 msgctxt "#60628"
-msgid "Hint EOTF on mode change"
-msgstr "EOTF bei Moduswechsel vorgeben"
+msgid "Coherent Dolby Vision signalling at mode switch"
+msgstr "Kohärente Dolby-Vision-Signalisierung beim Moduswechsel"
 
-#. Help text for setting "Hint EOTF on mode change" of label #60628
+#. Help text for setting "Coherent Dolby Vision signalling at mode switch" of label #60628
 #: system/settings/settings.xml
 msgctxt "#60629"
-msgid "Signals the correct HDR transfer function (Dolby Vision, HDR10 or SDR) in the HDMI AVI InfoFrame the instant the mode switches, instead of letting it lag a frame behind the picture. Keeps the AVI consistent with the Dolby Vision / HDR packet on the wire. Most displays don't care, but some HDMI chains glitch on the brief mismatch. Applies to all displays and is safe to leave on; turn it off only to fall back to the legacy behaviour for troubleshooting."
-msgstr "Signalisiert die korrekte HDR-Übertragungsfunktion (Dolby Vision, HDR10 oder SDR) im HDMI-AVI-InfoFrame sofort beim Moduswechsel, anstatt sie dem Bild ein Frame hinterherhinken zu lassen. Hält das AVI mit dem auf der Leitung gesendeten Dolby-Vision-/HDR-Paket konsistent. Den meisten Anzeigegeräten ist das egal, manche HDMI-Ketten verschlucken sich aber an der kurzen Inkonsistenz. Gilt für alle Anzeigegeräte und kann aktiviert bleiben; nur zur Fehlersuche deaktivieren, um auf das alte Verhalten zurückzufallen."
-
-#. Label for Dolby Vision AVR mode-switch AVMUTE setting
-#: system/settings/settings.xml
-msgctxt "#60630"
-msgid "AVMUTE through DV mode change (AVR)"
-msgstr "AVMUTE bei DV-Moduswechsel (AVR)"
-
-#. Help text for setting "AVMUTE through DV mode change (AVR)" of label #60630
-#: system/settings/settings.xml
-msgctxt "#60631"
-msgid "Briefly mutes the HDMI signal (AVMUTE) across the actual Dolby Vision / HDR mode switch so the sink re-locks on the new format cleanly instead of seeing it change live. This is on top of the mute the driver already does during the mode set, and bridges the short gap until the matching Dolby Vision / HDR metadata packet is on the wire. Only applies to AV receiver (repeater) chains, where that gap can make the receiver lose lock — direct-to-TV connections handle the switch fine and are skipped so they don't get an unnecessary extra blank (~0.1s). On by default; if an AV receiver still drops to a no-signal / black screen at Dolby Vision playback start, turn this off to remove the added blank."
-msgstr "Schaltet das HDMI-Signal beim eigentlichen Dolby-Vision-/HDR-Moduswechsel kurz stumm (AVMUTE), damit sich die Senke sauber auf das neue Format synchronisiert, statt die Umschaltung live zu sehen. Dies geschieht zusätzlich zu der Stummschaltung, die der Treiber beim Moduswechsel ohnehin vornimmt, und überbrückt die kurze Lücke, bis das passende Dolby-Vision-/HDR-Metadaten-Paket auf der Leitung ist. Gilt nur für AV-Receiver-Ketten (Repeater), wo diese Lücke dazu führen kann, dass der Receiver die Synchronisation verliert – Direktverbindungen zum Fernseher bewältigen die Umschaltung problemlos und werden übersprungen, damit sie keine unnötige zusätzliche Austastung (~0,1 s) bekommen. Standardmäßig aktiviert; falls ein AV-Receiver beim Start der Dolby-Vision-Wiedergabe trotzdem auf ein Kein-Signal-/Schwarzbild springt, diese Option deaktivieren, um die zusätzliche Austastung zu entfernen."
+msgid "At a Dolby Vision mode switch, emits the Dolby Vision VSIF together with the matching video InfoFrame (AVI) so the display sees a coherent DV signal the instant the picture comes back, instead of the AVI briefly appearing before its VSIF. Closes that gap as part of the mode change itself (no extra blanking). Helps displays — especially AV receiver chains — that glitch or black out on the brief mismatch. Off by default; enable if your display or AV receiver blacks out or flickers when Dolby Vision playback starts."
+msgstr "Sendet beim Dolby-Vision-Moduswechsel das Dolby-Vision-VSIF zusammen mit dem zugehörigen Video-InfoFrame (AVI), damit das Anzeigegerät im Moment der Bildrückkehr ein kohärentes DV-Signal sieht, statt dass das AVI kurz vor seinem VSIF erscheint. Schließt diese Lücke als Teil des Moduswechsels selbst (ohne zusätzliche Austastung). Hilft Anzeigegeräten – insbesondere AV-Receiver-Ketten –, die sich an der kurzen Inkonsistenz verschlucken oder schwarz werden. Standardmäßig deaktiviert; aktivieren, falls Ihr Anzeigegerät oder AV-Receiver beim Start der Dolby-Vision-Wiedergabe schwarz wird oder flackert."
 
 msgctxt "#69196"
 msgid "Convert DV Profile 7 FEL to MEL or to Profile 8.1"

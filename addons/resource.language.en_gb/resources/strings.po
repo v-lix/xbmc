@@ -26740,28 +26740,16 @@ msgctxt "#60627"
 msgid "For Player-Led output on projectors whose automatic dynamic-range detection flip-flops between SDR and HDR. Re-applies the Dolby Vision / VS10 output after the resolution switches at playback start (the same effect as manually toggling the VS10 mode). May cause a brief blip at playback start, so leave this off unless you actually see SDR/HDR flickering."
 msgstr ""
 
-#. Label for Dolby Vision EOTF AVI hint setting
+#. Label for Dolby Vision coherent mode-switch signalling setting
 #: system/settings/settings.xml
 msgctxt "#60628"
-msgid "Hint EOTF on mode change"
+msgid "Coherent Dolby Vision signalling at mode switch"
 msgstr ""
 
-#. Help text for setting "Hint EOTF on mode change" of label #60628
+#. Help text for setting "Coherent Dolby Vision signalling at mode switch" of label #60628
 #: system/settings/settings.xml
 msgctxt "#60629"
-msgid "Signals the correct HDR transfer function (Dolby Vision, HDR10 or SDR) in the HDMI AVI InfoFrame the instant the mode switches, instead of letting it lag a frame behind the picture. Keeps the AVI consistent with the Dolby Vision / HDR packet on the wire. Most displays don't care, but some HDMI chains glitch on the brief mismatch. Applies to all displays and is safe to leave on; turn it off only to fall back to the legacy behaviour for troubleshooting."
-msgstr ""
-
-#. Label for Dolby Vision AVR mode-switch AVMUTE setting
-#: system/settings/settings.xml
-msgctxt "#60630"
-msgid "AVMUTE through DV mode change (AVR)"
-msgstr ""
-
-#. Help text for setting "AVMUTE through DV mode change (AVR)" of label #60630
-#: system/settings/settings.xml
-msgctxt "#60631"
-msgid "Briefly mutes the HDMI signal (AVMUTE) across the actual Dolby Vision / HDR mode switch so the sink re-locks on the new format cleanly instead of seeing it change live. This is on top of the mute the driver already does during the mode set, and bridges the short gap until the matching Dolby Vision / HDR metadata packet is on the wire. Only applies to AV receiver (repeater) chains, where that gap can make the receiver lose lock — direct-to-TV connections handle the switch fine and are skipped so they don't get an unnecessary extra blank (~0.1s). On by default; if an AV receiver still drops to a no-signal / black screen at Dolby Vision playback start, turn this off to remove the added blank."
+msgid "At a Dolby Vision mode switch, emits the Dolby Vision VSIF together with the matching video InfoFrame (AVI) so the display sees a coherent DV signal the instant the picture comes back, instead of the AVI briefly appearing before its VSIF. Closes that gap as part of the mode change itself (no extra blanking). Helps displays — especially AV receiver chains — that glitch or black out on the brief mismatch. Off by default; enable if your display or AV receiver blacks out or flickers when Dolby Vision playback starts."
 msgstr ""
 
 #. Title of Dolby Vision RPU conversion setting
