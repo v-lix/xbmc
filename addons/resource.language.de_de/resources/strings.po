@@ -18845,8 +18845,8 @@ msgid "DV VS10 for DV video"
 msgstr "Dolby Vision"
 
 msgctxt "#60062"
-msgid "Select output format when playing Dolby Vision content. DV = native DV tunnel. SDR = convert to SDR."
-msgstr "Ausgabeformat für Dolby Vision-Inhalte wählen. DV = nativer DV-Tunnel. SDR = Konvertierung zu SDR."
+msgid "Select output format when playing Dolby Vision content. Off = native DV tunnel. SDR = convert to SDR."
+msgstr "Ausgabeformat für Dolby Vision-Inhalte wählen. Aus = nativer DV-Tunnel. SDR = Konvertierung zu SDR."
 
 msgctxt "#60063"
 msgid "Off"
@@ -19577,8 +19577,8 @@ msgid "Reset PTS offset on seek"
 msgstr "PTS-Offset beim Seeken zurücksetzen"
 
 msgctxt "#60605"
-msgid "Reset the PTS timestamp correction offset when seeking. Fixes subtitle desync after multiple seeks, but introduces a slightly \"jumpy\" A/V sync behaviour after seeking, which is not a big issue and usually desirable over subtitle desync."
-msgstr "Setzt den PTS-Zeitstempel-Korrektur-Offset beim Seeken zurück, jedoch nur, solange eine externe Untertiteldatei geladen ist. Behebt die Desynchronisation externer Untertitel nach mehreren Suchvorgängen. Kann auf Dateien mit Zeitstempel-Unstetigkeiten ein leicht \"sprunghaftes\" A/V-Synchronisationsverhalten nach dem Seekvorgang verursachen, was in der Regel gegenüber driftenden Untertiteln vorzuziehen ist. Eingebettete Untertitel sowie die Wiedergabe ohne externe Untertitel sind nicht betroffen."
+msgid "Enable this only if external (separate-file) subtitles drift out of sync after repeated seeks. It resets the PTS timestamp correction offset on each seek, which keeps external subtitles aligned but can cause a one-time \"jumpy\" A/V resync after seeking on files with timestamp discontinuities. Has no effect on embedded subtitles or playback without external subtitles. Leave off unless you actually see external-subtitle drift."
+msgstr "Nur aktivieren, wenn externe (in separater Datei vorliegende) Untertitel nach mehreren Suchvorgängen aus dem Takt geraten. Setzt bei jedem Seek den PTS-Zeitstempel-Korrektur-Offset zurück, wodurch externe Untertitel synchron bleiben, kann aber bei Dateien mit Zeitstempel-Unstetigkeiten ein einmaliges \"sprunghaftes\" A/V-Synchronisationsverhalten nach dem Seeken verursachen. Hat keine Auswirkung auf eingebettete Untertitel oder die Wiedergabe ohne externe Untertitel. Im Zweifel deaktiviert lassen."
 
 msgctxt "#60606"
 msgid "Force all display modes"

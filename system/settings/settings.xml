@@ -4625,7 +4625,7 @@
         </setting>
         <setting id="coreelec.resetptsonseek" type="boolean" label="60604" help="60605">
           <level>2</level>
-          <default>true</default>
+          <default>false</default>
           <control type="toggle" />
         </setting>
         <setting id="coreelec.amlogic.usedisplayasclock" type="boolean" label="14298" help="14299">

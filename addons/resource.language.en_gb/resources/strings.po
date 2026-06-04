@@ -25536,7 +25536,7 @@ msgstr ""
 #. "Dolby Vision VS10"
 #: system/settings/settings.xml
 msgctxt "#60062"
-msgid "Select output format when playing Dolby Vision content. DV = native DV tunnel. SDR = convert to SDR."
+msgid "Select output format when playing Dolby Vision content. Off = native DV tunnel. SDR = convert to SDR."
 msgstr ""
 
 #. "Dolby Vision VS10"
@@ -26633,7 +26633,7 @@ msgstr ""
 #. Help text for Reset PTS offset on seek setting
 #: system/settings/settings.xml
 msgctxt "#60605"
-msgid "Reset the PTS timestamp correction offset when seeking, but only while an external subtitle file is loaded. Fixes external subtitle desync after multiple seeks. It can introduce a slightly \"jumpy\" A/V sync after a seek on files with timestamp discontinuities, which is usually preferable to drifting subtitles. Embedded subtitles and playback without external subtitles are unaffected."
+msgid "Enable this only if external (separate-file) subtitles drift out of sync after repeated seeks. It resets the PTS timestamp correction offset on each seek, which keeps external subtitles aligned but can cause a one-time \"jumpy\" A/V resync after seeking on files with timestamp discontinuities. Has no effect on embedded subtitles or playback without external subtitles. Leave off unless you actually see external-subtitle drift."
 msgstr ""
 
 msgctxt "#60606"
