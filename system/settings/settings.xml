@@ -4581,7 +4581,7 @@
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
           </dependencies>
-          <control type="boolean" />
+          <control type="toggle" />
         </setting>
         <!-- Per-folder override channel used by service.p3i.sb override.ini. Format:
              "top,bottom,left,right" (unsigned ints, RPU active-area space) or empty
