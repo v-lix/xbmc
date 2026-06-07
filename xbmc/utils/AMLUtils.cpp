@@ -105,6 +105,19 @@ static bool s_dvPlaybackActive = false;
 // ever set a real mode.
 static std::mutex s_lastDisplayModeMutex;
 static std::string s_lastDisplayMode;
+
+// Serializes ALL mutations of the DV-core sysfs state across the threads that
+// touch it: the VideoPlayer codec thread (aml_dv_open/aml_dv_close), the
+// announcement thread (aml_dv_start via Player.OnStop / OnWake) and the
+// windowing/render thread (aml_dv_display_trigger after a resolution switch).
+// Without this, a back-to-back DV->DV switch can interleave one path's
+// aml_dv_off() Bypass cycle into another path's aml_dv_on() register sequence,
+// leaving the core enabled with inconsistent matrices (gray/green corrupted
+// output). Recursive because aml_dv_start()/aml_dv_open() legitimately nest
+// aml_dv_off()/aml_dv_on(). Lock ordering is always s_dvStartMutex ->
+// s_dvCoreMutex (only aml_dv_start takes both, in that order), never the
+// reverse, so the two cannot deadlock.
+static std::recursive_mutex s_dvCoreMutex;
 // Forward-declared: defined below near aml_dv_display_trigger, called from
 // aml_dv_off (above) too. Round-trips display/mode through sysfs but recovers
 // to last-known-good if the read returned "null".
@@ -675,6 +688,7 @@ void aml_dv_apply_l5_sysfs()
 
 unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
 {
+  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
   aml_dv_apply_l5_sysfs();
   aml_dv_apply_l5_override_sysfs();
 
@@ -1229,6 +1243,7 @@ void aml_hdmi_link_probe(const char* ctx)
 
 void aml_dv_off(bool skip_hdmi_update)
 {
+  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
   aml_dv_detect_active_area_stop();
 
   // change mode and disable.
@@ -1340,6 +1355,7 @@ unsigned int aml_dv_dolby_vision_mode()
 
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries)
 {
+  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
   aml_dv_dump_state("dv_open/pre");
   s_dvPlaybackActive = true;
 
@@ -1377,6 +1393,7 @@ void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries 
 
 void aml_dv_close()
 {
+  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
   aml_dv_dump_state("dv_close/pre");
   s_dvPlaybackActive = false;
   s_pm4kActive = false;
@@ -1479,6 +1496,7 @@ static void aml_display_mode_round_trip(const char* fn)
 
 void aml_dv_display_trigger()
 {
+  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
   if (aml_is_dv_enable()) {
     aml_display_mode_round_trip(__FUNCTION__);
 
@@ -1531,6 +1549,9 @@ static std::mutex s_dvStartMutex;
 void aml_dv_start()
 {
   std::lock_guard<std::mutex> lock(s_dvStartMutex);
+  // Ordering: s_dvStartMutex -> s_dvCoreMutex (never the reverse). The nested
+  // aml_dv_off()/aml_dv_on() below re-acquire s_dvCoreMutex recursively.
+  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
 
   if (aml_is_dv_enable())
   {
