@@ -234,6 +234,11 @@ void CWinSystemAmlogicGLESContext::SetVSyncImpl(bool enable)
 
 void CWinSystemAmlogicGLESContext::PresentRenderImpl(bool rendered)
 {
+  // GUI-path HDMI link watchdog: catches a sink dropping sync in the menus,
+  // where neither the DV-transition dump nor the playback vsync-stall snapshot
+  // is active. Self-throttled to ~1Hz and only logs on a state change.
+  aml_hdmi_link_probe("present");
+
   if (m_delayDispReset && m_dispResetTimer.IsTimePast())
   {
     m_delayDispReset = false;

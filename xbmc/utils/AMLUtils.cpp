@@ -1170,6 +1170,62 @@ void aml_dv_dump_state(const char* tag)
     s_dvPlaybackActive ? 1 : 0);
 }
 
+void aml_hdmi_link_probe(const char* ctx)
+{
+  // Runs from the GUI present hook (every frame, in menus and playback alike),
+  // so keep it cheap: throttle to ~1Hz and bail before touching sysfs.
+  static std::mutex s_probeMutex;
+  std::lock_guard<std::mutex> lock(s_probeMutex);
+
+  static std::chrono::steady_clock::time_point s_lastCheck{};
+  auto now = std::chrono::steady_clock::now();
+  if (s_lastCheck.time_since_epoch().count() != 0 &&
+      now - s_lastCheck < std::chrono::seconds(1))
+    return;
+  s_lastCheck = now;
+
+  auto rd = [](const char* path) -> std::string {
+    CSysfsPath p{path};
+    if (!p.Exists()) return "-";
+    auto v = p.Get<std::string>();
+    if (!v.has_value()) return "?";
+    std::string s = std::move(v.value());
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r' || s.back() == ' '))
+      s.pop_back();
+    return s;
+  };
+
+  const std::string hpd = rd("/sys/class/amhdmitx/amhdmitx0/hpd_state");
+  const std::string rxsense = rd("/sys/class/amhdmitx/amhdmitx0/rxsense_state");
+  const std::string rhpd = rd("/sys/class/amhdmitx/amhdmitx0/rhpd_state");
+  const std::string used = rd("/sys/class/amhdmitx/amhdmitx0/hdmi_used");
+  const std::string disp_mode = rd("/sys/class/amhdmitx/amhdmitx0/disp_mode");
+  const std::string sink_type = rd("/sys/class/amhdmitx/amhdmitx0/sink_type");
+
+  std::string state = StringUtils::Format(
+    "hpd={} rxsense={} rhpd={} used={} disp_mode={} sink_type={}",
+    hpd, rxsense, rhpd, used, disp_mode, sink_type);
+
+  // Only log when something actually changes — quiet on a stable link.
+  static std::string s_lastState;
+  static bool s_haveBaseline = false;
+  if (s_haveBaseline && state == s_lastState)
+    return;
+
+  // "Degraded" = the sink stopped asserting hot-plug / R-term, or the kernel
+  // lost the active display mode: the signature of a blue/no-signal sink.
+  const bool degraded =
+      hpd == "0" || rhpd == "0" || rxsense == "0" ||
+      disp_mode.empty() || disp_mode == "null" || disp_mode == "-" || disp_mode == "?";
+
+  CLog::Log(degraded ? LOGWARNING : LOGINFO,
+    "AMLUtils::aml_hdmi_link_probe [{}] {}{}",
+    ctx, s_haveBaseline ? "link changed -> " : "baseline ", state);
+
+  s_lastState = std::move(state);
+  s_haveBaseline = true;
+}
+
 void aml_dv_off(bool skip_hdmi_update)
 {
   aml_dv_detect_active_area_stop();

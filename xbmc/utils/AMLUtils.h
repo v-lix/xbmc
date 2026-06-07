@@ -133,6 +133,16 @@ void aml_dv_apply_l5_sysfs();
 // also trigger one when it detects a vsync ioctl stall — that captures
 // post-transition drift the existing transition snapshots can't see.
 void aml_dv_dump_state(const char* tag);
+
+// Lightweight HDMI-TX link-state watchdog for the GUI/menu path. The richer
+// aml_dv_dump_state() only fires on DV transitions, and the vsync-stall
+// snapshot only runs while the RefClock playback thread is alive — so a sink
+// that drops sync while sitting in the menus (no playback) leaves no trace in
+// the log. Call this from the per-frame present hook: it self-throttles to
+// ~1Hz and only logs when the link state changes (LOGWARNING on a degrade,
+// LOGINFO otherwise) — quiet when stable, loud the moment the link drops.
+void aml_hdmi_link_probe(const char* ctx);
+
 void aml_get_dv_cap();
 struct xbmc_dv_cap
 {
