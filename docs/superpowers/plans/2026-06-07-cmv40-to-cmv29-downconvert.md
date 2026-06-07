@@ -219,7 +219,7 @@ Insert immediately after the `</setting>` that closes `coreelec.amlogic.dolbyvis
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
           </dependencies>
-          <control type="boolean" />
+          <control type="toggle" />
         </setting>
 ```
 

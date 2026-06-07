@@ -113,7 +113,7 @@ Mirror the append wiring exactly:
   **boolean toggle**, copying the append entry's `<requirement>HAVE_AMCODEC</requirement>`,
   `<visible>false</visible>`, `<level>2</level>`, `parent`, and the three `<dependency type="visible">`
   rules (mode !is 2, video.processor is 0, type is 0). `<default>false</default>`, new label/help
-  ids, `<control type="boolean" />`.
+  ids, `<control type="toggle" />`.
 - Runtime visibility promotion: add the strip setting to the list in
   `CDolbyVisionAML::set_dv_settings_visible()` (same as `cmv40.append`) so the addon's JSON-RPC
   `SetSettingValue` is not rejected by the `IsVisible()` gate.
