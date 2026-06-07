@@ -901,6 +901,7 @@ unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
   {
     CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
     CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
+    aml_dv_set_sdr_target_nits(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_TARGET_NITS));
   }
 
   // force_hdmi: re-run the HDMI re-assertion (toggle_frame + attr/eotf) for the
@@ -1417,6 +1418,20 @@ void aml_dv_set_hdr10_osd_brightness(int nits)
 {
   CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", nits);
+}
+
+void aml_dv_set_sdr_target_nits(int nits)
+{
+  // Override the DV core's SDR-output target display luminance: the *->SDR
+  // column of dolby_vision_target_lum_max[src][dst] (flat indices 2/5/8). The
+  // kernel hardcodes this to 100 nits (SDR reference white), so DV/HDR content
+  // tone-mapped to SDR via VS10 lands well below the panel's actual SDR
+  // brightness and reads as dim next to the GUI and native SDR files. Raising
+  // the target tells the CVM to map for a brighter SDR display, lifting
+  // mid-tones. Non-SDR columns keep the kernel defaults; nits==100 reproduces
+  // stock behaviour.
+  std::string lum_max = StringUtils::Format("4000 1000 {} 1000 1000 {} 600 1000 {}", nits, nits, nits);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_target_lum_max", lum_max);
 }
 
 bool aml_is_dv_enable()

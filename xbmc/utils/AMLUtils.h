@@ -166,6 +166,7 @@ bool aml_dv_playback_active();
 void aml_dv_set_osd_max(int max);
 void aml_dv_set_osd_brightness(int nits);
 void aml_dv_set_hdr10_osd_brightness(int nits);
+void aml_dv_set_sdr_target_nits(int nits);
 bool aml_is_dv_enable();
 void aml_dv_display_trigger();
 void aml_hdr10plus_vsif_hold(bool hold);

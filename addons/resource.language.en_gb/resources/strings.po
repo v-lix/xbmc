@@ -25575,6 +25575,18 @@ msgctxt "#60068"
 msgid "Set the maximum luminance for OSD graphics (GUI, subtitles) in nits during DV playback. Controls how bright overlays appear when the DV compositor is active. Default 300 matches the compositor's built-in value."
 msgstr ""
 
+#. "Dolby Vision VS10 SDR Target Peak Brightness"
+#: system/settings/settings.xml
+msgctxt "#60632"
+msgid "SDR target peak brightness (nits)"
+msgstr ""
+
+#. "Dolby Vision VS10 SDR Target Peak Brightness"
+#: system/settings/settings.xml
+msgctxt "#60633"
+msgid "Target display luminance the DV engine maps to when converting DV/HDR to SDR via VS10. The kernel default of 100 (SDR reference white) makes tone-mapped output look dim next to the GUI and native SDR files. Raise it towards your panel's actual SDR brightness to lift mid-tones (may clip highlights). 100 keeps stock behaviour."
+msgstr ""
+
 #. "Dolby Vision VS10 HDR10 OSD Peak Brightness"
 #: system/settings/settings.xml
 msgctxt "#60069"

@@ -18872,6 +18872,14 @@ msgctxt "#60068"
 msgid "Set the maximum luminance for OSD graphics (GUI, subtitles) in nits during DV playback. Controls how bright overlays appear when the DV compositor is active. Default 300 matches the compositor's built-in value."
 msgstr "Maximale Luminanz für OSD-Grafiken (GUI, Untertitel) in Nits während der DV-Wiedergabe festlegen. Steuert, wie hell Overlays erscheinen, wenn der DV-Compositor aktiv ist. Der Standardwert 300 entspricht dem im Compositor integrierten Wert."
 
+msgctxt "#60632"
+msgid "SDR target peak brightness (nits)"
+msgstr "SDR-Ziel-Spitzenhelligkeit (Nits)"
+
+msgctxt "#60633"
+msgid "Target display luminance the DV engine maps to when converting DV/HDR to SDR via VS10. The kernel default of 100 (SDR reference white) makes tone-mapped output look dim next to the GUI and native SDR files. Raise it towards your panel's actual SDR brightness to lift mid-tones (may clip highlights). 100 keeps stock behaviour."
+msgstr "Ziel-Display-Luminanz, auf die die DV-Engine abbildet, wenn DV/HDR über VS10 nach SDR konvertiert wird. Der Kernel-Standardwert 100 (SDR-Referenzweiß) lässt das tone-gemappte Bild neben der GUI und nativen SDR-Dateien dunkel wirken. Erhöhe ihn in Richtung der tatsächlichen SDR-Helligkeit deines Panels, um die Mitteltöne anzuheben (kann Spitzlichter beschneiden). 100 behält das Standardverhalten bei."
+
 msgctxt "#60069"
 msgid "HDR10 OSD peak brightness (nits)"
 msgstr "HDR10-OSD-Spitzenhelligkeit (Nits)"
