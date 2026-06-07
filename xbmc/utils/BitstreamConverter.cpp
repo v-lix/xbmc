@@ -617,6 +617,31 @@ inline bool AppendCMv40(DOVICMv40Mode cmv40Mode,
   return true;
 }
 
+// Inverse of AppendCMv40: strip the CMv4.0 extension blocks (L3/L8/L9/L10/L11/
+// L254) from the RPU, leaving a clean CMv2.9 payload that old DV TVs which fail
+// to fall back can still lock onto. Gated on level254 (the CMv4.0 marker) so it
+// is a no-op on streams that are already CMv2.9-only.
+inline bool StripCMv40(const DoviVdrDmData* vdrDmData,
+                       DoviRpuOpaque* opaque,
+                       uint8_t*& nalBuf,
+                       int32_t& nalSize,
+                       const DoviData*& rpuData)
+{
+  if (!vdrDmData || !opaque) return false;
+
+  if (!vdrDmData->dm_data.level254) return false;
+
+  if (dovi_rpu_remove_cmv40_metadata(opaque) != 1)
+    return false;
+
+  rpuData = dovi_write_unspec62_nalu(opaque);
+  if (!rpuData) return false;
+
+  nalBuf = const_cast<uint8_t*>(rpuData->data);
+  nalSize = static_cast<int32_t>(rpuData->len);
+  return true;
+}
+
 } // namespace
 
 #endif
@@ -690,6 +715,7 @@ CBitstreamConverter::CBitstreamConverter(CDVDStreamInfo& hints)
   m_start_decode = true;
   m_convert_dovi = DOVIMode::MODE_NONE;
   m_append_cmv40 = DOVICMv40Mode::CMV40_NONE;
+  m_strip_cmv40 = false;
   m_convert_Hdr10Plus = false;
   m_prefer_Hdr10Plus_conversion = false;
   m_dual_priority_Hdr10Plus = false;
@@ -1570,9 +1596,18 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
       ConvertDoVi(m_convert_dovi, m_first_frame, opaque, header, vdrDmData,
                   m_hints, m_dataCacheCore, nal_buf, nal_size, rpuData);
 
-    if (m_append_cmv40 != DOVICMv40Mode::CMV40_NONE)
+    bool stripped = false;
+    if (m_strip_cmv40)
+    {
+      // Strip wins over append: down-convert CMv4.0 -> CMv2.9 for old DV TVs
+      // that fail to fall back. Appending then stripping would be nonsense.
+      stripped = StripCMv40(vdrDmData, opaque, nal_buf, nal_size, appendRpuData);
+    }
+    else if (m_append_cmv40 != DOVICMv40Mode::CMV40_NONE)
+    {
       appended = AppendCMv40(m_append_cmv40, header, vdrDmData, opaque,
                              nal_buf, nal_size, appendRpuData);
+    }
 
     if (opaque)
     {
@@ -1595,6 +1630,17 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
       }
       if (m_first_frame)
         CLog::Log(LOGINFO, "CBitstreamConverter::ProcessDoViRpu - CMv4.0 extension appended to RPU");
+    }
+    else if (stripped)
+    {
+      DOVIStreamMetadata meta = m_dataCacheCore.GetVideoDoViStreamMetadata();
+      if (meta.meta_version.rfind("C29 ", 0) != 0)
+      {
+        meta.meta_version = "C29 " + meta.meta_version;
+        m_dataCacheCore.SetVideoDoViStreamMetadata(meta);
+      }
+      if (m_first_frame)
+        CLog::Log(LOGINFO, "CBitstreamConverter::ProcessDoViRpu - CMv4.0 stripped to CMv2.9");
     }
 
     if (header) dovi_rpu_free_header(header);

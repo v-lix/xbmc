@@ -141,6 +141,13 @@ public:
                       if (m_append_cmv40 != value) InvalidateDoViCache();
                       m_append_cmv40 = value;
                     }
+                    // Strip CMv4.0 ext blocks -> clean CMv2.9 (for old DV TVs
+                    // that fail to fall back). Mutually exclusive with append;
+                    // strip wins (see ProcessDoViRpu).
+  void              SetStripCMv40(bool value) {
+                      if (m_strip_cmv40 != value) InvalidateDoViCache();
+                      m_strip_cmv40 = value;
+                    }
                     // L5 active-area override pushed from
                     // CDVDVideoCodecAmlogic when the per-folder override.ini
                     // sets coreelec.amlogic.dolbyvision.level5.override.
@@ -250,6 +257,7 @@ protected:
   enum PeakBrightnessSource m_convert_Hdr10Plus_peak_brightness_source;
   bool              m_first_frame;
   enum DOVICMv40Mode m_append_cmv40;
+  bool              m_strip_cmv40{false};
   bool              m_l5_override_active{false};
   uint16_t          m_l5_override_top{0};
   uint16_t          m_l5_override_bottom{0};

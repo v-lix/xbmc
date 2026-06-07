@@ -19160,6 +19160,16 @@ msgctxt "#60324"
 msgid "Always"
 msgstr "Immer"
 
+#. CMv4.0 -> CMv2.9 down-convert setting
+#: system/settings/settings.xml
+msgctxt "#60328"
+msgid "Convert CMv4.0 to CMv2.9"
+msgstr "CMv4.0 zu CMv2.9 konvertieren"
+
+msgctxt "#60329"
+msgid "Strip CMv4.0 extension blocks from Dolby Vision RPU metadata during playback, leaving a CMv2.9-only stream. For old DV TVs that fail to fall back from CMv4.0 (e.g. black screen on CMv4.0 content). Mutually exclusive with CMv4.0 append."
+msgstr "CMv4.0-Erweiterungsblöcke während der Wiedergabe aus den Dolby Vision RPU-Metadaten entfernen, sodass ein reiner CMv2.9-Stream verbleibt. Für ältere DV-Fernseher, die nicht korrekt von CMv4.0 zurückfallen (z. B. Schwarzbild bei CMv4.0-Inhalten). Schließt sich mit „CMv4.0 anhängen“ gegenseitig aus."
+
 msgctxt "#60325"
 msgid "Auto"
 msgstr "Automatisch"

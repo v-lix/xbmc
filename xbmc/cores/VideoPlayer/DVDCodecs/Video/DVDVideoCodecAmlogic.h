@@ -112,6 +112,7 @@ protected:
   std::unique_ptr<CBitstreamConverter> m_bitstream;
 private:
   void UpdateAppendCMv40SettingCache();
+  void UpdateStripCMv40SettingCache();
   void UpdateLevel5OverrideSettingCache();
   void ApplyDynamicDoViSettings();
 
@@ -123,6 +124,8 @@ private:
 
   std::atomic<int> m_appendCMv40ModeSetting{static_cast<int>(DOVICMv40Mode::CMV40_NONE)};
   DOVICMv40Mode m_appendCMv40ModeApplied{DOVICMv40Mode::CMV40_NONE};
+  std::atomic<bool> m_stripCMv40Setting{false};
+  bool m_stripCMv40Applied{false};
   // L5 active-area override. Active is tracked separately from values so
   // "0,0,0,0" (a legitimate override meaning "treat the stream as having no
   // bars") is distinguished from "no override set" (empty string). Values

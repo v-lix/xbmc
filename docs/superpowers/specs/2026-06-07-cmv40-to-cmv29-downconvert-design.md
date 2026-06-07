@@ -40,7 +40,7 @@ patched libdovi only exposes the *add*.
 |---|---|
 | Strip implementation | Approach A — new libdovi patch function (symmetric with the add; libdovi owns RBSP/CRC/serialization) |
 | Setting shape | Boolean on/off |
-| Strip vs append both enabled | Strip wins in code (skip append silently); documented in code/commit |
+| Strip vs append both enabled | Mutually exclusive: bidirectional `enable` dependency in settings.xml (each greys the other) **plus** strip-wins-in-code as the runtime backstop |
 | Upstream PR target | quietvoid/dovi_tool (canonical libdovi), matching previous libdovi additions |
 
 ## Design

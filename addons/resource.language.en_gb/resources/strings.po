@@ -26003,6 +26003,16 @@ msgctxt "#60325"
 msgid "Auto"
 msgstr ""
 
+#. CMv4.0 -> CMv2.9 down-convert setting
+#: system/settings/settings.xml
+msgctxt "#60328"
+msgid "Convert CMv4.0 to CMv2.9"
+msgstr ""
+
+msgctxt "#60329"
+msgid "Strip CMv4.0 extension blocks from Dolby Vision RPU metadata during playback, leaving a CMv2.9-only stream. For old DV TVs that fail to fall back from CMv4.0 (e.g. black screen on CMv4.0 content). Mutually exclusive with CMv4.0 append."
+msgstr ""
+
 #. Level 5 active-area override channel (written by service.p3i.sb override.ini)
 #: system/settings/settings.xml
 msgctxt "#60326"

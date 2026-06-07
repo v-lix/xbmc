@@ -501,6 +501,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PEAK_BRIGHTNESS_SOURCE = "coreelec.amlogic.dolbyvision.hdr10plus.peak.brightness.source";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_DUAL_PRIORITY = "coreelec.amlogic.dolbyvision.dual.priority";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND = "coreelec.amlogic.dolbyvision.cmv40.append";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP = "coreelec.amlogic.dolbyvision.cmv40.strip";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE = "coreelec.amlogic.dolbyvision.level5.override";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_AUDIO_SEAMLESSBRANCH = "coreelec.amlogic.dolbyvision.audio.seamlessbranch";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES = "coreelec.amlogic.dolbyvision.force.modes";

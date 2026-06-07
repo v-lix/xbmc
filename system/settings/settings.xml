@@ -4550,6 +4550,8 @@
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
+            <!-- Mutually exclusive with CMv4.0 strip: appending then stripping is nonsense. -->
+            <dependency type="enable" setting="coreelec.amlogic.dolbyvision.cmv40.strip" operator="is">false</dependency>
           </dependencies>
           <constraints>
             <options>
@@ -4559,6 +4561,20 @@
             </options>
           </constraints>
           <control type="spinner" format="string" />
+        </setting>
+        <setting id="coreelec.amlogic.dolbyvision.cmv40.strip" type="boolean" label="60328" help="60329" parent="coreelec.amlogic.dolbyvision.type">
+          <requirement>HAVE_AMCODEC</requirement>
+          <visible>false</visible>
+          <level>2</level>
+          <default>false</default>
+          <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
+            <!-- Mutually exclusive with CMv4.0 append (greyed out when append is enabled). -->
+            <dependency type="enable" setting="coreelec.amlogic.dolbyvision.cmv40.append" operator="is">0</dependency>
+          </dependencies>
+          <control type="boolean" />
         </setting>
         <!-- Per-folder override channel used by service.p3i.sb override.ini. Format:
              "top,bottom,left,right" (unsigned ints, RPU active-area space) or empty

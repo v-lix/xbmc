@@ -81,6 +81,7 @@ CDVDVideoCodecAmlogic::CDVDVideoCodecAmlogic(CProcessInfo &processInfo)
     {
       settings->RegisterCallback(this, {
         CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND,
+        CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP,
         CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE,
         CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE
       });
@@ -88,6 +89,7 @@ CDVDVideoCodecAmlogic::CDVDVideoCodecAmlogic(CProcessInfo &processInfo)
     }
   }
   UpdateAppendCMv40SettingCache();
+  UpdateStripCMv40SettingCache();
   UpdateLevel5OverrideSettingCache();
 }
 
@@ -118,6 +120,23 @@ void CDVDVideoCodecAmlogic::UpdateAppendCMv40SettingCache()
       if (aml_dv_type() != DV_TYPE_DISPLAY_LED)
         cmv40 = 0;
       m_appendCMv40ModeSetting.store(cmv40);
+    }
+  }
+}
+
+void CDVDVideoCodecAmlogic::UpdateStripCMv40SettingCache()
+{
+  if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
+  {
+    if (const auto settings = settingsComponent->GetSettings())
+    {
+      // Stripping CMv4.0 -> CMv2.9 only matters on the Display-LED path, where
+      // the TV consumes the RPU. On Player-LED / VS10-only we are the tonemapper
+      // and the raw RPU is not forwarded, so stripping is wasted work.
+      bool strip = settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP);
+      if (aml_dv_type() != DV_TYPE_DISPLAY_LED)
+        strip = false;
+      m_stripCMv40Setting.store(strip);
     }
   }
 }
@@ -162,6 +181,9 @@ void CDVDVideoCodecAmlogic::OnSettingChanged(const std::shared_ptr<const CSettin
   if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND ||
       id == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
     UpdateAppendCMv40SettingCache();
+  if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP ||
+      id == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
+    UpdateStripCMv40SettingCache();
   if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE)
     UpdateLevel5OverrideSettingCache();
 }
@@ -175,6 +197,14 @@ void CDVDVideoCodecAmlogic::ApplyDynamicDoViSettings()
     m_bitstream->SetAppendCMv40(mode);
     m_appendCMv40ModeApplied = mode;
     CLog::Log(LOGINFO, "{}::{} - CMv4.0 append mode changed to {}", __MODULE_NAME__, __FUNCTION__, static_cast<int>(mode));
+  }
+
+  const bool strip = m_stripCMv40Setting.load();
+  if (strip != m_stripCMv40Applied)
+  {
+    m_bitstream->SetStripCMv40(strip);
+    m_stripCMv40Applied = strip;
+    CLog::Log(LOGINFO, "{}::{} - CMv4.0 strip-to-CMv2.9 changed to {}", __MODULE_NAME__, __FUNCTION__, strip);
   }
 
   const bool active = m_level5OverrideActiveSetting.load();
@@ -437,6 +467,15 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
             m_bitstream->SetAppendCMv40(cmv40Mode);
           }
           m_appendCMv40ModeApplied = cmv40Mode;
+
+          const bool stripCMv40 = m_stripCMv40Setting.load();
+          if (stripCMv40)
+          {
+            CLog::Log(LOGINFO, "{}::{} - DV HEVC bitstream - CMv4.0 strip-to-CMv2.9 enabled",
+                      __MODULE_NAME__, __FUNCTION__);
+            m_bitstream->SetStripCMv40(true);
+          }
+          m_stripCMv40Applied = stripCMv40;
 
           if (dualPriorityHdr10Plus)
           {
