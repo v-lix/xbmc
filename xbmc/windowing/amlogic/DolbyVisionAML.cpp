@@ -1015,8 +1015,21 @@ void CDolbyVisionAML::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
   // When video playback fully stops (not channel-switch), restore DV to IPT
   // mode for the GUI.  aml_dv_close() defers this for DV_MODE_ON to avoid
   // unnecessary HDMI mode switches during live-TV channel changes.
+  //
+  // !aml_dv_playback_active() is load-bearing: OnStop is dispatched
+  // asynchronously on the announcement thread (CAnnouncementManager is a
+  // CThread with a queue), so during a back-to-back DV->DV switch the OnStop
+  // for the *previous* title can arrive AFTER the next title's aml_dv_open()
+  // has already reconfigured the DV core.  Without this guard, aml_dv_start()
+  // then runs its off->Bypass->on(IPT) cycle mid-playback over a live stream,
+  // corrupting the HDMI-TX/DV color-space (gray/green "trippy" output that
+  // persists into the GUI since DV_MODE_ON keeps the core enabled).  The
+  // playback-active flag distinguishes "playback truly ended" (restore GUI
+  // IPT) from "switched to another title" (leave the new core alone — it is
+  // already correctly configured).  Mirrors the guard at
+  // CWinSystemAmlogicGLESContext::SetFullScreen.
   if ((flag == ANNOUNCEMENT::Player) && (message == "OnStop") &&
-      (aml_dv_mode() == DV_MODE_ON) && aml_is_dv_enable())
+      (aml_dv_mode() == DV_MODE_ON) && aml_is_dv_enable() && !aml_dv_playback_active())
   {
     unsigned int mode = aml_dv_dolby_vision_mode();
     if (mode != DOLBY_VISION_OUTPUT_MODE_IPT && mode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
