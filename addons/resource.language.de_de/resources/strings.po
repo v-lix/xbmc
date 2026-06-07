@@ -19174,6 +19174,16 @@ msgctxt "#60325"
 msgid "Auto"
 msgstr "Automatisch"
 
+#. Dolby Vision auto-letterbox L5 for cropped content
+#: system/settings/settings.xml
+msgctxt "#60330"
+msgid "Auto Level 5 for cropped video"
+msgstr "Auto-Level-5 für beschnittenes Video"
+
+msgctxt "#60331"
+msgid "For Dolby Vision video whose black bars are cropped off (non-16:9 resolution, e.g. 3840x1600), synthesise the Level 5 active-area offsets from the coded aspect and send them to the display, so the letterbox bars added when scaling to a 16:9 output are masked black instead of being raised to grey by a positive lift. Matches how the TV's internal player handles cropped content. No file scanning is involved. Disable if your display crops or mispositions cropped Dolby Vision content."
+msgstr "Bei Dolby-Vision-Videos, deren schwarze Balken weggeschnitten wurden (Nicht-16:9-Auflösung, z. B. 3840x1600), die Level-5-Aktivbereichs-Offsets aus dem kodierten Seitenverhältnis berechnen und an das Display senden, damit die beim Skalieren auf ein 16:9-Bild hinzugefügten Letterbox-Balken schwarz maskiert und nicht durch einen positiven Lift grau angehoben werden. Entspricht der Handhabung beschnittener Inhalte durch den internen Player des Fernsehers. Es findet kein Datei-Scan statt. Deaktivieren, falls Ihr Display beschnittene Dolby-Vision-Inhalte falsch beschneidet oder positioniert."
+
 msgctxt "#60500"
 msgid "Set Min PQ 20 only"
 msgstr "Nur Min. PQ 20"

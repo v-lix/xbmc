@@ -202,6 +202,17 @@ bool aml_dv_l5_override_active();
 // from aml_dv_on() at playback start and from CDolbyVisionAML::OnSettingChanged
 // when the override key changes mid-playback.
 void aml_dv_apply_l5_override_sysfs();
+
+// Stash the current stream's coded geometry + native-DV flag for the
+// auto-letterbox L5 path (coreelec.amlogic.dolbyvision.l5.auto.letterbox).
+// Called at codec Open(); pass nativeDV=false for non-DV streams to clear.
+void aml_dv_set_active_area_geometry(int width, int height, bool nativeDV);
+
+// True when the auto-letterbox L5 path is reacting to the current stream:
+// native DV, L5 + auto-letterbox enabled, no manual L5 override set, and the
+// coded frame is non-16:9 (cropped). Gates the kernel substitution master and
+// feeds synthesised offsets into aml_dv_apply_l5_override_sysfs().
+bool aml_dv_auto_letterbox_active();
 enum DV_MODE aml_dv_mode();
 enum DV_TYPE aml_dv_type();
 unsigned int aml_vs10_by_setting(const std::string setting);

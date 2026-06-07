@@ -2103,6 +2103,13 @@ bool CAMLCodec::OpenDecoder()
   bool isFullscreen = m_processInfo.IsFullscreen() ||
                       CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo();
   m_dvOpened = (isFullscreen || !skipWindowed);
+
+  // Stash coded geometry for the auto-letterbox L5 path before any DV-on apply.
+  // Non-DV streams clear the native flag so a prior DV stream's geometry can't
+  // leak into the override channel.
+  aml_dv_set_active_area_geometry(hints.width, hints.height,
+                                  hints.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION);
+
   if (m_dvOpened)
     aml_dv_open(hints.hdrType, hints.bitdepth, hints.colorPrimaries);
 

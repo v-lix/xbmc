@@ -964,11 +964,15 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
            settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5 ||
            settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_STD_SOURCE_LEVEL_5_OSDST ||
            settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_SIGNAL_SUBS ||
-           settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA)
+           settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA ||
+           settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_L5_AUTO_LETTERBOX)
   {
     // Re-push the L5 sysfs flags so per-folder override.ini writes from
     // service.p3i.sb take effect mid-playback. Without this, an L5 toggle
-    // from Python would only land on the next aml_dv_on().
+    // from Python would only land on the next aml_dv_on(). The override push
+    // re-evaluates the auto-letterbox geometry so toggling that key applies
+    // (or clears) immediately on cropped content.
+    aml_dv_apply_l5_override_sysfs();
     aml_dv_apply_l5_sysfs();
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
   }

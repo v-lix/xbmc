@@ -26023,6 +26023,16 @@ msgctxt "#60327"
 msgid "Per-folder override channel written by the seamless-branching helper addon. Format: \"top,bottom,left,right\" (unsigned ints, RPU active-area space) or empty for no override."
 msgstr ""
 
+#. Dolby Vision auto-letterbox L5 for cropped content
+#: system/settings/settings.xml
+msgctxt "#60330"
+msgid "Auto Level 5 for cropped video"
+msgstr ""
+
+msgctxt "#60331"
+msgid "For Dolby Vision video whose black bars are cropped off (non-16:9 resolution, e.g. 3840x1600), synthesise the Level 5 active-area offsets from the coded aspect and send them to the display, so the letterbox bars added when scaling to a 16:9 output are masked black instead of being raised to grey by a positive lift. Matches how the TV's internal player handles cropped content. No file scanning is involved. Disable if your display crops or mispositions cropped Dolby Vision content."
+msgstr ""
+
 #. "Dolby Vision Display LL Dolby VSVDB Limit"
 #: system/settings/settings.xml
 msgctxt "#60500"

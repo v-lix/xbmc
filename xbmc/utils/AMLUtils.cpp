@@ -679,7 +679,8 @@ void aml_dv_apply_l5_sysfs()
    * needs the master enable on. */
   bool dv_detect_active_area = dv_level5_enabled &&
                                (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA) ||
-                                aml_dv_l5_override_active());
+                                aml_dv_l5_override_active() ||
+                                aml_dv_auto_letterbox_active());
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detect_active_area", dv_detect_active_area);
   CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_sysfs - l5_enabled={} src_l5={} osdst={} subt_mode={} detect={}",
             dv_level5_enabled, dv_source_level_5, dv_source_level_5_osdst,
@@ -1665,10 +1666,79 @@ bool aml_dv_l5_override_active()
   return _l5_override_parse(t, b, l, r);
 }
 
+/* ---- Auto-letterbox L5 for cropped (non-16:9) content ---------------------
+ * When a Dolby Vision encode has its black bars cropped off (e.g. 3840x1600),
+ * the player pads it back to a 16:9 output and a DV positive-lift trim would
+ * raise those added bars to grey. We synthesise the L5 active-area offsets from
+ * the coded aspect (matching R9 / the TV's internal player) and push them
+ * through the override channel (xbmc_override_l5_* + force) so the DV core masks
+ * the bars black. Pure geometry — no file scan, the detector is never engaged. */
+static std::atomic<int> s_autoLbWidth{0};
+static std::atomic<int> s_autoLbHeight{0};
+static std::atomic<bool> s_autoLbNativeDV{false};
+
+void aml_dv_set_active_area_geometry(int width, int height, bool nativeDV)
+{
+  s_autoLbWidth.store(width);
+  s_autoLbHeight.store(height);
+  s_autoLbNativeDV.store(nativeDV);
+}
+
+/* Compute the synthesised L5 offsets for the current stream. Returns false (and
+ * leaves outputs 0) when the auto-letterbox path should not react: not native
+ * DV, the feature or L5 disabled, a manual override is set (it wins), unknown
+ * geometry, or the coded frame is ~16:9 (nothing to mask). */
+static bool _auto_letterbox_geometry(uint16_t& top, uint16_t& bottom,
+                                     uint16_t& left, uint16_t& right)
+{
+  top = bottom = left = right = 0;
+  if (!s_autoLbNativeDV.load())
+    return false;
+  if (!settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5))
+    return false;
+  if (!settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_L5_AUTO_LETTERBOX))
+    return false;
+  if (aml_dv_l5_override_active()) /* manual per-folder override wins */
+    return false;
+
+  const int w = s_autoLbWidth.load();
+  const int h = s_autoLbHeight.load();
+  if (w <= 0 || h <= 0)
+    return false;
+
+  /* Gap needed to reach 16:9 at the coded width/height; one pair is non-zero.
+   * E.g. 3840x1600 -> refH=2160, tbGap=(2160-1600)/2=280 (matches R9). */
+  const int refH = w * 9 / 16;   /* implied 16:9 height for this width */
+  const int refW = h * 16 / 9;   /* implied 16:9 width for this height */
+  const int tbGap = (refH > h) ? (refH - h) / 2 : 0;
+  const int lrGap = (refW > w) ? (refW - w) / 2 : 0;
+  if (tbGap <= 20 && lrGap <= 20)
+    return false; /* ~16:9 — not cropped, nothing to do */
+
+  top = bottom = static_cast<uint16_t>(std::min(tbGap, 0xFFFF));
+  left = right = static_cast<uint16_t>(std::min(lrGap, 0xFFFF));
+  return true;
+}
+
+bool aml_dv_auto_letterbox_active()
+{
+  uint16_t t = 0, b = 0, l = 0, r = 0;
+  return _auto_letterbox_geometry(t, b, l, r);
+}
+
 void aml_dv_apply_l5_override_sysfs()
 {
   uint16_t top = 0, bottom = 0, left = 0, right = 0;
-  const bool active = _l5_override_parse(top, bottom, left, right);
+  bool active = _l5_override_parse(top, bottom, left, right);
+
+  /* No manual override set — fall back to the auto-letterbox geometry for
+   * cropped content. Manual always wins (checked inside the helper too). */
+  bool autoLb = false;
+  if (!active)
+  {
+    autoLb = _auto_letterbox_geometry(top, bottom, left, right);
+    active = autoLb;
+  }
 
   // xbmc_override_l5_* is the override namespace (kernel commit 61aaaed51c52),
   // separate from xbmc_detected_l5_* which is owned by the detect thread.
@@ -1679,8 +1749,8 @@ void aml_dv_apply_l5_override_sysfs()
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_right",  right);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_force_l5_override",  active);
 
-  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_override_sysfs - active={} t={} b={} l={} r={}",
-            active, top, bottom, left, right);
+  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_override_sysfs - active={} auto={} t={} b={} l={} r={}",
+            active, autoLb, top, bottom, left, right);
 }
 
 /* Cached detected values — written by background detection thread,
