@@ -631,7 +631,8 @@ inline bool StripCMv40(const DoviVdrDmData* vdrDmData,
 
   if (!vdrDmData->dm_data.level254) return false;
 
-  if (dovi_rpu_remove_cmv40_metadata(opaque) != 1)
+  // libdovi returns 0 on success, -1 on error (mirrors dovi_rpu_remove_mapping).
+  if (dovi_rpu_remove_cmv40_metadata(opaque) < 0)
     return false;
 
   rpuData = dovi_write_unspec62_nalu(opaque);
