@@ -40,7 +40,7 @@ patched libdovi only exposes the *add*.
 |---|---|
 | Strip implementation | Approach A — new libdovi patch function (symmetric with the add; libdovi owns RBSP/CRC/serialization) |
 | Setting shape | Boolean on/off |
-| Strip vs append both enabled | Mutually exclusive: bidirectional `enable` dependency in settings.xml (each greys the other) **plus** strip-wins-in-code as the runtime backstop |
+| Strip vs append both enabled | Mutually exclusive **in C** (`DolbyVisionAML::OnSettingChanged`: whichever the user turns on forces the other off) **plus** strip-wins-in-code in `ProcessDoViRpu` as the backstop. NOTE: an earlier settings.xml bidirectional `enable` dependency was reverted — it greyed the append control and fought the TV-preset auto-apply (commit `5f336e644c`). Also added append+strip to the observed `settingSet` so user edits flip the preset to Manual (no snap-back to the preset-forced `append=2`). |
 | Upstream PR target | quietvoid/dovi_tool (canonical libdovi), matching previous libdovi additions |
 
 ## Design
