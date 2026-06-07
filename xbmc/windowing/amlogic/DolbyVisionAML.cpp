@@ -723,6 +723,9 @@ static void apply_tv_preset(int preset)
       // and CMv4.0 append is only consumed by the TV in Display-LED too.
       settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT, true);
       settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, 2); // Always
+      // Down-convert to CMv2.9 is the opposite of append; keep it off on the
+      // Display-LED auto-default (mutually exclusive with append above).
+      settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP, false);
     }
   }
   else
@@ -803,6 +806,8 @@ bool CDolbyVisionAML::Setup()
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_THROTTLE);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_FORCE_MODES);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
+  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND);
+  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP);
   settingsManager->RegisterCallback(this, settingSet);
 
   // Override EDID is always visible (no DV mode dependency) so users can enable DV on non-DV displays
@@ -870,6 +875,24 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
       settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TV_PRESET) != TV_PRESET_MANUAL)
   {
     settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TV_PRESET, TV_PRESET_MANUAL);
+  }
+
+  // CMv4.0 append and CMv4.0->CMv2.9 strip are mutually exclusive (appending then
+  // stripping is nonsense). Enforced here in code rather than via a settings.xml
+  // enable-dependency: the dependency greyed the control and fought the TV-preset
+  // auto-apply (which force-writes append=2 on Display-LED). Whichever the user just
+  // turned on wins; the other is forced off.
+  if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP)
+  {
+    if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP) &&
+        settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND) != 0)
+      settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, 0);
+  }
+  else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND)
+  {
+    if (settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND) != 0 &&
+        settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP))
+      settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP, false);
   }
 
   if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_MODE)

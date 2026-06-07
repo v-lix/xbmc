@@ -4561,8 +4561,6 @@
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
-            <!-- Mutually exclusive with CMv4.0 strip: appending then stripping is nonsense. -->
-            <dependency type="enable" setting="coreelec.amlogic.dolbyvision.cmv40.strip" operator="is">false</dependency>
           </dependencies>
           <constraints>
             <options>
@@ -4582,8 +4580,6 @@
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
-            <!-- Mutually exclusive with CMv4.0 append (greyed out when append is enabled). -->
-            <dependency type="enable" setting="coreelec.amlogic.dolbyvision.cmv40.append" operator="is">0</dependency>
           </dependencies>
           <control type="boolean" />
         </setting>
