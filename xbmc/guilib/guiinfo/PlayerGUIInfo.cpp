@@ -723,24 +723,47 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
       uint16_t dTop = 0, dBottom = 0, dLeft = 0, dRight = 0;
       if (detected)
         aml_dv_detect_active_area_get(dTop, dBottom, dLeft, dRight);
-      /* hasL5: only true when there are actual non-zero source offsets OR
-       * detection completed (even with 0/0/0/0 — that's a valid result for
-       * 16:9 content). Pre-cropped content doesn't set stable, so detected
-       * is false → hasL5 is false → L5 section hidden in the UI. */
-      bool hasL5 = sourceHasL5 || detected;
+      /* Auto-letterbox synthesises L5 from the coded aspect for cropped
+       * (non-16:9) content — neither source nor the pixel detector provides
+       * it (the detector skips non-16:9 and never goes stable). Surface those
+       * synthesised offsets so the L5 section is visible in player info. */
+      uint16_t aTop = 0, aBottom = 0, aLeft = 0, aRight = 0;
+      bool autoLb = !sourceHasL5 && !detected &&
+                    aml_dv_auto_letterbox_get(aTop, aBottom, aLeft, aRight);
+      /* hasL5: true when there are non-zero source offsets, detection completed
+       * (even 0/0/0/0 — valid for 16:9), or auto-letterbox is reacting. */
+      bool hasL5 = sourceHasL5 || detected || autoLb;
+
+      /* Value precedence: detected → auto-letterbox → source. */
+      uint16_t fTop, fBottom, fLeft, fRight;
+      if (detected)
+      {
+        fTop = dTop; fBottom = dBottom; fLeft = dLeft; fRight = dRight;
+      }
+      else if (autoLb)
+      {
+        fTop = aTop; fBottom = aBottom; fLeft = aLeft; fRight = aRight;
+      }
+      else
+      {
+        fTop = meta.level5_active_area_top_offset;
+        fBottom = meta.level5_active_area_bottom_offset;
+        fLeft = meta.level5_active_area_left_offset;
+        fRight = meta.level5_active_area_right_offset;
+      }
 
       switch (info.m_info)
       {
         case PLAYER_PROCESS_VIDEO_DOVI_HAS_L5:
           value = std::to_string(hasL5); break;
         case PLAYER_PROCESS_VIDEO_DOVI_L5_LEFT_OFFSET:
-          value = std::to_string(detected ? dLeft : meta.level5_active_area_left_offset); break;
+          value = std::to_string(fLeft); break;
         case PLAYER_PROCESS_VIDEO_DOVI_L5_RIGHT_OFFSET:
-          value = std::to_string(detected ? dRight : meta.level5_active_area_right_offset); break;
+          value = std::to_string(fRight); break;
         case PLAYER_PROCESS_VIDEO_DOVI_L5_TOP_OFFSET:
-          value = std::to_string(detected ? dTop : meta.level5_active_area_top_offset); break;
+          value = std::to_string(fTop); break;
         case PLAYER_PROCESS_VIDEO_DOVI_L5_BOTTOM_OFFSET:
-          value = std::to_string(detected ? dBottom : meta.level5_active_area_bottom_offset); break;
+          value = std::to_string(fBottom); break;
         case PLAYER_PROCESS_VIDEO_DOVI_L5_DETECTED:
           value = std::to_string(detected); break;
         default: break;

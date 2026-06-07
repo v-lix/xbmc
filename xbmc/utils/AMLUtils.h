@@ -213,6 +213,12 @@ void aml_dv_set_active_area_geometry(int width, int height, bool nativeDV);
 // coded frame is non-16:9 (cropped). Gates the kernel substitution master and
 // feeds synthesised offsets into aml_dv_apply_l5_override_sysfs().
 bool aml_dv_auto_letterbox_active();
+
+// Fetch the synthesised auto-letterbox L5 offsets for the current stream.
+// Returns false (outputs 0) when the path is not reacting (same gating as
+// aml_dv_auto_letterbox_active()). For surfacing the values in player info.
+bool aml_dv_auto_letterbox_get(uint16_t& top, uint16_t& bottom,
+                               uint16_t& left, uint16_t& right);
 enum DV_MODE aml_dv_mode();
 enum DV_TYPE aml_dv_type();
 unsigned int aml_vs10_by_setting(const std::string setting);

@@ -1726,6 +1726,12 @@ bool aml_dv_auto_letterbox_active()
   return _auto_letterbox_geometry(t, b, l, r);
 }
 
+bool aml_dv_auto_letterbox_get(uint16_t& top, uint16_t& bottom,
+                               uint16_t& left, uint16_t& right)
+{
+  return _auto_letterbox_geometry(top, bottom, left, right);
+}
+
 void aml_dv_apply_l5_override_sysfs()
 {
   uint16_t top = 0, bottom = 0, left = 0, right = 0;
