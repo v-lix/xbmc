@@ -711,6 +711,7 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
     case PLAYER_PROCESS_VIDEO_DOVI_L5_TOP_OFFSET:
     case PLAYER_PROCESS_VIDEO_DOVI_L5_BOTTOM_OFFSET:
     case PLAYER_PROCESS_VIDEO_DOVI_L5_DETECTED:
+    case PLAYER_PROCESS_VIDEO_DOVI_ACTIVE_AREA_CLASS:
     {
       /* Prefer source L5 when it has non-zero offsets. Only fall back to
        * detected values when source is absent or all-zero — avoids
@@ -766,6 +767,25 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
           value = std::to_string(fBottom); break;
         case PLAYER_PROCESS_VIDEO_DOVI_L5_DETECTED:
           value = std::to_string(detected); break;
+        case PLAYER_PROCESS_VIDEO_DOVI_ACTIVE_AREA_CLASS:
+        {
+          /* Resolution-independent aspect class from the effective top bar:
+           * bucket top/height so 1080p and 2160p of the same aspect agree. */
+          int videoHeight = CServiceBroker::GetDataCacheCore().GetVideoHeight();
+          int cls = 0;
+          if (hasL5 && videoHeight > 0)
+          {
+            float frac = static_cast<float>(fTop) / static_cast<float>(videoHeight);
+            if (frac >= 0.11f)
+              cls = 3;
+            else if (frac >= 0.08f)
+              cls = 2;
+            else if (frac >= 0.04f)
+              cls = 1;
+          }
+          value = std::to_string(cls);
+          break;
+        }
         default: break;
       }
       return true;
