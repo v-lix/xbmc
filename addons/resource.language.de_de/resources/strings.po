@@ -6867,8 +6867,8 @@ msgid "Use display vsync as playback reference clock"
 msgstr "Display-VSync als Wiedergabe-Referenztakt verwenden"
 
 msgctxt "#14299"
-msgid "Drive the playback reference clock from real HDMI vsync events instead of the system clock. Improves timing accuracy and reduces micro-hitches. Disable to fall back to the legacy system-clock based timing."
-msgstr "Steuert den Wiedergabe-Referenztakt anhand echter HDMI-VSync-Ereignisse statt der Systemuhr. Verbessert die Genauigkeit der Frame-Synchronisation und reduziert kleine Ruckler. Deaktivieren, um auf das ältere systemuhrbasierte Timing zurückzufallen."
+msgid "Drive the playback reference clock from real HDMI vsync events instead of the system clock. Improves timing accuracy and reduces micro-hitches. Disable to fall back to the legacy system-clock based timing. Takes effect immediately; toggling during playback may cause a brief A/V glitch."
+msgstr "Steuert den Wiedergabe-Referenztakt anhand echter HDMI-VSync-Ereignisse statt der Systemuhr. Verbessert die Genauigkeit der Frame-Synchronisation und reduziert kleine Ruckler. Deaktivieren, um auf das ältere systemuhrbasierte Timing zurückzufallen. Wirkt sofort; ein Umschalten während der Wiedergabe kann einen kurzen A/V-Aussetzer verursachen."
 
 msgctxt "#14280"
 msgid "Maintenance"

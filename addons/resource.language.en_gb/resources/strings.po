@@ -8799,7 +8799,7 @@ msgstr ""
 #. CoreELEC: Amlogic vsync-driven reference clock help
 #: system/settings/settings.xml
 msgctxt "#14299"
-msgid "Drive the playback reference clock from real HDMI vsync events instead of the system clock. Improves timing accuracy and reduces micro-hitches. Disable to fall back to the legacy system-clock based timing."
+msgid "Drive the playback reference clock from real HDMI vsync events instead of the system clock. Improves timing accuracy and reduces micro-hitches. Disable to fall back to the legacy system-clock based timing. Takes effect immediately; toggling during playback may cause a brief A/V glitch."
 msgstr ""
 
 #. pvr "channels" settings group label

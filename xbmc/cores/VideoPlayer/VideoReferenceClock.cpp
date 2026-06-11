@@ -10,6 +10,7 @@
 #include "ServiceBroker.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
+#include "settings/lib/Setting.h"
 #include "utils/MathUtils.h"
 #include "utils/TimeUtils.h"
 #include "utils/log.h"
@@ -34,11 +35,24 @@ CVideoReferenceClock::CVideoReferenceClock() : CThread("RefClock")
   m_VblankTime = 0;
   m_vsyncStopEvent.Reset();
 
+  if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
+  {
+    if (const auto settings = settingsComponent->GetSettings())
+      settings->RegisterCallback(this,
+          {CSettings::SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK});
+  }
+
   Start();
 }
 
 CVideoReferenceClock::~CVideoReferenceClock()
 {
+  if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
+  {
+    if (const auto settings = settingsComponent->GetSettings())
+      settings->UnregisterCallback(this);
+  }
+
   m_bStop = true;
   m_vsyncStopEvent.Set();
   StopThread();
@@ -46,6 +60,8 @@ CVideoReferenceClock::~CVideoReferenceClock()
 
 void CVideoReferenceClock::Start()
 {
+  std::unique_lock<CCriticalSection> lock(m_LifecycleSection);
+
   if (IsRunning())
     return;
 
@@ -53,7 +69,50 @@ void CVideoReferenceClock::Start()
   if (settings && !settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK))
     return;
 
+  // Reset transient state so a re-spawn after Stop() starts cleanly.
+  m_disableRequested = false;
+  m_vsyncStopEvent.Reset();
+  m_bStop = false;
+
   Create();
+}
+
+void CVideoReferenceClock::Stop()
+{
+  std::unique_lock<CCriticalSection> lock(m_LifecycleSection);
+
+  if (!IsRunning())
+    return;
+
+  // Signal both gates: m_disableRequested makes the outer Process() loop
+  // break instead of re-entering Setup(); m_vsyncStopEvent unblocks the
+  // CVideoSync::Run() that is currently parked on a vsync wait.
+  m_disableRequested = true;
+  m_vsyncStopEvent.Set();
+  StopThread(true);
+  // Leave m_bStop as StopThread left it; Start() will clear it before
+  // the next Create().
+}
+
+void CVideoReferenceClock::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
+{
+  if (!setting)
+    return;
+
+  if (setting->GetId() != CSettings::SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK)
+    return;
+
+  const bool enabled =
+      std::static_pointer_cast<const CSettingBool>(setting)->GetValue();
+
+  CLog::Log(LOGINFO,
+            "CVideoReferenceClock: vsync ref-clock toggled {} via settings",
+            enabled ? "ON" : "OFF");
+
+  if (enabled)
+    Start();
+  else
+    Stop();
 }
 
 void CVideoReferenceClock::UpdateClock(int NrVBlanks, uint64_t time)
@@ -121,6 +180,17 @@ void CVideoReferenceClock::Process()
 
     if (!SetupSuccess)
       break;
+
+    // Honour a live-toggle disable: the user flipped
+    // coreelec.amlogic.usedisplayasclock to false; exit cleanly so the
+    // thread joins and IsRunning() becomes false. Start() will re-spawn
+    // a fresh thread on the next enable.
+    if (m_disableRequested.exchange(false))
+    {
+      CLog::Log(LOGINFO,
+                "CVideoReferenceClock: vsync ref-clock disabled — exiting thread");
+      break;
+    }
   }
 }
 
