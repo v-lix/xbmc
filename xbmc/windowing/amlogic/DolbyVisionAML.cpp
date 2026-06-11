@@ -1044,23 +1044,20 @@ void CDolbyVisionAML::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
   // mode for the GUI.  aml_dv_close() defers this for DV_MODE_ON to avoid
   // unnecessary HDMI mode switches during live-TV channel changes.
   //
-  // !aml_dv_playback_active() is load-bearing: OnStop is dispatched
+  // The playback-active guard is load-bearing: OnStop is dispatched
   // asynchronously on the announcement thread (CAnnouncementManager is a
   // CThread with a queue), so during a back-to-back DV->DV switch the OnStop
   // for the *previous* title can arrive AFTER the next title's aml_dv_open()
-  // has already reconfigured the DV core.  Without this guard, aml_dv_start()
-  // then runs its off->Bypass->on(IPT) cycle mid-playback over a live stream,
+  // has already reconfigured the DV core.  Without it, aml_dv_start() runs
+  // its off->Bypass->on(IPT) cycle mid-playback over a live stream,
   // corrupting the HDMI-TX/DV color-space (gray/green "trippy" output that
-  // persists into the GUI since DV_MODE_ON keeps the core enabled).  The
-  // playback-active flag distinguishes "playback truly ended" (restore GUI
-  // IPT) from "switched to another title" (leave the new core alone — it is
-  // already correctly configured).  Mirrors the guard at
-  // CWinSystemAmlogicGLESContext::SetFullScreen.
-  if ((flag == ANNOUNCEMENT::Player) && (message == "OnStop") &&
-      (aml_dv_mode() == DV_MODE_ON) && aml_is_dv_enable() && !aml_dv_playback_active())
-  {
-    unsigned int mode = aml_dv_dolby_vision_mode();
-    if (mode != DOLBY_VISION_OUTPUT_MODE_IPT && mode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
-      aml_dv_start();
-  }
+  // persists into the GUI since DV_MODE_ON keeps the core enabled).
+  //
+  // All guard checks (DV_MODE_ON, dv enabled, NOT playback-active, not
+  // already IPT) now live inside aml_dv_restore_gui_ipt() UNDER the DV-core
+  // lock, so the decision and the cycle are atomic vs a concurrent
+  // aml_dv_open() — the unlocked check-then-cycle here used to leave a
+  // narrower variant of the same race open.
+  if ((flag == ANNOUNCEMENT::Player) && (message == "OnStop"))
+    aml_dv_restore_gui_ipt("Player.OnStop");
 }

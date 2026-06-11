@@ -123,22 +123,19 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
   // with display_auto_now) corrupts the HDMI TX color-space state, causing
   // persistent color distortion in the GUI.
   // Synchronously restore DV to IPT here, before any HDMI work or early
-  // return.  The announcement handler's own mode check will then skip the
-  // redundant call.  The playback-active flag prevents this from firing
-  // during playback-start mode switches where aml_dv_open() has already set
-  // the correct output mode.
+  // return.  The announcement handler's own checks will then skip the
+  // redundant call.  All guard checks (incl. playback-active, which prevents
+  // this from firing during playback-start mode switches where aml_dv_open()
+  // has already set the correct output mode) run inside
+  // aml_dv_restore_gui_ipt() UNDER the DV-core lock — atomic vs a concurrent
+  // aml_dv_open() on the codec thread.
   aml_dv_wait_for_pipeline();
-  if (aml_dv_mode() == DV_MODE_ON && aml_is_dv_enable() && !aml_dv_playback_active())
+  if (aml_dv_restore_gui_ipt("SetFullScreen"))
   {
-    unsigned int dvMode = aml_dv_dolby_vision_mode();
-    if (dvMode != DOLBY_VISION_OUTPUT_MODE_IPT && dvMode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
-    {
-      aml_dv_start();
-      // Re-write the display mode to trigger VPP reconfiguration for the
-      // new DV output mode, matching what CWinSystemAmlogic::CreateNewWindow
-      // does via aml_dv_display_trigger() in the full mode-switch path.
-      aml_dv_display_trigger();
-    }
+    // Re-write the display mode to trigger VPP reconfiguration for the
+    // new DV output mode, matching what CWinSystemAmlogic::CreateNewWindow
+    // does via aml_dv_display_trigger() in the full mode-switch path.
+    aml_dv_display_trigger();
   }
 
   // check if mode switch is needed

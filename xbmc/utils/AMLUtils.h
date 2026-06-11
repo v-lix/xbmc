@@ -172,6 +172,13 @@ void aml_dv_display_trigger();
 void aml_hdr10plus_vsif_hold(bool hold);
 void aml_dv_display_auto_now();
 void aml_dv_start();
+// Restore the GUI IPT output mode after playback truly ended. All guard
+// checks (DV_MODE_ON, dv enabled, NOT playback-active, not already IPT) run
+// inside the DV-core critical section so the decision and the off->on cycle
+// are atomic vs a concurrent aml_dv_open() — a queued restore that lost the
+// race to a new playback no-ops instead of cycling over the live stream.
+// Returns true when a restore cycle actually ran. reason = log tag.
+bool aml_dv_restore_gui_ipt(const char* reason);
 void aml_dv_wait_for_pipeline();
 void aml_dv_set_subtitles(bool visible);
 void aml_dv_set_xbmc_osd();

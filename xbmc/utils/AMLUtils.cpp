@@ -1598,13 +1598,10 @@ void aml_dv_display_auto_now()
 // recreation doesn't race with DV pipeline restoration.
 static std::mutex s_dvStartMutex;
 
-void aml_dv_start()
+// Body of aml_dv_start(). Caller must hold BOTH s_dvStartMutex and
+// s_dvCoreMutex (ordering: start -> core, never the reverse).
+static void _dv_start_locked()
 {
-  std::lock_guard<std::mutex> lock(s_dvStartMutex);
-  // Ordering: s_dvStartMutex -> s_dvCoreMutex (never the reverse). The nested
-  // aml_dv_off()/aml_dv_on() below re-acquire s_dvCoreMutex recursively.
-  CDVCoreGuard dvlock(__FUNCTION__);
-
   if (aml_is_dv_enable())
   {
     unsigned int mode = aml_dv_dolby_vision_mode();
@@ -1623,6 +1620,49 @@ void aml_dv_start()
     aml_dv_reset_osd_max();
     aml_dv_on(DOLBY_VISION_OUTPUT_MODE_IPT);
   }
+}
+
+void aml_dv_start()
+{
+  std::lock_guard<std::mutex> lock(s_dvStartMutex);
+  // Ordering: s_dvStartMutex -> s_dvCoreMutex (never the reverse). The nested
+  // aml_dv_off()/aml_dv_on() inside re-acquire s_dvCoreMutex recursively.
+  CDVCoreGuard dvlock(__FUNCTION__);
+  _dv_start_locked();
+}
+
+bool aml_dv_restore_gui_ipt(const char* reason)
+{
+  std::lock_guard<std::mutex> lock(s_dvStartMutex);
+  CDVCoreGuard dvlock(__FUNCTION__);
+
+  // Re-validate UNDER the DV-core lock. The callers (Player.OnStop
+  // announcement handler, CWinSystemAmlogicGLESContext::SetFullScreen) used
+  // to evaluate these conditions unlocked and then call aml_dv_start(): a
+  // concurrent aml_dv_open() winning the race between check and cycle
+  // re-created the mid-playback off->Bypass->on corruption (gray/green /
+  // black output) through a narrower window than the one 123ad70121 closed,
+  // and a restore queued behind a codec-thread close/reopen executed stale
+  // instead of no-oping. Holding the lock across check+cycle makes the
+  // decision and the action atomic: a restore that lost the race to a new
+  // playback sees playback-active under the lock and skips.
+  if (aml_dv_mode() != DV_MODE_ON || !aml_is_dv_enable() || aml_dv_playback_active())
+  {
+    CLog::Log(LOGDEBUG,
+              "AMLUtils::{} - [{}] skip: DV state changed while queued "
+              "(mode/enable/playback-active)",
+              __FUNCTION__, reason);
+    return false;
+  }
+
+  unsigned int mode = aml_dv_dolby_vision_mode();
+  if (mode == DOLBY_VISION_OUTPUT_MODE_IPT || mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
+    return false; // already in a GUI-suitable mode — nothing to restore
+
+  CLog::Log(LOGINFO, "AMLUtils::{} - [{}] restoring GUI IPT (from mode {})",
+            __FUNCTION__, reason, aml_dv_output_mode_to_string(mode));
+  _dv_start_locked();
+  return true;
 }
 
 void aml_dv_wait_for_pipeline()
