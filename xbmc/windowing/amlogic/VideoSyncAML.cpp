@@ -236,6 +236,20 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
           m_stallTs = kernelTs; // frozen ts; recovery = a probe ts beyond it
           m_lastProbe = stnow;
         }
+        // Primary→legacy handoff: re-anchor the dead-reckoning ledger.
+        // numVBlanks counted *real* vsyncs while the kernel path ran, but the
+        // legacy estimator below counts nominal frame intervals against
+        // startTs — the ppm-level difference between the display's actual
+        // clock and the nominal rate (PLL tolerance, fractional-rate
+        // approximation) diverges the two ledgers by a few frames per hour of
+        // kernel-path runtime. Reconciling against a stale anchor would replay
+        // all of that accumulated drift into the reference clock at once
+        // (countVSyncs = curVBlanks - numVBlanks → one-shot jump, or repeated
+        // zero-advances → freeze). Start dead-reckoning fresh from here
+        // instead; the blocked-ioctl gap itself is already conserved by the
+        // GetTime() synthesis + missed-vblank accounting.
+        startTs = stnow;
+        numVBlanks = 0;
         // fall through to legacy timing for this iteration
       }
       else
@@ -250,6 +264,12 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
                     strerror(errno));
           close(m_fbFd);
           m_fbFd = -1;
+          // Same ledger re-anchor as the stale-return handoff above: legacy
+          // dead-reckoning owns the clock from here on. (In practice this
+          // fires on the first ioctl of the session, so the anchor is fresh
+          // anyway — kept for consistency.)
+          startTs = std::chrono::steady_clock::now();
+          numVBlanks = 0;
         }
       }
     }
