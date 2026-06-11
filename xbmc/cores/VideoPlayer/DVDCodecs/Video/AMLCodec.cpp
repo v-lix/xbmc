@@ -2878,6 +2878,11 @@ void CAMLCodec::ShowMainVideo(const bool show)
   if (saved_disable_video == disable_video)
     return;
 
+  // INFO on purpose: disable_video=1 blanks the video plane — the timestamp of
+  // this write vs the black-screen onset is a primary diagnostic for the FEL
+  // black-with-audio reports (plane hidden but first frame never arrives).
+  CLog::Log(LOGINFO, "CAMLCodec::ShowMainVideo - video plane {} (disable_video={})",
+            show ? "show" : "hide", disable_video);
   CSysfsPath("/sys/class/video/disable_video", disable_video);
   saved_disable_video = disable_video;
 }

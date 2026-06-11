@@ -118,6 +118,52 @@ static std::string s_lastDisplayMode;
 // s_dvCoreMutex (only aml_dv_start takes both, in that order), never the
 // reverse, so the two cannot deadlock.
 static std::recursive_mutex s_dvCoreMutex;
+
+// RAII guard for s_dvCoreMutex with convoy diagnostics. A DV off/on cycle
+// advances kernel-side per-vsync, so a queue of serialized DV ops can hold the
+// core lock for whole frames — long enough to stall the render thread's
+// SetFullScreen path behind a codec-thread close/reopen (FEL black-screen
+// class). Log when acquiring had to wait on another thread (>50ms) and when a
+// critical section held the lock long (>100ms, outermost acquisition only —
+// nested recursive re-entries are free and would double-count).
+class CDVCoreGuard
+{
+public:
+  explicit CDVCoreGuard(const char* tag) : m_tag(tag)
+  {
+    const auto t0 = std::chrono::steady_clock::now();
+    s_dvCoreMutex.lock();
+    const auto waitMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - t0).count();
+    if (waitMs > 50)
+      CLog::Log(LOGWARNING, "AMLUtils::{} - waited {}ms for DV-core lock (convoy)",
+                m_tag, waitMs);
+    m_outermost = (s_lockDepth++ == 0);
+    if (m_outermost)
+      m_acquired = std::chrono::steady_clock::now();
+  }
+  ~CDVCoreGuard()
+  {
+    --s_lockDepth;
+    if (m_outermost)
+    {
+      const auto heldMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now() - m_acquired).count();
+      if (heldMs > 100)
+        CLog::Log(LOGWARNING, "AMLUtils::{} - held DV-core lock for {}ms", m_tag, heldMs);
+    }
+    s_dvCoreMutex.unlock();
+  }
+  CDVCoreGuard(const CDVCoreGuard&) = delete;
+  CDVCoreGuard& operator=(const CDVCoreGuard&) = delete;
+private:
+  static thread_local int s_lockDepth;
+  const char* m_tag;
+  bool m_outermost{false};
+  std::chrono::steady_clock::time_point m_acquired{};
+};
+thread_local int CDVCoreGuard::s_lockDepth = 0;
+
 // Forward-declared: defined below near aml_dv_display_trigger, called from
 // aml_dv_off (above) too. Round-trips display/mode through sysfs but recovers
 // to last-known-good if the read returned "null".
@@ -262,6 +308,11 @@ int aml_blackout_policy(int new_blackout)
   {
     int existing_blackout = blackout_policy.Get<int>().value();
     blackout_policy.Set(new_blackout);
+    // INFO on purpose: blackout_policy=1 is what blanks the video plane on a
+    // decoder close — the timestamp of this write vs the black-screen onset is
+    // a primary diagnostic for the FEL black-with-audio reports.
+    CLog::Log(LOGINFO, "AMLUtils::{} - blackout_policy {} -> {}",
+              __FUNCTION__, existing_blackout, new_blackout);
     return existing_blackout;
   }
   return 0;
@@ -689,7 +740,7 @@ void aml_dv_apply_l5_sysfs()
 
 unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
 {
-  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
+  CDVCoreGuard dvlock(__FUNCTION__);
   aml_dv_apply_l5_sysfs();
   aml_dv_apply_l5_override_sysfs();
 
@@ -1244,7 +1295,7 @@ void aml_hdmi_link_probe(const char* ctx)
 
 void aml_dv_off(bool skip_hdmi_update)
 {
-  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
+  CDVCoreGuard dvlock(__FUNCTION__);
   aml_dv_detect_active_area_stop();
 
   // change mode and disable.
@@ -1356,7 +1407,7 @@ unsigned int aml_dv_dolby_vision_mode()
 
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries)
 {
-  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
+  CDVCoreGuard dvlock(__FUNCTION__);
   aml_dv_dump_state("dv_open/pre");
   s_dvPlaybackActive = true;
 
@@ -1394,7 +1445,7 @@ void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries 
 
 void aml_dv_close()
 {
-  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
+  CDVCoreGuard dvlock(__FUNCTION__);
   aml_dv_dump_state("dv_close/pre");
   s_dvPlaybackActive = false;
   s_pm4kActive = false;
@@ -1497,7 +1548,7 @@ static void aml_display_mode_round_trip(const char* fn)
 
 void aml_dv_display_trigger()
 {
-  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
+  CDVCoreGuard dvlock(__FUNCTION__);
   if (aml_is_dv_enable()) {
     aml_display_mode_round_trip(__FUNCTION__);
 
@@ -1552,7 +1603,7 @@ void aml_dv_start()
   std::lock_guard<std::mutex> lock(s_dvStartMutex);
   // Ordering: s_dvStartMutex -> s_dvCoreMutex (never the reverse). The nested
   // aml_dv_off()/aml_dv_on() below re-acquire s_dvCoreMutex recursively.
-  std::lock_guard<std::recursive_mutex> dvlock(s_dvCoreMutex);
+  CDVCoreGuard dvlock(__FUNCTION__);
 
   if (aml_is_dv_enable())
   {
@@ -1579,7 +1630,14 @@ void aml_dv_wait_for_pipeline()
   // Block until any in-progress aml_dv_start() completes. Called from
   // CreateNewWindow to prevent EGL surface creation while the DV pipeline
   // is transitioning through Bypass mode (causes color corruption).
+  const auto t0 = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> lock(s_dvStartMutex);
+  const auto waitMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - t0).count();
+  if (waitMs > 50)
+    CLog::Log(LOGWARNING,
+              "AMLUtils::{} - blocked {}ms behind an in-flight DV start/restore",
+              __FUNCTION__, waitMs);
 }
 
 void aml_dv_set_subtitles(bool visible)

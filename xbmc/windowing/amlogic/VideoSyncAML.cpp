@@ -184,9 +184,14 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
           m_refClock->UpdateClock(countVSyncs, CurrentHostCounter());
           continue;
         }
-        // kernelTs == 0 when VD1 is powered down (HDMI mode-switch settle,
-        // VPP reconfig on seek, etc.); unchanged ts means the kernel ioctl
-        // timed out (~1s) without a real vblank. Reset m_lastKernelTs so the
+        // The kernel stamps timestamp[VIU1] on every VIU1 vsync IRQ, gated
+        // only by display suspend — NOT by VD1/VPP plane state (verified:
+        // vsync_isr in osd_hw.c stamps in both rdma and non-rdma branches).
+        // An unchanged ts therefore means the ioctl's ~1s kernel timeout
+        // expired without a single vsync IRQ: the encoder timing itself is
+        // stopped (mode-switch window, display-engine null-wedge). ts==0
+        // cannot occur after the first vsync post-boot (the stamp only ever
+        // moves forward); that branch is defensive. Reset m_lastKernelTs so the
         // first valid ts after the gap is treated as a fresh anchor —
         // otherwise the catch-up math above reads deltaNs across the entire
         // blackout and advances m_CurrTime by N×interval in one shot, on top
@@ -194,7 +199,7 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
         // jump is the dominant cause of audible TrueHD/MAT stutter + paired
         // video stall at start of playback and post-seek.
         if (kernelTs == 0)
-          CLog::Log(LOGDEBUG, "CVideoSyncAML: ioctl returned ts=0 (VD1 off?), legacy fallback");
+          CLog::Log(LOGDEBUG, "CVideoSyncAML: ioctl returned ts=0 (pre-first-vsync?), legacy fallback");
         else
           CLog::Log(LOGDEBUG, "CVideoSyncAML: ioctl ts unchanged ({}), legacy fallback", kernelTs);
         m_lastKernelTs = 0;
