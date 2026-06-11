@@ -8847,7 +8847,7 @@ msgstr ""
 #. CoreELEC: Amlogic videosync fallback-on-stall help
 #: system/settings/settings.xml
 msgctxt "#14308"
-msgid "When the HDMI vsync clock (FBIO_WAITFORVSYNC_64) stops progressing for ~1 second the reference clock falls back to legacy elapsed-time timing for the rest of the playback session and a notification is shown. Useful on AVR/repeater chains where the HDMI engine can briefly stall after rapid mode changes. Default off — most setups should stay on the kernel vsync."
+msgid "If the HDMI vsync clock (FBIO_WAITFORVSYNC_64) keeps stalling, latch legacy elapsed-time timing for the rest of the current playback instead of re-probing for recovery, and show a notification. A brief vsync stall (seek, mode switch) always drops to legacy timing automatically and resumes the kernel vsync clock once it recovers — this option only controls whether a sustained stall stops re-probing. Useful on AVR/repeater chains where the HDMI engine can stay stalled after rapid mode changes. Resets on stop, so the next playback starts on the kernel vsync clock."
 msgstr ""
 
 #empty strings from id 14309 to 15010

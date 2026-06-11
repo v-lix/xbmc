@@ -4675,7 +4675,7 @@
         <setting id="coreelec.amlogic.videosync.fallback.on.stall" type="boolean" parent="coreelec.amlogic.usedisplayasclock" label="14307" help="14308">
           <requirement>HAVE_AMCODEC</requirement>
           <level>2</level>
-          <default>false</default>
+          <default>true</default>
           <dependencies>
             <dependency type="enable">
               <condition setting="coreelec.amlogic.usedisplayasclock" operator="is">true</condition>

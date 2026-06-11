@@ -51,8 +51,15 @@ bool CVideoSyncAML::Setup()
 {
   m_abort = false;
   m_lastKernelTs = 0;
-  m_staleTsCount = 0;
-  m_staleStallLogged = false;
+  // Reset all stall state so the fallback disengages on stop: every playback
+  // (re-Setup) starts clean on the kernel vsync path.
+  m_lastGoodTs = {};
+  m_lastProbe = {};
+  m_vsyncDegraded = false;
+  m_failedProbes = 0;
+  m_stallTs = 0;
+  m_stallFaultLogged = false;
+  m_legacyLatched = false;
 
   // Cache opt-in fallback setting once per Setup so the per-iteration hot
   // path doesn't touch the settings system. Re-evaluated on next playback.
@@ -85,6 +92,12 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
   auto startTs = std::chrono::steady_clock::now();
   uint64_t numVBlanks = 0;
 
+  // Anchor the stall detector at Run start so a vsync that never produces a
+  // single tick (sink that never syncs) still trips to legacy after the
+  // threshold instead of blocking ~1s per ioctl forever; refreshed on every
+  // advancing vsync below.
+  m_lastGoodTs = startTs;
+
   /* This shouldn't be very busy and timing is important so increase priority */
   CThread::GetCurrentThread()->SetPriority(ThreadPriority::ABOVE_NORMAL);
 
@@ -115,8 +128,14 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
       startTs = std::chrono::steady_clock::now();
       numVBlanks = 0;
       m_lastKernelTs = 0;
-      m_staleTsCount = 0;
-      m_staleStallLogged = false;
+      // A mode switch is exactly when vsync briefly stalls then recovers; give
+      // the kernel vsync path a clean retry instead of staying degraded, and
+      // re-anchor the stall detector to now (startTs was just reset above) so
+      // the settle after the switch is measured from here, not epoch-zero.
+      m_lastGoodTs = startTs;
+      m_vsyncDegraded = false;
+      m_failedProbes = 0;
+      m_stallFaultLogged = false;
       if (last_fps > 0.0)
       {
         CLog::Log(LOGDEBUG,
@@ -132,7 +151,10 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
       last_fps = cur_fps;
     }
 
-    if (m_fbFd >= 0)
+    const auto nowSteady = std::chrono::steady_clock::now();
+    const bool useVsyncPath = (m_fbFd >= 0) && !m_legacyLatched;
+
+    if (useVsyncPath && !m_vsyncDegraded)
     {
       int64_t kernelTs = 0;
       if (ioctl(m_fbFd, FBIO_WAITFORVSYNC_64, &kernelTs) == 0)
@@ -157,62 +179,64 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
                       countVSyncs, deltaNs, expectedIntervalNs);
           }
           m_lastKernelTs = kernelTs;
+          m_lastGoodTs = nowSteady; // anchor for time-based stall detection
           numVBlanks += static_cast<uint64_t>(countVSyncs);
           m_refClock->UpdateClock(countVSyncs, CurrentHostCounter());
-          // Fresh valid ts → recover from any stall state.
-          m_staleTsCount = 0;
-          m_staleStallLogged = false;
           continue;
         }
         // kernelTs == 0 when VD1 is powered down (HDMI mode-switch settle,
-        // VPP reconfig on seek, etc.); unchanged ts means the wake fired
-        // without a real vblank. Either way drop to legacy. Reset
-        // m_lastKernelTs so the first valid ts after the gap is treated as
-        // a fresh anchor — otherwise the catch-up math above reads deltaNs
-        // across the entire blackout and advances m_CurrTime by N×interval
-        // in one shot, on top of what the legacy fallback already advanced
-        // during the gap. That jump is what AE samples right when playback
-        // engages after a refresh-rate-change delay, and is the dominant
-        // cause of audible TrueHD/MAT stutter + paired video stall at
-        // start of playback and post-seek.
+        // VPP reconfig on seek, etc.); unchanged ts means the kernel ioctl
+        // timed out (~1s) without a real vblank. Reset m_lastKernelTs so the
+        // first valid ts after the gap is treated as a fresh anchor —
+        // otherwise the catch-up math above reads deltaNs across the entire
+        // blackout and advances m_CurrTime by N×interval in one shot, on top
+        // of what the legacy fallback already advanced during the gap. That
+        // jump is the dominant cause of audible TrueHD/MAT stutter + paired
+        // video stall at start of playback and post-seek.
         if (kernelTs == 0)
           CLog::Log(LOGDEBUG, "CVideoSyncAML: ioctl returned ts=0 (VD1 off?), legacy fallback");
         else
           CLog::Log(LOGDEBUG, "CVideoSyncAML: ioctl ts unchanged ({}), legacy fallback", kernelTs);
         m_lastKernelTs = 0;
-        // Stall detection: count consecutive non-progressing returns. Short
-        // bursts during mode switches / VPP reconfig are normal — only log if
-        // the stall sustains. Threshold ~24 iterations is ~1s at 24Hz; far
-        // above any legitimate transient (mode-switch settle is ~100-300ms).
-        // Latched so we only dump once per stall episode.
-        ++m_staleTsCount;
-        if (!m_staleStallLogged && m_staleTsCount >= 24)
-        {
-          CLog::Log(LOGWARNING,
-                    "CVideoSyncAML: vsync stalled ({} consecutive stale ioctl "
-                    "returns) — capturing kernel state for diagnosis",
-                    m_staleTsCount);
-          aml_dv_dump_state("vsync_stall");
-          m_staleStallLogged = true;
 
-          if (m_fallbackOnStall)
-          {
-            // Permanent (per-session) fallback to legacy timing. Close the
-            // fb to make the next loop iterations skip the ioctl entirely.
-            // Reset on next Setup() so a fresh playback gets another shot
-            // at the kernel vsync path.
-            CLog::Log(LOGWARNING,
-                      "CVideoSyncAML: stall-fallback enabled — closing "
-                      "/dev/fb0 and staying on legacy timing for this session");
-            close(m_fbFd);
-            m_fbFd = -1;
-            CGUIDialogKaiToast::QueueNotification(
-              CGUIDialogKaiToast::Warning,
-              g_localizeStrings.Get(14307),
-              "Switched to legacy timing",
-              8000);
-          }
+        // Time-based degrade trip. A brief gap (a single VPP reconfig on a
+        // seek) clears within a frame or two and just falls through to legacy
+        // for this iteration. Once vsync hasn't advanced for longer than the
+        // threshold, riding the blocking ioctl means ~1s blocked per frame
+        // while the clock lurches forward only once a second — the "black
+        // picture, audio still playing" symptom — so drop to legacy timing and
+        // stop issuing the blocking ioctl until a re-probe shows vsync is back.
+        //
+        // This is intentionally quiet: a legitimate multi-second HDMI mode
+        // switch (AVR/projector trees relock in ~5s) looks identical to a stall
+        // and gets the same treatment (ride legacy, auto-recover on relock).
+        // Only a gap that outlasts any plausible mode switch is logged as a
+        // fault below, in the re-probe branch.
+        //
+        // Floor at 750ms. In the dangerous case the kernel ioctl blocks its
+        // full ~1s timeout before returning a stale ts, so the first stale
+        // return already shows ~1s elapsed — any threshold up to ~1s trips on
+        // it, and detection is bounded below by that kernel timeout regardless.
+        // (6×interval only exceeds the floor below ~8fps.)
+        const auto stallThreshold = std::chrono::microseconds(
+            static_cast<int64_t>(std::max(750000.0, 6.0 * frameIntervalUs)));
+        // Fresh timestamp: nowSteady was sampled at the loop top, before the
+        // ioctl that just blocked up to ~1s, so it understates the gap. Measure
+        // from after the blocking call so the first stale return trips at ~1s.
+        const auto stnow = std::chrono::steady_clock::now();
+        if ((stnow - m_lastGoodTs) > stallThreshold)
+        {
+          CLog::Log(LOGDEBUG,
+                    "CVideoSyncAML: vsync gap {} ms — riding legacy timing, "
+                    "re-probing for recovery",
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        stnow - m_lastGoodTs).count());
+          m_vsyncDegraded = true;
+          m_failedProbes = 0;
+          m_stallTs = kernelTs; // frozen ts; recovery = a probe ts beyond it
+          m_lastProbe = stnow;
         }
+        // fall through to legacy timing for this iteration
       }
       else
       {
@@ -228,6 +252,83 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
           m_fbFd = -1;
         }
       }
+    }
+    else if (useVsyncPath && m_vsyncDegraded)
+    {
+      // Degraded: ride legacy (pre-T4) wall-clock timing and re-probe the kernel
+      // vsync at a bounded cadence. Legacy is open-loop dead-reckoning against
+      // the *nominal* frame interval, so it drifts from the true display clock
+      // the longer it runs — it is NOT a good steady state, it is a stopgap. Its
+      // only merit over riding the stalled ioctl is that the reference clock
+      // keeps advancing instead of freezing ~1s per blocking call, which keeps
+      // audio/master-clock moving and makes recovery jump-free. It does NOT
+      // repaint the display: if the gap is a true hardware plane stall the
+      // picture stays black until vsync relocks regardless of clock pacing. So
+      // the goal is to spend as little time here as possible — re-probe, and
+      // snap back to the hardware vsync clock the instant a fresh advancing ts
+      // returns (a recovered vsync answers immediately; a stalled one costs up
+      // to ~1s, paid only while the stall persists).
+      constexpr auto kProbeInterval = std::chrono::seconds(2);
+      if (nowSteady - m_lastProbe >= kProbeInterval)
+      {
+        int64_t probeTs = 0;
+        const bool ok = ioctl(m_fbFd, FBIO_WAITFORVSYNC_64, &probeTs) == 0;
+        // Pace the next probe from when this (possibly 1s-blocking) one returns,
+        // so a stalled probe doesn't immediately re-fire on the next iteration.
+        m_lastProbe = std::chrono::steady_clock::now();
+        if (ok && probeTs > 0 && probeTs > m_stallTs)
+        {
+          // Recovered — a mode switch relocked, or the stall cleared. If we had
+          // escalated to a fault, note the recovery at the same level so the
+          // log pairs up; otherwise this is the unremarkable mode-switch case.
+          CLog::Log(m_stallFaultLogged ? LOGWARNING : LOGINFO,
+                    "CVideoSyncAML: vsync recovered after {} ms — resuming "
+                    "kernel vsync clock",
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        nowSteady - m_lastGoodTs).count());
+          m_vsyncDegraded = false;
+          m_failedProbes = 0;
+          m_stallFaultLogged = false;
+          m_lastKernelTs = 0;          // next normal-path ts is a fresh anchor
+          m_lastGoodTs = m_lastProbe;
+        }
+        else
+        {
+          // Still stalled. Only now — once the gap has outlasted any plausible
+          // HDMI mode switch (AVR/projector trees can take ~5s, sometimes more,
+          // to relock) — treat it as a genuine fault and capture kernel state
+          // once for diagnosis. The mitigation (legacy timing) already engaged
+          // at 750ms, so erring high here only delays the log, never the fix.
+          constexpr auto kFaultThreshold = std::chrono::seconds(10);
+          if (!m_stallFaultLogged && (nowSteady - m_lastGoodTs) > kFaultThreshold)
+          {
+            CLog::Log(LOGWARNING,
+                      "CVideoSyncAML: vsync stalled for {} ms (beyond any mode "
+                      "switch) — capturing kernel state for diagnosis",
+                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                          nowSteady - m_lastGoodTs).count());
+            aml_dv_dump_state("vsync_stall");
+            m_stallFaultLogged = true;
+          }
+
+          if (m_fallbackOnStall && m_stallFaultLogged && ++m_failedProbes >= 3)
+          {
+            // Sustained, confirmed fault and the user opted into escalation:
+            // stop paying the periodic re-probe hiccup and latch legacy timing
+            // for the rest of this playback. Disengages on stop (Setup reset).
+            CLog::Log(LOGWARNING,
+                      "CVideoSyncAML: vsync stall sustained — latching legacy "
+                      "timing for the rest of this playback");
+            m_legacyLatched = true;
+            CGUIDialogKaiToast::QueueNotification(
+              CGUIDialogKaiToast::Warning,
+              g_localizeStrings.Get(14307),
+              "Switched to legacy timing",
+              8000);
+          }
+        }
+      }
+      // fall through to legacy timing for this iteration
     }
 
     int countVSyncs = 1;
