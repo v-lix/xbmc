@@ -33,6 +33,7 @@
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "guilib/StereoscopicsManager.h"
+#include "interfaces/AnnouncementManager.h"
 #include "messaging/ApplicationMessenger.h"
 #include "messaging/helpers/DialogHelper.h"
 #include "settings/Settings.h"
@@ -385,12 +386,22 @@ void CApplicationSkinHandling::ReloadSkin(bool confirm)
                   CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow());
   CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg);
 
+  // Notify listeners (e.g. python addons running their own custom windows) that the
+  // skin is about to be torn down, so they can stop their UI loops before the window
+  // manager DeInitialize()s their windows underneath them. There is no GUI_MSG path
+  // to python, hence the announcement.
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::GUI, "OnSkinUnloading");
+
   const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
   std::string newSkin = settings->GetString(CSettings::SETTING_LOOKANDFEEL_SKIN);
   if (LoadSkin(newSkin))
   {
     // We ask the running OnAction loops to stop after this call
     RequestStopActionPropagation();
+
+    // Skin has been fully reloaded and the active window restored. Listeners that own
+    // custom windows can now safely rebuild/restart themselves.
+    CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::GUI, "OnSkinLoaded");
 
     /* The Reset() or SetString() below will cause recursion, so the m_confirmSkinChange boolean is set so as to not prompt the
        user as to whether they want to keep the current skin. */
