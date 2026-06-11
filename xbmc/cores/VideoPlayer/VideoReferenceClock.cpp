@@ -8,17 +8,54 @@
 #include "VideoReferenceClock.h"
 
 #include "ServiceBroker.h"
+#include "application/ApplicationComponents.h"
+#include "application/ApplicationPlayer.h"
+#include "interfaces/AnnouncementManager.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "settings/lib/Setting.h"
 #include "utils/MathUtils.h"
 #include "utils/TimeUtils.h"
 #include "utils/log.h"
+#include "utils/Variant.h"
 #include "windowing/GraphicContext.h"
 #include "windowing/VideoSync.h"
 #include "windowing/WinSystem.h"
 
 #include <mutex>
+
+namespace
+{
+// "Is something CDVDClock-relevant playing right now."
+//
+// IsPlayingVideo() (= IsPlaying && HasVideo) races against the VideoPlayer
+// processing thread setting m_HasVideo in OpenVideoStream(): at OnPlay
+// dispatch, m_HasVideo is still false for a legitimate video file, so we'd
+// skip Start and only catch up at OnAVStart, leaving CDVDClock on the wall
+// clock during stream sync. Inverting the check — "skip only if no player
+// or a definitively audio-only player" — closes that window because at
+// OnPlay both m_HasVideo and m_HasAudio are false, so IsPlayingAudio() is
+// false and we Start immediately. PAPlayer hardcodes HasAudio() = true, so
+// PAPlayer audio still correctly resolves to skip. The only false positive
+// is an audio-only file routed through VideoPlayer (rare); OnAVStart's
+// re-evaluation catches that and Stops the briefly-started clock.
+bool ShouldClockRun()
+{
+  const auto settingsComponent = CServiceBroker::GetSettingsComponent();
+  const auto settings = settingsComponent ? settingsComponent->GetSettings() : nullptr;
+  if (settings && !settings->GetBool(
+          CSettings::SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK))
+    return false;
+
+  const auto player =
+      CServiceBroker::GetAppComponents().GetComponent<CApplicationPlayer>();
+  if (!player || !player->IsPlaying())
+    return false;
+  if (player->IsPlayingAudio())
+    return false;
+  return true;
+}
+} // namespace
 
 CVideoReferenceClock::CVideoReferenceClock() : CThread("RefClock")
 {
@@ -42,11 +79,19 @@ CVideoReferenceClock::CVideoReferenceClock() : CThread("RefClock")
           {CSettings::SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK});
   }
 
-  Start();
+  if (const auto announcer = CServiceBroker::GetAnnouncementManager())
+    announcer->AddAnnouncer(this);
+
+  // Thread no longer auto-starts at construction; the OnPlay announcer
+  // spawns it on playback start (if the setting is on), and OnStop joins
+  // it. This avoids burning ~24-60 ioctls/sec on /dev/fb0 while idle.
 }
 
 CVideoReferenceClock::~CVideoReferenceClock()
 {
+  if (const auto announcer = CServiceBroker::GetAnnouncementManager())
+    announcer->RemoveAnnouncer(this);
+
   if (const auto settingsComponent = CServiceBroker::GetSettingsComponent())
   {
     if (const auto settings = settingsComponent->GetSettings())
@@ -102,14 +147,34 @@ void CVideoReferenceClock::OnSettingChanged(const std::shared_ptr<const CSetting
   if (setting->GetId() != CSettings::SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK)
     return;
 
-  const bool enabled =
-      std::static_pointer_cast<const CSettingBool>(setting)->GetValue();
+  CLog::Log(LOGINFO, "CVideoReferenceClock: vsync ref-clock setting toggled");
+  ReevaluateState();
+}
 
-  CLog::Log(LOGINFO,
-            "CVideoReferenceClock: vsync ref-clock toggled {} via settings",
-            enabled ? "ON" : "OFF");
+void CVideoReferenceClock::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                                    const std::string& sender,
+                                    const std::string& message,
+                                    const CVariant& data)
+{
+  if (flag != ANNOUNCEMENT::Player)
+    return;
 
-  if (enabled)
+  // OnPlay/OnAVStart/OnStop all re-evaluate desired state against the
+  // ShouldClockRun() gate. Subscribing to all three closes various race
+  // windows: OnPlay catches the start before HasVideo is even set
+  // (ShouldClockRun() inverts to "skip only audio-only"); OnAVStart
+  // re-checks once HasVideo/HasAudio are definitive (corrects a false
+  // positive for audio-only-via-VideoPlayer); OnStop tears down only when
+  // nothing video-relevant is playing — for a file-to-file swap on the
+  // same CVideoPlayer the new file is already IsPlaying when the old
+  // file's OnStop is finally dispatched, so the clock survives the swap.
+  if (message == "OnPlay" || message == "OnAVStart" || message == "OnStop")
+    ReevaluateState();
+}
+
+void CVideoReferenceClock::ReevaluateState()
+{
+  if (ShouldClockRun())
     Start();
   else
     Stop();

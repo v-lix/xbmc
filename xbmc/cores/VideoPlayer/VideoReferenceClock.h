@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "interfaces/IAnnouncer.h"
 #include "settings/lib/ISettingCallback.h"
 #include "threads/CriticalSection.h"
 #include "threads/Event.h"
@@ -18,7 +19,9 @@
 
 class CVideoSync;
 
-class CVideoReferenceClock : CThread, public ISettingCallback
+class CVideoReferenceClock : CThread,
+                             public ISettingCallback,
+                             public ANNOUNCEMENT::IAnnouncer
 {
   public:
     CVideoReferenceClock();
@@ -37,10 +40,21 @@ class CVideoReferenceClock : CThread, public ISettingCallback
     // coreelec.amlogic.usedisplayasclock is flipped from the GUI.
     void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
 
+    // IAnnouncer — start/stop the thread with playback so we don't burn
+    // ~24-60 ioctls/sec on /dev/fb0 while idle in the GUI.
+    void Announce(ANNOUNCEMENT::AnnouncementFlag flag,
+                  const std::string& sender,
+                  const std::string& message,
+                  const CVariant& data) override;
+
   private:
     void    Process() override;
     void Start();
     void Stop();
+    // Single source of truth driven by every lifecycle event: starts the
+    // clock when it should run (setting on, a video player is active),
+    // stops it otherwise. Idempotent.
+    void ReevaluateState();
     void UpdateClockInternal(int NrVBlanks, bool CheckMissed);
     double  UpdateInterval() const;
     int64_t TimeOfNextVblank() const;
