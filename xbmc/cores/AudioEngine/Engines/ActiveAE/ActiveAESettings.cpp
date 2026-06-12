@@ -57,6 +57,7 @@ CActiveAESettings::CActiveAESettings(CActiveAE &ae) : m_audioEngine(ae)
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_STREAMNOISE);
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_MIXSUBLEVEL);
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_LFEMIXTO);
+  settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_BOOSTCENTER);
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_MAINTAINORIGINALVOLUME);
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_DTSHDCOREFALLBACK);
   settings->GetSettingsManager()->RegisterCallback(this, settingSet);

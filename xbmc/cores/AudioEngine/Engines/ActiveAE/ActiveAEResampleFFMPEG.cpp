@@ -251,10 +251,11 @@ bool CActiveAEResampleFFMPEG::Init(SampleConfig dstConfig,
     av_opt_set_double(m_pContext, "rematrix_maxval", 1.0, 0);
   }
 
-  int boost_center = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt("audiooutput.boostcenter");
-  if (boost_center)
+  double boost_center = CServiceBroker::GetSettingsComponent()->GetSettings()->GetNumber(
+      CSettings::SETTING_AUDIOOUTPUT_BOOSTCENTER);
+  if (boost_center > 0.0)
   {
-    float gain = pow(10.0f, ((float)(-3 + boost_center))/20.0f);
+    double gain = pow(10.0, (boost_center - 3.0) / 20.0);
     av_opt_set_double(m_pContext, "center_mix_level", gain, 0);
   }
   else
