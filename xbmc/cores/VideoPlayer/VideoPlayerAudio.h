@@ -135,6 +135,10 @@ protected:
   bool m_displayReset = false;
   unsigned int m_disconAdjustTimeMs = 30; // maximum sync-off before adjusting
   int m_disconAdjustCounter = 0;
+  // LAV Full smoothing active on the current codec path (passthrough codec
+  // internal clock or the PCM jitter tracker below) — precondition for the
+  // tightened SYNC_DISCON gate
+  bool m_lavFullSyncEnabled{false};
 
   //============================================================================
   // LAV Jitter Tracking for PCM/Decoded Audio

@@ -25,6 +25,7 @@
 #include "cores/DataCacheCore.h"
 #include "ServiceBroker.h"
 
+#include <algorithm>
 #include <mutex>
 
 #ifdef TARGET_RASPBERRY_PI
@@ -52,6 +53,12 @@ constexpr double MAX_REASONABLE_PTS = 86400.0 * DVD_TIME_BASE;
 inline bool IsValidPts(double pts) {
     return (pts >= 0.0) && (pts <= MAX_REASONABLE_PTS);
 }
+
+// Tightened SYNC_DISCON gate used when LAV Full sync is active and the vsync
+// reference clock drives CDVDClock (ErrorAdjust then quantizes corrections to
+// whole frame times inside its +20/-27ms window, so the outer gate only needs
+// to admit errors that window can act on).
+constexpr unsigned int DISCON_VSYNC_ADJUST_TIME_MS = 20;
 
 class CDVDMsgAudioCodecChange : public CDVDMsg
 {
@@ -151,6 +158,7 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
   if (m_pAudioCodec->NeedPassthrough())
   {
     m_lavStylePcmSyncEnabled = false;  // Passthrough has its own LAV sync in codec
+    m_lavFullSyncEnabled = false;
     CDVDAudioCodecPassthrough* passthroughCodec =
         dynamic_cast<CDVDAudioCodecPassthrough*>(m_pAudioCodec.get());
     if (passthroughCodec)
@@ -159,6 +167,7 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
       passthroughCodec->SetLavStyleSyncEnabled(enableLavFull);
       if (enableLavSeamlessBranch && !enableLavFull)
         passthroughCodec->SetLavSeamlessBranchEnabled(true);
+      m_lavFullSyncEnabled = enableLavFull;
 
       CLog::Log(LOGDEBUG, "CVideoPlayerAudio::OpenStream - LAV passthrough: {}",
                 enableLavFull ? "FULL" : 
@@ -182,6 +191,7 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
   else
   {
     m_lavStylePcmSyncEnabled = enableLavFull;  // PCM uses this class for LAV sync
+    m_lavFullSyncEnabled = enableLavFull;
     CLog::Log(LOGDEBUG, "CVideoPlayerAudio::OpenStream - LAV PCM sync {}",
               enableLavFull ? "ENABLED" : "disabled");
   }
@@ -860,7 +870,24 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
   {
     double syncerror = m_audioSink.GetSyncError();
 
-    if (std::abs(syncerror) > DVD_MSEC_TO_TIME(m_disconAdjustTimeMs))
+    // With LAV Full smoothing the PTS stream and the vsync reference clock
+    // driving CDVDClock, ErrorAdjust quantizes corrections to whole frame
+    // times inside its own +20/-27ms window — tighten the outer gate so that
+    // window governs steady-state lipsync instead of this coarser one.
+    // Baseline (non-LAV) PTS handling can swing transiently past 20ms around
+    // seamless branches, so it keeps the wide gate. GetClockInfo() is true
+    // only while the vblank clock runs; GetVsyncAdjust() != 0 is the same
+    // discriminator ErrorAdjust uses for the quantized path.
+    unsigned int adjustTimeMs = m_disconAdjustTimeMs;
+    if (m_lavFullSyncEnabled && m_pClock->GetVsyncAdjust() != 0)
+    {
+      int missedvblanks;
+      double clockspeed, refreshrate;
+      if (m_pClock->GetClockInfo(missedvblanks, clockspeed, refreshrate))
+        adjustTimeMs = std::min(adjustTimeMs, DISCON_VSYNC_ADJUST_TIME_MS);
+    }
+
+    if (std::abs(syncerror) > DVD_MSEC_TO_TIME(adjustTimeMs))
     {
       // Normal gradual correction via ErrorAdjust
       double correction = m_pClock->ErrorAdjust(syncerror, "CVideoPlayerAudio::OutputPacket");
@@ -1037,6 +1064,7 @@ bool CVideoPlayerAudio::SwitchCodecIfNeeded()
   if (isPassthrough)
   {
     m_lavStylePcmSyncEnabled = false;  // Passthrough has its own LAV sync
+    m_lavFullSyncEnabled = false;
     CDVDAudioCodecPassthrough* passthroughCodec = dynamic_cast<CDVDAudioCodecPassthrough*>(m_pAudioCodec.get());
     if (passthroughCodec)
     {
@@ -1044,6 +1072,7 @@ bool CVideoPlayerAudio::SwitchCodecIfNeeded()
       passthroughCodec->SetLavStyleSyncEnabled(lavFullEnabled);
       if (lavSeamlessBranchEnabled && !lavFullEnabled)
         passthroughCodec->SetLavSeamlessBranchEnabled(true);
+      m_lavFullSyncEnabled = lavFullEnabled;
 
       // Reset LAV sync state for fresh codec (clears jitter tracker, PTS cache, etc.)
       if (lavFullEnabled)
@@ -1058,6 +1087,7 @@ bool CVideoPlayerAudio::SwitchCodecIfNeeded()
   {
     // Switched to PCM/decoded
     m_lavStylePcmSyncEnabled = lavFullEnabled;
+    m_lavFullSyncEnabled = lavFullEnabled;
   }
 
   return true;
