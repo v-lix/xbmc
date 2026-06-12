@@ -18,6 +18,7 @@
 #include <numeric>
 #include <cmath>
 #include <algorithm>
+#include <atomic>
 #include <mutex>
 
 #include "AMLUtils.h"
@@ -117,7 +118,17 @@ static std::string s_lastDisplayMode;
 // aml_dv_off()/aml_dv_on(). Lock ordering is always s_dvStartMutex ->
 // s_dvCoreMutex (only aml_dv_start takes both, in that order), never the
 // reverse, so the two cannot deadlock.
-static std::recursive_mutex s_dvCoreMutex;
+//
+// Lock-ordering rule for everything inside a CDVCoreGuard scope: NEVER call
+// GUI/windowmanager APIs while holding the DV-core lock. The render thread
+// takes the gfx context lock first (SetVideoResolution -> CreateNewWindow ->
+// aml_dv_display_trigger -> DV-core lock); a holder of the DV-core lock that
+// then needs the gfx lock (GetWindow/GetProperty) closes an ABBA cycle and
+// freezes the whole UI (vlix Back->replay picture freeze, 2026-06-12).
+static std::recursive_timed_mutex s_dvCoreMutex;
+// Tag of the current outermost holder, for the blocked-acquire diagnostic.
+// Diagnostic-only (relaxed): a racing read may see a just-released holder.
+static std::atomic<const char*> s_dvCoreHolder{nullptr};
 
 // RAII guard for s_dvCoreMutex with convoy diagnostics. A DV off/on cycle
 // advances kernel-side per-vsync, so a queue of serialized DV ops can hold the
@@ -132,12 +143,26 @@ public:
   explicit CDVCoreGuard(const char* tag) : m_tag(tag)
   {
     const auto t0 = std::chrono::steady_clock::now();
-    s_dvCoreMutex.lock();
+    // Poll instead of a bare lock(): the convoy/held warnings below only fire
+    // after acquire/release, which a deadlock never reaches — a lock-order
+    // inversion used to freeze silently. A blocked acquire now identifies
+    // itself and the holder in the log every 5s while it waits.
+    while (!s_dvCoreMutex.try_lock_for(std::chrono::seconds(5)))
+    {
+      const auto waitS = std::chrono::duration_cast<std::chrono::seconds>(
+          std::chrono::steady_clock::now() - t0).count();
+      const char* holder = s_dvCoreHolder.load(std::memory_order_relaxed);
+      CLog::Log(LOGERROR,
+                "AMLUtils::{} - blocked {}s waiting for DV-core lock held by {} - "
+                "possible lock-order deadlock",
+                m_tag, waitS, holder ? holder : "<unknown>");
+    }
     const auto waitMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - t0).count();
     if (waitMs > 50)
       CLog::Log(LOGWARNING, "AMLUtils::{} - waited {}ms for DV-core lock (convoy)",
                 m_tag, waitMs);
+    m_prevHolder = s_dvCoreHolder.exchange(m_tag, std::memory_order_relaxed);
     m_outermost = (s_lockDepth++ == 0);
     if (m_outermost)
       m_acquired = std::chrono::steady_clock::now();
@@ -152,6 +177,7 @@ public:
       if (heldMs > 100)
         CLog::Log(LOGWARNING, "AMLUtils::{} - held DV-core lock for {}ms", m_tag, heldMs);
     }
+    s_dvCoreHolder.store(m_prevHolder, std::memory_order_relaxed);
     s_dvCoreMutex.unlock();
   }
   CDVCoreGuard(const CDVCoreGuard&) = delete;
@@ -159,6 +185,7 @@ public:
 private:
   static thread_local int s_lockDepth;
   const char* m_tag;
+  const char* m_prevHolder{nullptr};
   bool m_outermost{false};
   std::chrono::steady_clock::time_point m_acquired{};
 };
@@ -1407,13 +1434,21 @@ unsigned int aml_dv_dolby_vision_mode()
 
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries)
 {
+  // Detect PM4K once at playback start for OSD visibility override.
+  // MUST stay above the CDVCoreGuard: GetWindow()/GetProperty() take the gfx
+  // context lock / window critsec, which the main thread holds while it takes
+  // the DV-core lock (SetVideoResolution -> CreateNewWindow ->
+  // aml_dv_display_trigger). Doing this under the guard is an ABBA deadlock —
+  // the vlix Back->replay picture freeze.
+  CGUIWindow* pm4kHome = CServiceBroker::GetGUI()->GetWindowManager().GetWindow(WINDOW_HOME);
+  const bool pm4kActive =
+      pm4kHome && !pm4kHome->GetProperty("script.plex.is_active").asString().empty();
+
   CDVCoreGuard dvlock(__FUNCTION__);
   aml_dv_dump_state("dv_open/pre");
   s_dvPlaybackActive = true;
-
-  // Detect PM4K once at playback start for OSD visibility override.
-  s_pm4kHome = CServiceBroker::GetGUI()->GetWindowManager().GetWindow(WINDOW_HOME);
-  s_pm4kActive = s_pm4kHome && !s_pm4kHome->GetProperty("script.plex.is_active").asString().empty();
+  s_pm4kHome = pm4kHome;
+  s_pm4kActive = pm4kActive;
 
   enum DV_MODE dv_mode(aml_dv_mode());
   CLog::Log(LOGINFO, "AMLUtils::{} - Checking DV for DV mode: [{}], DV type: [{}]", __FUNCTION__, aml_dv_mode_to_string(dv_mode), aml_dv_type_to_string(aml_dv_type()));
