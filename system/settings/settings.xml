@@ -4312,7 +4312,7 @@
           <requirement>HAVE_AMCODEC</requirement>
           <visible>false</visible>
           <level>2</level>
-          <default>3</default>
+          <default>5</default>
           <dependencies>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="update" setting="coreelec.amlogic.dolbyvision.force.modes" />
@@ -4326,7 +4326,7 @@
           <requirement>HAVE_AMCODEC</requirement>
           <visible>false</visible>
           <level>2</level>
-          <default>3</default>
+          <default>5</default>
           <dependencies>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="update" setting="coreelec.amlogic.dolbyvision.force.modes" />
