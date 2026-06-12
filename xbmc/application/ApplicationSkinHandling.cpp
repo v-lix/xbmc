@@ -424,16 +424,26 @@ void CApplicationSkinHandling::ReloadSkin(bool confirm)
     if (!setting)
     {
       CLog::Log(LOGFATAL, "Failed to load setting for: {}", CSettings::SETTING_LOOKANDFEEL_SKIN);
+      // nothing left to load - tell listeners the reload is over and failed so anyone that
+      // reacted to OnSkinUnloading doesn't wait forever
+      CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::GUI, "OnSkinLoadFailed");
       return;
     }
 
     std::string defaultSkin = std::static_pointer_cast<CSettingString>(setting)->GetDefault();
     if (newSkin != defaultSkin)
     {
+      // fall back to the default skin; that reload announces its own OnSkinLoaded, so we
+      // don't signal failure here - listeners should wait for the default to come up
       m_confirmSkinChange = false;
       setting->Reset();
       CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Error, g_localizeStrings.Get(24102),
                                             g_localizeStrings.Get(24103));
+    }
+    else
+    {
+      // the default skin itself failed - nothing to fall back to
+      CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::GUI, "OnSkinLoadFailed");
     }
   }
   m_confirmSkinChange = true;
