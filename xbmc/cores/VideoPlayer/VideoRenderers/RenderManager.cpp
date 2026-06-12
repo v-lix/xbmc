@@ -1491,13 +1491,15 @@ void CRenderManager::CheckEnableClockSync()
 {
   // refresh rate can be a multiple of video fps
   double diff = 1.0;
+  bool refClockRunning = false;
 
   if (m_fps != 0)
   {
     double fps = static_cast<double>(m_fps);
     double refreshrate, clockspeed;
     int missedvblanks;
-    if (m_dvdClock.GetClockInfo(missedvblanks, clockspeed, refreshrate))
+    refClockRunning = m_dvdClock.GetClockInfo(missedvblanks, clockspeed, refreshrate);
+    if (refClockRunning)
     {
       fps *= clockspeed;
     }
@@ -1510,7 +1512,12 @@ void CRenderManager::CheckEnableClockSync()
     diff = std::abs(std::round(diff) - diff);
   }
 
-  if (diff && diff > 0.0005)
+  // Upstream semantics (sync the clock to vsync phase when fps is an integer
+  // ratio of the refresh rate), additionally gated on the vsync reference
+  // clock actually driving CDVDClock: with the clock on system time the
+  // fmod-phase average in PrepareNextRender is noise and SetVsyncAdjust would
+  // quantize audio corrections against a cadence nothing is locked to.
+  if (refClockRunning && diff < 0.0005)
   {
     m_clockSync.m_enabled = true;
   }
