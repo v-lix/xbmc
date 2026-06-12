@@ -107,6 +107,9 @@ private:
   bool             m_opened;
   bool             m_drain = false;
   bool             m_stream_eof = false;
+  // True between a codec_reset and the next AddData: nothing is drainable in
+  // that state, see the m_drain branch in GetPicture.
+  bool             m_no_data_since_reset = false;
   am_private_t    *am_private;
 
   int              m_speed;

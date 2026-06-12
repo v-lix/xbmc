@@ -2439,6 +2439,7 @@ void CAMLCodec::Reset()
   m_state = 0;
   m_stream_eof = false;
   m_buffer_level_ready = false;
+  m_no_data_since_reset = true;
 
   SetSpeed(m_speed);
 
@@ -2477,6 +2478,8 @@ bool CAMLCodec::AddData(uint8_t *pData, size_t iSize, double dts, double pts)
     );
     return false;
   }
+
+  m_no_data_since_reset = false;
 
   if (am_private->hdr_buf.size > 0)
   {
@@ -2804,6 +2807,16 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   // or if decoder stalls for >frametime*10 after the initial timeout.
   else if (m_drain)
   {
+    // Nothing was fed since the last codec_reset, so there is nothing to
+    // drain — but a freshly-reset vdec (notably dual-layer FEL) can keep
+    // reporting a stale non-zero buffer level without ever producing a
+    // frame, riding out the full drain timeout below. That is the 5s of
+    // black video + wrong-matrix (green) OSD on Back->replay: the stream
+    // switch only proceeds (and the DV core only leaves playback IPT) once
+    // this drain returns VC_EOF.
+    if (m_no_data_since_reset)
+      return CDVDVideoCodec::VC_EOF;
+
     auto drain_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::system_clock::now() - m_tp_drain_start);
     int poll_ms = (am_private->video_rate * 10000 + UNIT_FREQ - 1) / UNIT_FREQ;
