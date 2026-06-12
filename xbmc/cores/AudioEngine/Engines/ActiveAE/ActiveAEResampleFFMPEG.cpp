@@ -74,6 +74,14 @@ bool CActiveAEResampleFFMPEG::Init(SampleConfig dstConfig,
     av_channel_layout_uninit(&layout);
   }
 
+  // fold the centre boost into centerMix before any matrix construction;
+  // swresample ignores center_mix_level once a custom matrix has been set
+  // via swr_set_matrix, so the LFE-redirect matrix below must see it too
+  double boost_center = CServiceBroker::GetSettingsComponent()->GetSettings()->GetNumber(
+      CSettings::SETTING_AUDIOOUTPUT_BOOSTCENTER);
+  if (boost_center > 0.0)
+    centerMix = pow(10.0, (boost_center - 3.0) / 20.0);
+
   AVChannelLayout dstChLayout = {};
   AVChannelLayout srcChLayout = {};
 
@@ -177,17 +185,38 @@ bool CActiveAEResampleFFMPEG::Init(SampleConfig dstConfig,
               case AV_CHAN_BACK_LEFT:
               case AV_CHAN_SIDE_LEFT:
                 if (outChan == AV_CHAN_FRONT_LEFT)
-                  m_rematrix[out][in] = M_SQRT1_2;
+                  m_rematrix[out][in] = surroundMix;
                 break;
               case AV_CHAN_BACK_RIGHT:
               case AV_CHAN_SIDE_RIGHT:
                 if (outChan == AV_CHAN_FRONT_RIGHT)
-                  m_rematrix[out][in] = M_SQRT1_2;
+                  m_rematrix[out][in] = surroundMix;
                 break;
               default:
                 break;
             }
           }
+        }
+      }
+
+      // swresample only normalizes its own auto matrix, not one supplied
+      // through swr_set_matrix; mirror the rematrix_maxval handling below
+      if ((m_dst_fmt == AV_SAMPLE_FMT_FLT || m_dst_fmt == AV_SAMPLE_FMT_FLTP) && normalize)
+      {
+        double maxRowSum = 0.0;
+        for (int out = 0; out < m_dst_channels; out++)
+        {
+          double sum = 0.0;
+          for (int in = 0; in < m_src_channels; in++)
+            sum += fabs(m_rematrix[out][in]);
+          if (sum > maxRowSum)
+            maxRowSum = sum;
+        }
+        if (maxRowSum > 1.0)
+        {
+          for (int out = 0; out < m_dst_channels; out++)
+            for (int in = 0; in < m_src_channels; in++)
+              m_rematrix[out][in] /= maxRowSum;
         }
       }
 
@@ -251,15 +280,7 @@ bool CActiveAEResampleFFMPEG::Init(SampleConfig dstConfig,
     av_opt_set_double(m_pContext, "rematrix_maxval", 1.0, 0);
   }
 
-  double boost_center = CServiceBroker::GetSettingsComponent()->GetSettings()->GetNumber(
-      CSettings::SETTING_AUDIOOUTPUT_BOOSTCENTER);
-  if (boost_center > 0.0)
-  {
-    double gain = pow(10.0, (boost_center - 3.0) / 20.0);
-    av_opt_set_double(m_pContext, "center_mix_level", gain, 0);
-  }
-  else
-    av_opt_set_double(m_pContext, "center_mix_level", centerMix, 0);
+  av_opt_set_double(m_pContext, "center_mix_level", centerMix, 0);
 
   av_opt_set_double(m_pContext, "surround_mix_level", surroundMix, 0);
 
