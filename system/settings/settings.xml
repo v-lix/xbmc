@@ -3387,8 +3387,8 @@
             <step>0.5</step>
             <maximum>30</maximum>
           </constraints>
-          <control type="spinner" format="string">
-            <formatlabel>38009</formatlabel>
+          <control type="slider" format="number">
+            <format>{:.1f} dB</format>
           </control>
         </setting>
         <setting id="audiooutput.ignoredownmixmetadata" type="boolean" label="38027" help="38028">
