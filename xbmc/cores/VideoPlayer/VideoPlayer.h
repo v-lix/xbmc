@@ -597,7 +597,9 @@ protected:
   XbmcThreads::EndTime<> m_syncTimer;
 
   std::chrono::steady_clock::time_point m_brokenFileStallStart;
+  int64_t m_brokenFileStallBytes = -1;
   bool m_brokenFileNotified = false;
+  bool m_brokenFileStallStarveLogged = false;
 
   CEdl m_Edl;
   bool m_SkipCommercials;

@@ -25316,7 +25316,7 @@ msgstr ""
 #. Setting help for broken / truncated file detection
 #: system/settings/settings.xml
 msgctxt "#55008"
-msgid "Stop playback when the source file ends earlier than its container header claims (typical for partial downloads or aborted unrar). Prevents the hardware decoder from being fed half-written packets, which can stall or crash playback on some setups. Disable only if you need to play back partial files for forensic purposes."
+msgid "Stop playback when the source file ends earlier than its container header claims (typical for partial downloads or aborted unrar). Prevents the hardware decoder from being fed half-written packets, which can stall or crash playback on some setups. Stalls caused by a slow or unresponsive source (network share hiccups, sleeping disks) are recognised as such and do not trigger this. Disable only if you need to play back partial files for forensic purposes."
 msgstr ""
 
 #. Toast title shown when a truncated file is detected during playback

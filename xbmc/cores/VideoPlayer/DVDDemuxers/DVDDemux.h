@@ -271,6 +271,21 @@ public:
   virtual void MarkBroken() {}
 
   /*
+   * Total bytes read from the underlying source so far, or -1 if unknown.
+   * Corroborates broken-source detection: a demuxer scanning a garbage /
+   * zero-filled tail keeps reading at I/O speed without producing packets,
+   * while a stalled source (network outage, sleeping disk) reads next to
+   * nothing - only the former indicates a broken file.
+   */
+  virtual int64_t GetSourceReadBytes() { return -1; }
+
+  /*
+   * Minimum source read progress, with no packet produced, before a stall
+   * may be attributed to a broken file rather than slow I/O.
+   */
+  static constexpr int64_t BROKEN_SOURCE_MIN_SCAN_BYTES = 16LL * 1024 * 1024;
+
+  /*
    * Flush the demuxer, if any data is kept in buffers, this should be freed now
    */
   virtual void Flush() = 0;

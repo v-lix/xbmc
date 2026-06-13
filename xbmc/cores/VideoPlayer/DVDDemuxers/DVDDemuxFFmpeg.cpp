@@ -185,6 +185,8 @@ static int dvd_file_read(void* h, uint8_t* buf, int size)
   int len = pInputStream->Read(buf, size);
   if (len == 0)
     return AVERROR_EOF;
+  if (len > 0)
+    demuxer->m_sourceReadBytes += len;
   return len;
 }
 
@@ -261,6 +263,7 @@ bool CDVDDemuxFFmpeg::Open(const std::shared_ptr<CDVDInputStream>& pInput, bool 
   m_program = UINT_MAX;
   m_seekToKeyFrame = false;
   m_brokenFileDetected = false;
+  m_sourceReadBytes = 0;
 
   const AVIOInterruptCB int_cb = { interrupt_cb, this };
 
@@ -1351,6 +1354,7 @@ bool CDVDDemuxFFmpeg::SeekTime(double time, bool backwards, double* startpts)
     const bool brokenFileSetting =
         CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
             CSettings::SETTING_COREELEC_VIDEOPLAYER_DETECT_BROKEN_FILES);
+    const int64_t seekReadBytesStart = m_sourceReadBytes;
     if (brokenFileSetting)
       m_timeout.Set(15s);
     ret = av_seek_frame(m_pFormatContext, m_seekStream, seek_pts, backwards ? AVSEEK_FLAG_BACKWARD : 0);
@@ -1359,14 +1363,29 @@ bool CDVDDemuxFFmpeg::SeekTime(double time, bool backwards, double* startpts)
 
     if (ret == AVERROR_EXIT && brokenFileSetting)
     {
-      CLog::Log(LOGERROR,
-                "CDVDDemuxFFmpeg::SeekTime - av_seek_frame did not return "
-                "within 15s; treating source as broken");
-      m_brokenFileDetected = true;
-      CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Warning,
-                                            g_localizeStrings.Get(55009),
-                                            g_localizeStrings.Get(55010),
-                                            TOAST_DISPLAY_TIME * 2);
+      // Corroborate before declaring the source broken: a corrupt cue index
+      // keeps the seek scanner reading at full I/O speed, while a blocked
+      // read (NFS outage, sleeping disk) times out having read next to
+      // nothing. The latter is slow I/O, not a broken file - fail the seek
+      // but leave playback alone.
+      if (m_sourceReadBytes - seekReadBytesStart >= BROKEN_SOURCE_MIN_SCAN_BYTES)
+      {
+        CLog::Log(LOGERROR,
+                  "CDVDDemuxFFmpeg::SeekTime - av_seek_frame did not return "
+                  "within 15s while scanning the source; treating it as broken");
+        m_brokenFileDetected = true;
+        CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Warning,
+                                              g_localizeStrings.Get(55009),
+                                              g_localizeStrings.Get(55010),
+                                              TOAST_DISPLAY_TIME * 2);
+      }
+      else
+      {
+        CLog::Log(LOGWARNING,
+                  "CDVDDemuxFFmpeg::SeekTime - av_seek_frame did not return "
+                  "within 15s but made no read progress; treating as stalled "
+                  "I/O, not a broken file");
+      }
     }
 
     if (ret < 0)
