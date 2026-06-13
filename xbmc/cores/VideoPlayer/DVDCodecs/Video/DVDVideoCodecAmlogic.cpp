@@ -81,6 +81,7 @@ CDVDVideoCodecAmlogic::CDVDVideoCodecAmlogic(CProcessInfo &processInfo)
     {
       settings->RegisterCallback(this, {
         CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND,
+        CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_SMART_THRESHOLD,
         CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP,
         CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE,
         CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE
@@ -119,6 +120,15 @@ void CDVDVideoCodecAmlogic::UpdateAppendCMv40SettingCache()
       int cmv40 = settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND);
       if (aml_dv_type() != DV_TYPE_DISPLAY_LED)
         cmv40 = 0;
+      if (static_cast<DOVICMv40Mode>(cmv40) == DOVICMv40Mode::CMV40_SMART)
+      {
+        // Display peak comes from the EDID VSVDB/HGIG max luminance read at
+        // startup by DolbyVisionAML; threshold is the percent headroom setting.
+        // Store these before the mode atomic below so a decode-thread reader
+        // that observes CMV40_SMART also observes these (seq_cst publication).
+        m_smartDisplayNits.store(settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM));
+        m_smartThresholdPct.store(settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_SMART_THRESHOLD));
+      }
       m_appendCMv40ModeSetting.store(cmv40);
     }
   }
@@ -179,6 +189,7 @@ void CDVDVideoCodecAmlogic::OnSettingChanged(const std::shared_ptr<const CSettin
 {
   const auto& id = setting->GetId();
   if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND ||
+      id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_SMART_THRESHOLD ||
       id == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
     UpdateAppendCMv40SettingCache();
   if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP ||
@@ -194,6 +205,13 @@ void CDVDVideoCodecAmlogic::ApplyDynamicDoViSettings()
   const auto mode = static_cast<DOVICMv40Mode>(m_appendCMv40ModeSetting.load());
   if (mode != m_appendCMv40ModeApplied)
   {
+    // Push smart-bypass inputs before SetAppendCMv40 so they are in place when
+    // it resets the logging sentinel and the first frame's decision uses them.
+    if (mode == DOVICMv40Mode::CMV40_SMART)
+    {
+      m_bitstream->SetSmartBypassDisplayNits(m_smartDisplayNits.load());
+      m_bitstream->SetSmartBypassThresholdPct(m_smartThresholdPct.load());
+    }
     m_bitstream->SetAppendCMv40(mode);
     m_appendCMv40ModeApplied = mode;
     CLog::Log(LOGINFO, "{}::{} - CMv4.0 append mode changed to {}", __MODULE_NAME__, __FUNCTION__, static_cast<int>(mode));
@@ -464,6 +482,17 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
           {
             CLog::Log(LOGINFO, "{}::{} - DV HEVC bitstream - CMv4.0 append mode: {}",
                       __MODULE_NAME__, __FUNCTION__, static_cast<int>(cmv40Mode));
+            // Push smart-bypass inputs before SetAppendCMv40 so the first frame
+            // decision (and its log) uses the cached display nits / threshold.
+            if (cmv40Mode == DOVICMv40Mode::CMV40_SMART)
+            {
+              const int smartNits = m_smartDisplayNits.load();
+              const int smartPct = m_smartThresholdPct.load();
+              m_bitstream->SetSmartBypassDisplayNits(smartNits);
+              m_bitstream->SetSmartBypassThresholdPct(smartPct);
+              CLog::Log(LOGINFO, "{}::{} - DV HEVC bitstream - Smart CMv4.0 bypass display {}nits threshold {}%",
+                        __MODULE_NAME__, __FUNCTION__, smartNits, smartPct);
+            }
             m_bitstream->SetAppendCMv40(cmv40Mode);
           }
           m_appendCMv40ModeApplied = cmv40Mode;

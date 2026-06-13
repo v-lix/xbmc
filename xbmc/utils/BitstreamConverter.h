@@ -102,6 +102,7 @@ enum DOVICMv40Mode : int
   CMV40_NONE = 0,
   CMV40_NO_L2,
   CMV40_ALWAYS,
+  CMV40_SMART,  // append unless content signal peak (source_max_pq) > display EDID max nits
 };
 
 class CBitstreamParser
@@ -140,7 +141,13 @@ public:
   void              SetAppendCMv40(enum DOVICMv40Mode value) {
                       if (m_append_cmv40 != value) InvalidateDoViCache();
                       m_append_cmv40 = value;
+                      m_smart_last_effective = CMV40_SMART;
                     }
+                    // Smart-bypass inputs: display EDID peak nits and the
+                    // percent headroom above it before CMv4.0 append is
+                    // bypassed. Only consulted when m_append_cmv40 == CMV40_SMART.
+  void              SetSmartBypassDisplayNits(int nits) { m_smart_display_nits = nits; }
+  void              SetSmartBypassThresholdPct(int pct) { m_smart_threshold_pct = pct; }
                     // Strip CMv4.0 ext blocks -> clean CMv2.9 (for old DV TVs
                     // that fail to fall back). Mutually exclusive with append;
                     // strip wins (see ProcessDoViRpu).
@@ -257,6 +264,9 @@ protected:
   enum PeakBrightnessSource m_convert_Hdr10Plus_peak_brightness_source;
   bool              m_first_frame;
   enum DOVICMv40Mode m_append_cmv40;
+  int               m_smart_display_nits{0};
+  int               m_smart_threshold_pct{20};
+  DOVICMv40Mode     m_smart_last_effective{CMV40_SMART};
   bool              m_strip_cmv40{false};
   bool              m_l5_override_active{false};
   uint16_t          m_l5_override_top{0};

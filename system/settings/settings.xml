@@ -4567,9 +4567,27 @@
               <option label="60322">0</option>
               <option label="60323">1</option>
               <option label="60324">2</option>
+              <option label="60325">3</option>
             </options>
           </constraints>
           <control type="spinner" format="string" />
+        </setting>
+        <setting id="coreelec.amlogic.dolbyvision.cmv40.smart.threshold" type="integer" label="60332" help="60333" parent="coreelec.amlogic.dolbyvision.cmv40.append">
+          <requirement>HAVE_AMCODEC</requirement>
+          <visible>false</visible>
+          <level>2</level>
+          <default>20</default>
+          <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.video.processor" operator="is">0</dependency>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.cmv40.append" operator="is">3</dependency>
+          </dependencies>
+          <constraints>
+            <minimum>0</minimum>
+            <maximum>50</maximum>
+          </constraints>
+          <control type="edit" format="integer" />
         </setting>
         <setting id="coreelec.amlogic.dolbyvision.cmv40.strip" type="boolean" label="60328" help="60329" parent="coreelec.amlogic.dolbyvision.type">
           <requirement>HAVE_AMCODEC</requirement>

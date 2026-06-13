@@ -126,6 +126,16 @@ private:
   DOVICMv40Mode m_appendCMv40ModeApplied{DOVICMv40Mode::CMV40_NONE};
   std::atomic<bool> m_stripCMv40Setting{false};
   bool m_stripCMv40Applied{false};
+  // Smart CMv4.0 bypass inputs (cached from settings; only used when
+  // m_appendCMv40ModeSetting == CMV40_SMART). Display peak nits come from the
+  // EDID VSVDB/HGIG max-luminance setting; threshold is percent headroom.
+  // Atomic like the mode/strip caches above: written on the settings thread
+  // (UpdateAppendCMv40SettingCache via OnSettingChanged), read on the decode
+  // thread (ApplyDynamicDoViSettings / Open). They are published *before* the
+  // gating m_appendCMv40ModeSetting store so a reader that observes CMV40_SMART
+  // also observes coherent nits/threshold.
+  std::atomic<int> m_smartDisplayNits{0};
+  std::atomic<int> m_smartThresholdPct{20};
   // L5 active-area override. Active is tracked separately from values so
   // "0,0,0,0" (a legitimate override meaning "treat the stream as having no
   // bars") is distinguished from "no override set" (empty string). Values

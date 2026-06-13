@@ -611,6 +611,7 @@ static void set_dv_settings_visible(bool show)
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_HDR10PLUS_PEAK_BRIGHTNESS_SOURCE, show);
   set_visible(CSettings::SETTING_VIDEOPLAYER_CONVERTDOVI, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_SMART_THRESHOLD, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_AUDIO_SEAMLESSBRANCH, show);
