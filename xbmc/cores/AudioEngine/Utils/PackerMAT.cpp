@@ -118,7 +118,7 @@ bool CPackerMAT::PackTrueHD(const uint8_t* data, int size)
       // The output timing is always one frame ahead for buffering reasons, so deduct one frame worth
       uint32_t prevOutput = static_cast<uint16_t>(info.outputTiming - frameSamples);
       if (prevOutput < frameTime) // wrap around, output is always in front of frame time
-        prevOutput += UINT16_MAX;
+        prevOutput += 0x10000u; // 2^16, not UINT16_MAX (65535) — 16-bit counter wraps at 65536
 
       // Get the offset of this frame, so we can compare to the previous frame,
       // and determine the amount of padding that needs to be inserted
@@ -154,20 +154,21 @@ bool CPackerMAT::PackTrueHD(const uint8_t* data, int size)
 
   if (m_lavStyleEnabled)
   {
-    // LAV Filters has no overflow safety net - it trusts the early discontinuity detection.
-    // If padding goes negative, WritePadding() will simply skip (padding <= 0 check).
-    // If padding is excessively large, it will be consumed over multiple MAT frames.
-    // We only clamp negative padding to 0 to prevent issues in WritePadding loop.
-    if (m_state.padding < 0)
-      m_state.padding = 0;
-  
+    // LAV Filters allows padding to go negative — the while(padding > 0) loop simply
+    // does not execute, and WritePadding() now also guards <= 0 directly.
+    // Negative padding represents a timing deficit (large previous frame consumed more
+    // space than the branch-point default spaceSize allocated) and must carry forward
+    // so subsequent frames compensate with less padding. Clamping to 0 here would
+    // insert ~440 extra bytes of padding and shift audio unit boundaries within the
+    // MAT frame, which can confuse strict TrueHD decoders.
+
     // LAV: Record the offset of frame time to output time, which is used to verify
     // the size of the padding on discontinuities
     if (m_state.outputTimingValid)
     {
       uint32_t prevOutput = static_cast<uint16_t>(m_state.outputTiming - frameSamples);
       if (prevOutput < frameTime) // wrap around, output is always in front of frame time
-        prevOutput += UINT16_MAX;
+        prevOutput += 0x10000u; // 2^16, not UINT16_MAX (65535) — 16-bit counter wraps at 65536
 
       m_state.nOutputTimeOffset = static_cast<int32_t>(prevOutput - frameTime);
     }
@@ -335,7 +336,12 @@ void CPackerMAT::WriteHeader()
 
 void CPackerMAT::WritePadding()
 {
-  if (m_state.padding == 0)
+  // Guard against zero AND negative padding — matches LAV's <= 0 check.
+  // Negative padding must never reach FillDataBuffer: mixed signed/unsigned
+  // arithmetic there would corrupt m_bufferCount (uint32_t underflow).
+  // The while(padding > 0) call site already prevents this, but we defend
+  // here too so the function is safe against any future direct calls.
+  if (m_state.padding <= 0)
     return;
 
   // for padding not writes any data (nullptr) as buffer is already zeroed
