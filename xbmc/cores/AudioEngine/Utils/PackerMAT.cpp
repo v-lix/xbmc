@@ -399,8 +399,10 @@ int CPackerMAT::FillDataBuffer(const uint8_t* data, int size, Type type)
       remaining -= mat_middle_code.size();
 
     // write remaining data after the MAT marker
+    // Guard nullptr: when type==PADDING, data is nullptr — pointer arithmetic on nullptr is UB.
+    // LAV fix (commit 7a43fd3f): pass nullptr through rather than offsetting it.
     if (remaining > 0)
-      remaining = FillDataBuffer(data + nBytesBefore, remaining, type);
+      remaining = FillDataBuffer(data ? data + nBytesBefore : nullptr, remaining, type);
 
     return remaining;
   }
