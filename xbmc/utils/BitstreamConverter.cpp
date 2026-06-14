@@ -1610,9 +1610,9 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
       if (m_append_cmv40 == DOVICMv40Mode::CMV40_SMART)
       {
         bool level2IsEmpty = !vdrDmData || (vdrDmData->dm_data.level2.len == 0);
-        bool hasData = (m_smart_display_nits > 0 && vdrDmData);
+        bool hasData = (m_smart_display_nits > 0 && vdrDmData && vdrDmData->dm_data.level1);
         int contentNits = hasData
-            ? max_pq_to_nits(static_cast<int>(vdrDmData->source_max_pq))
+            ? max_pq_to_nits(static_cast<int>(vdrDmData->dm_data.level1->max_pq))
             : 0;
         // Bypass only when the stream has L2 trims (not a CMv2.9-no-L2 upgrade candidate)
         // and the content signal peaks beyond display capability plus threshold headroom.
