@@ -1619,18 +1619,24 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
         int threshold = m_smart_display_nits * (100 + m_smart_threshold_pct) / 100;
         bool bypass = !level2IsEmpty && hasData && (contentNits > threshold);
         effectiveMode = bypass ? DOVICMv40Mode::CMV40_NONE : DOVICMv40Mode::CMV40_ALWAYS;
+        CLog::Log(LOGDEBUG,
+                  "CBitstreamConverter::ProcessDoViRpu - Smart CMv4.0 frame: "
+                  "content {}nits display {}nits threshold {}nits ({}%) -> {}",
+                  contentNits, m_smart_display_nits, threshold, m_smart_threshold_pct,
+                  bypass ? "bypass" : "append");
         if (effectiveMode != m_smart_last_effective)
         {
           if (level2IsEmpty)
             CLog::Log(LOGINFO, "CBitstreamConverter::ProcessDoViRpu - Smart CMv4.0: "
-                      "no L2 trims, appending CMv4.0");
+                      "no L2 trims, appending CMv4.0 (evaluated per-frame)");
           else if (!hasData)
             CLog::Log(LOGINFO, "CBitstreamConverter::ProcessDoViRpu - Smart CMv4.0: "
-                      "display nits unavailable, defaulting to append");
+                      "display nits unavailable, defaulting to append (evaluated per-frame)");
           else
             CLog::Log(LOGINFO,
                       "CBitstreamConverter::ProcessDoViRpu - Smart CMv4.0: "
-                      "content {}nits display {}nits threshold {}nits ({}%) -> {}",
+                      "content {}nits display {}nits threshold {}nits ({}%) -> {} "
+                      "(decision changed; evaluated per-frame)",
                       contentNits, m_smart_display_nits, threshold, m_smart_threshold_pct,
                       bypass ? "bypass (no append)" : "append CMv4.0");
           m_smart_last_effective = effectiveMode;
