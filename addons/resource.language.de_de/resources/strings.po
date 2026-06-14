@@ -19561,12 +19561,12 @@ msgid "Set Min PQ 0 only"
 msgstr "Nur Min. PQ 0"
 
 msgctxt "#60594"
-msgid "Audio Fixes mode"
-msgstr "Audiokorrektur (Modus)"
+msgid "Passthrough audio sync mode"
+msgstr "Passthrough-Audiosynchronisation"
 
 msgctxt "#60595"
-msgid "Select the type of audio correction to fix seamless branching audio drop and audio sync issues. Different equipment will work better with different options, so try each option to see what works best for your setup."
-msgstr "Typ der Audiokorrektur auswählen, um Audioaussetzer bei nahtlosen Übergängen sowie Probleme mit der Audiosynchronisation zu beheben. Unterschiedliche Geräte reagieren unterschiedlich auf die einzelnen Optionen. Daher empfiehlt sich das Testen aller Optionen, um die am besten geeignete Einstellung für die jeweilige Konfiguration zu ermitteln."
+msgid "Fixes audio dropouts at seamless branch points and audio/video sync drift for bitstreamed (passthrough) TrueHD, DTS and Dolby Digital. \"LAV Full\" (the default) applies the complete LAV Filters sync model and is recommended for most setups; \"LAV SB\" only re-aligns at branch points; \"Off\" uses stock Kodi handling. Some equipment (certain AV receivers or TVs) may work better with a different option."
+msgstr "Behebt Audioaussetzer bei nahtlosen Übergängen (Seamless Branching) und Audio-/Video-Synchronisationsdrift bei durchgeschleiftem (Passthrough) TrueHD, DTS und Dolby Digital. „LAV Full“ (Standard) verwendet das vollständige Synchronisationsmodell von LAV Filters und wird für die meisten Konfigurationen empfohlen; „LAV SB“ korrigiert nur an Übergangspunkten; „Aus“ verwendet die Standard-Kodi-Verarbeitung. Manche Geräte (bestimmte AV-Receiver oder Fernseher) funktionieren möglicherweise besser mit einer anderen Option."
 
 msgctxt "#60596"
 msgid "Off"

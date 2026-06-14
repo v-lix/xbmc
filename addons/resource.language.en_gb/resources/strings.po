@@ -26609,13 +26609,13 @@ msgstr ""
 #. "Audio Issues Fix"
 #: system/settings/settings.xml
 msgctxt "#60594"
-msgid "Audio Fixes mode"
+msgid "Passthrough audio sync mode"
 msgstr ""
 
 #. "Audio Issues Fix"
 #: system/settings/settings.xml
 msgctxt "#60595"
-msgid "Select the type of audio correction to fix seamless branching audio drop and audio sync issues. Different equipment will work better with different options, so try each option to see what works best for your setup."
+msgid "Fixes audio dropouts at seamless branch points and audio/video sync drift for bitstreamed (passthrough) TrueHD, DTS and Dolby Digital. \"LAV Full\" (the default) applies the complete LAV Filters sync model and is recommended for most setups; \"LAV SB\" only re-aligns at branch points; \"Off\" uses stock Kodi handling. Some equipment (certain AV receivers or TVs) may work better with a different option."
 msgstr ""
 
 #. "Audio Issues Fix"
