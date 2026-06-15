@@ -1610,27 +1610,33 @@ void CBitstreamConverter::ProcessDoViRpu(uint8_t *nal_buf, int32_t nal_size, uin
       if (m_append_cmv40 == DOVICMv40Mode::CMV40_SMART)
       {
         bool level2IsEmpty = !vdrDmData || (vdrDmData->dm_data.level2.len == 0);
-        bool hasData = (m_smart_display_nits > 0 && vdrDmData);
+        bool hasData = (m_smart_display_nits > 0 && vdrDmData && vdrDmData->dm_data.level1);
         int contentNits = hasData
-            ? max_pq_to_nits(static_cast<int>(vdrDmData->source_max_pq))
+            ? max_pq_to_nits(static_cast<int>(vdrDmData->dm_data.level1->max_pq))
             : 0;
         // Bypass only when the stream has L2 trims (not a CMv2.9-no-L2 upgrade candidate)
         // and the content signal peaks beyond display capability plus threshold headroom.
         int threshold = m_smart_display_nits * (100 + m_smart_threshold_pct) / 100;
         bool bypass = !level2IsEmpty && hasData && (contentNits > threshold);
         effectiveMode = bypass ? DOVICMv40Mode::CMV40_NONE : DOVICMv40Mode::CMV40_ALWAYS;
+        CLog::Log(LOGDEBUG,
+                  "CBitstreamConverter::ProcessDoViRpu - Smart CMv4.0 frame: "
+                  "content {}nits display {}nits threshold {}nits ({}%) -> {}",
+                  contentNits, m_smart_display_nits, threshold, m_smart_threshold_pct,
+                  bypass ? "bypass" : "append");
         if (effectiveMode != m_smart_last_effective)
         {
           if (level2IsEmpty)
             CLog::Log(LOGINFO, "CBitstreamConverter::ProcessDoViRpu - Smart CMv4.0: "
-                      "no L2 trims, appending CMv4.0");
+                      "no L2 trims, appending CMv4.0 (evaluated per-frame)");
           else if (!hasData)
             CLog::Log(LOGINFO, "CBitstreamConverter::ProcessDoViRpu - Smart CMv4.0: "
-                      "display nits unavailable, defaulting to append");
+                      "display nits unavailable, defaulting to append (evaluated per-frame)");
           else
             CLog::Log(LOGINFO,
                       "CBitstreamConverter::ProcessDoViRpu - Smart CMv4.0: "
-                      "content {}nits display {}nits threshold {}nits ({}%) -> {}",
+                      "content {}nits display {}nits threshold {}nits ({}%) -> {} "
+                      "(decision changed; evaluated per-frame)",
                       contentNits, m_smart_display_nits, threshold, m_smart_threshold_pct,
                       bypass ? "bypass (no append)" : "append CMv4.0");
           m_smart_last_effective = effectiveMode;

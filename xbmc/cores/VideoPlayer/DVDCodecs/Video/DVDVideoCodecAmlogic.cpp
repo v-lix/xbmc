@@ -84,7 +84,8 @@ CDVDVideoCodecAmlogic::CDVDVideoCodecAmlogic(CProcessInfo &processInfo)
         CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_SMART_THRESHOLD,
         CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP,
         CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5_OVERRIDE,
-        CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE
+        CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE,
+        CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM
       });
       m_settingsCallbackRegistered = true;
     }
@@ -190,7 +191,8 @@ void CDVDVideoCodecAmlogic::OnSettingChanged(const std::shared_ptr<const CSettin
   const auto& id = setting->GetId();
   if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND ||
       id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_SMART_THRESHOLD ||
-      id == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
+      id == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE ||
+      id == CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM)
     UpdateAppendCMv40SettingCache();
   if (id == CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP ||
       id == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)
