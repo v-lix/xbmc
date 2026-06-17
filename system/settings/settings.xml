@@ -3396,6 +3396,11 @@
           <default>false</default>
           <control type="toggle" />
         </setting>
+        <setting id="audiooutput.drc" type="integer" label="38029" help="38030">
+          <level>2</level>
+          <default>100</default>
+          <control type="slider" format="percentage" range="0,1,100" />
+        </setting>
         <setting id="audiooutput.lowlatency" type="boolean" label="295" help="36441">
           <level>2</level>
           <default>true</default>

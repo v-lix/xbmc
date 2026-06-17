@@ -22761,6 +22761,18 @@ msgctxt "#38028"
 msgid "Ignore centre and surround mix levels provided by AC3/EAC3/DTS streams when downmixing. Fixed default levels (-3 dB, 0.7071) are used instead. Helpful when stream-provided values produce a poor downmix."
 msgstr ""
 
+#. Label for audio setting controlling decoder dynamic range compression
+#: system/settings/settings.xml
+msgctxt "#38029"
+msgid "Dynamic range compression (AC3/E-AC3)"
+msgstr ""
+
+#. Description for the setting with label #38029 "Dynamic range compression (AC3/E-AC3)"
+#: system/settings/settings.xml
+msgctxt "#38030"
+msgid "How much of the dynamic range compression carried in AC3/E-AC3 streams to apply when decoding to PCM (no passthrough). 100% applies full compression for consistent, dialogue-friendly levels (e.g. on TV speakers); 0% disables it for the full dynamic range, matching passthrough loudness. Lower values play louder on loud passages. No effect on passthrough output or on other audio formats. The advancedsettings.xml <applydrc> value overrides this when set."
+msgstr ""
+
 #. Used for the rating selection
 #: xbmc/music/MusicUtils.cpp
 #: xbmc/video/dialogs/GUIDialogVideoInfo.cpp
@@ -22782,8 +22794,6 @@ msgstr ""
 msgctxt "#38026"
 msgid "Appearances"
 msgstr ""
-
-#empty strings from id 38027 to 38030
 
 #. Label for an option to select the video stream to play if current video has more than one video stream
 #: xbmc/video/dialogs/GUIDialogVideoSettings.cpp

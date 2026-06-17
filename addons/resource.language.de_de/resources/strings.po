@@ -16966,6 +16966,14 @@ msgctxt "#38028"
 msgid "Ignore centre and surround mix levels provided by AC3/E-AC3/DTS streams when downmixing. Fixed default levels (-3 dB, 0.7071) are used instead. Helpful when stream-provided values produce a poor downmix."
 msgstr "Ignoriert die im Stream (AC3/E-AC3/DTS) übermittelten Mischpegel für Center- und Surround-Kanäle beim Downmix. Stattdessen werden feste Standardwerte (-3 dB, 0,7071) verwendet. Hilfreich, wenn die stream-eigenen Werte einen schlechten Downmix ergeben."
 
+msgctxt "#38029"
+msgid "Dynamic range compression (AC3/E-AC3)"
+msgstr "Dynamikkompression (AC3/E-AC3)"
+
+msgctxt "#38030"
+msgid "How much of the dynamic range compression carried in AC3/E-AC3 streams to apply when decoding to PCM (no passthrough). 100% applies full compression for consistent, dialogue-friendly levels (e.g. on TV speakers); 0% disables it for the full dynamic range, matching passthrough loudness. Lower values play louder on loud passages. No effect on passthrough output or on other audio formats. The advancedsettings.xml <applydrc> value overrides this when set."
+msgstr "Legt fest, wie stark die in AC3/E-AC3-Streams enthaltene Dynamikkompression beim Dekodieren zu PCM (keine Durchschleifung) angewendet wird. 100 % wendet die volle Kompression an und sorgt für gleichmäßige, dialogfreundliche Pegel (z. B. über TV-Lautsprecher); 0 % deaktiviert sie und erhält den vollen Dynamikumfang, entsprechend der Lautstärke bei Durchschleifung. Niedrigere Werte spielen laute Passagen lauter ab. Keine Auswirkung auf durchgeschleifte Ausgabe oder andere Audioformate. Der Wert <applydrc> in der advancedsettings.xml hat Vorrang, sofern gesetzt."
+
 msgctxt "#38023"
 msgid "Set my rating"
 msgstr "Bewerten"
