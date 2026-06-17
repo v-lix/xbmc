@@ -2997,7 +2997,7 @@ void CAMLCodec::SetVideoRect(const CRect &SrcRect, const CRect &DestRect)
   if (m_guiStereoMode == RENDER_STEREO_MODE_MONO)
   {
     std::string videoStereoMode = m_processInfo.GetVideoStereoMode();
-    if (videoStereoMode == "left_right" || videoStereoMode == "righ_left")
+    if (videoStereoMode == "left_right" || videoStereoMode == "right_left")
       dst_rect.x2 *= 2.0f;
     else if (videoStereoMode == "top_bottom" || videoStereoMode == "bottom_top")
       dst_rect.y2 *= 2.0f;
