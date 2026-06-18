@@ -39,5 +39,15 @@ class CAELimiter
       m_samplerate = (float)samplerate;
     }
 
+    // Clear history-dependent state (attack/hold/release) so playback resumes
+    // deterministically after a flush/seek. Amplification and samplerate are
+    // preserved; only the dynamic attenuation envelope is reset.
+    void Reset()
+    {
+      m_attenuation = 1.0f;
+      m_holdcounter = 0;
+      m_increase = 0.0f;
+    }
+
     float Run(float* frame[AE_CH_MAX], int channels, int offset = 0, bool planar = false);
 };

@@ -1566,6 +1566,13 @@ void CActiveAE::SFlushStream(CActiveAEStream *stream)
   stream->m_syncError.Flush();
   stream->ResetFreeBuffers();
 
+  // A seek/flush is a discontinuity: drop the limiter's attack/hold/release
+  // history so the same content position replays at the same level regardless
+  // of what played before the seek (it otherwise carries the pre-seek
+  // attenuation into the post-seek audio). Matters on un-normalised downmix,
+  // where the limiter sets the final level.
+  stream->m_limiter.Reset();
+
   // Reset Logic State Variables to revive Servo
   stream->m_lastPts = 0.0;
   stream->m_lastPtsJump = 0.0;
