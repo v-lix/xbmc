@@ -21549,7 +21549,7 @@ msgstr ""
 #. Description of setting with label #346 "Normalize levels on downmix"
 #: settings/DisplaySettings.cpp
 msgctxt "#36533"
-msgid "Select how audio is downmixed, e.g. from 5.1 to 2.0.[CR][Enabled] Maintains volume level of the original audio source however the dynamic range is compressed.[CR][Disabled] Maintains the dynamic range of the original audio source when downmixed however volume will be lower. Note: Dynamic range is the difference between the quietest and loudest sounds in an audio source. Enable this setting if movie dialogues are barely audible."
+msgid "Select how audio is downmixed, e.g. from 5.1 to 2.0.[CR][Enabled] Maintains volume level of the original audio source however the dynamic range is compressed.[CR][Disabled] Maintains the dynamic range of the original audio source when downmixed however volume will be lower. Note: Dynamic range is the difference between the quietest and loudest sounds in an audio source. Enable this setting if movie dialogues are barely audible.[CR]This only sets the downmix level; for AC3/E-AC3 the dynamic range itself is compressed separately by \"Dynamic range compression (AC3/E-AC3)\"."
 msgstr ""
 
 #. Description of setting with label #668 "Component-specific logging..."
@@ -22770,7 +22770,7 @@ msgstr ""
 #. Description for the setting with label #38029 "Dynamic range compression (AC3/E-AC3)"
 #: system/settings/settings.xml
 msgctxt "#38030"
-msgid "How much of the dynamic range compression carried in AC3/E-AC3 streams to apply when decoding to PCM (no passthrough). 100% applies full compression for consistent, dialogue-friendly levels (e.g. on TV speakers); 0% disables it for the full dynamic range, matching passthrough loudness. Lower values play louder on loud passages. No effect on passthrough output or on other audio formats. The advancedsettings.xml <applydrc> value overrides this when set."
+msgid "How much of the dynamic range compression carried in AC3/E-AC3 streams to apply when decoding to PCM (no passthrough). 100% applies full compression for consistent, dialogue-friendly levels (e.g. on TV speakers); 0% keeps the full dynamic range. This is separate from \"Maintain original volume on downmix\": that sets the downmix level, while this sets how much the dynamics are compressed. For the most faithful playback, leave that off and set this to 0%. No effect on passthrough output or on non-AC3/E-AC3 formats. The advancedsettings.xml <applydrc> value overrides this when set."
 msgstr ""
 
 #. Used for the rating selection
