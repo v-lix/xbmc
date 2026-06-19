@@ -17959,7 +17959,7 @@ msgstr ""
 #. Description of setting with label #34131 "Include LFE when downmixing"
 #: system/settings/settings.xml
 msgctxt "#34132"
-msgid "If enabled, this setting will include lfe channel into the mixing when there is no dedicated LFE output channel available. This only makes sense for full range speakers."
+msgid "If enabled, this setting will include lfe channel into the mixing when there is no dedicated LFE output channel available. This only makes sense for full range speakers. Values above 100% boost the LFE for extra bass; with \"Maintain original volume on downmix\" enabled high values can clip on loud bass."
 msgstr ""
 
 #. Description of setting with label #34131 "Include LFE when downmixing"

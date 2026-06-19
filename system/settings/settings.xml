@@ -3465,7 +3465,14 @@
         <setting id="audiooutput.mixsublevel" type="integer" label="34131" help="34132">
           <level>2</level>
           <default>0</default>
-          <control type="slider" format="percentage" range="0,1,100" />
+          <constraints>
+            <minimum>0</minimum>
+            <step>1</step>
+            <maximum>200</maximum>
+          </constraints>
+          <control type="slider" format="integer">
+            <format>{:d} %</format>
+          </control>
         </setting>
         <setting id="audiooutput.lfemixto" type="integer" label="38019" help="38020">
           <level>2</level>

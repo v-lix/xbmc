@@ -13619,8 +13619,8 @@ msgid "Include LFE when downmixing"
 msgstr "LFE beim Downmixen einbeziehen"
 
 msgctxt "#34132"
-msgid "If enabled, this setting will include lfe channel into the mixing when there is no dedicated LFE output channel available. This only makes sense for full range speakers."
-msgstr "Wenn diese Einstellung aktiviert ist, wird der LFE-Kanal in die Abmischung einbezogen, wenn kein dedizierter LFE-Ausgangskanal verfügbar ist. Dies ist nur für Vollbereichslautsprecher sinnvoll."
+msgid "If enabled, this setting will include lfe channel into the mixing when there is no dedicated LFE output channel available. This only makes sense for full range speakers. Values above 100% boost the LFE for extra bass; with \"Maintain original volume on downmix\" enabled high values can clip on loud bass."
+msgstr "Wenn diese Einstellung aktiviert ist, wird der LFE-Kanal in die Abmischung einbezogen, wenn kein dedizierter LFE-Ausgangskanal verfügbar ist. Dies ist nur für Vollbereichslautsprecher sinnvoll. Werte über 100 % heben den LFE-Pegel für mehr Bass an; bei aktiviertem \"Originallautstärke beim Heruntermischen beibehalten\" können hohe Werte bei lautem Bass übersteuern."
 
 msgctxt "#34133"
 msgid "Off"
