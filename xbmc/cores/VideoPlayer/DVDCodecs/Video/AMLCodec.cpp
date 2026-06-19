@@ -1953,6 +1953,13 @@ bool CAMLCodec::OpenDecoder()
 
   ShowMainVideo(false);
 
+  // Green-flash mask also covers playback startup (same decode-restart class):
+  // assert the configured hold here, released on the first decoded frame.
+  m_videoHoldMode = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+      CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE);
+  if (m_videoHoldMode != 0)
+    HoldVideo(true);
+
   am_packet_init(&am_private->am_pkt);
   // default stream type
   am_private->stream_type      = AM_STREAM_ES;
@@ -2348,6 +2355,9 @@ void CAMLCodec::CloseDecoder()
 {
   CLog::Log(LOGINFO, "CAMLCodec::CloseDecoder");
 
+  // Make sure the green-flash hold can't outlive the decoder.
+  HoldVideo(false);
+
   SetPollDevice(-1);
 
   int blackout_policy = aml_blackout_policy(1);
@@ -2410,6 +2420,14 @@ void CAMLCodec::Reset()
 
   if (!m_opened)
     return;
+
+  // Green-flash mask: hide the video output across this decode restart so the
+  // brief window where the decoder reallocs over the keeper-pinned frame isn't
+  // shown. Read the mode live so the setting takes effect on the next seek;
+  // released on the first valid frame in GetPicture (fail-safe time cap there).
+  m_videoHoldMode = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+      CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE);
+  HoldVideo(m_videoHoldMode != 0);
 
   SetPollDevice(-1);
 
@@ -2708,6 +2726,18 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   if (!m_opened)
     return CDVDVideoCodec::VC_ERROR;
 
+  // Fail-safe for the green-flash hold: never leave the output blanked
+  // indefinitely. If no valid frame arrives within the cap after a restart,
+  // release it (decode stuck / bad seek / EOF) so the screen recovers. The cap
+  // tracks the "delay after refresh-rate change" setting (floored at 3s).
+  if (m_videoHoldActive)
+  {
+    const auto held = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now() - m_videoHoldStart);
+    if (held.count() > m_videoHoldTimeoutMs)
+      HoldVideo(false);
+  }
+
   bool streambuffer(am_private->gcodec.dec_mode == STREAM_TYPE_STREAM);
 
   // Detect approaching EOF using playback position from DataCacheCore.
@@ -2739,6 +2769,10 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   if (m_buffer_level_ready && ((ret = DequeueBuffer()) == 0))
   {
     videoPicture.iFlags = 0;
+
+    // First valid frame after a (re)start — release the green-flash hold so the
+    // video plane (or HDMI output) is shown again now that there is real content.
+    HoldVideo(false);
 
     // Frame mode: disable the minimum gate after the first frame (only needed for initial fill).
     // Stream mode: keep the gate active throughout playback.
@@ -2885,6 +2919,13 @@ void CAMLCodec::SetSpeed(int speed)
 
 void CAMLCodec::ShowMainVideo(const bool show)
 {
+  // While a video-plane restart hold is active, suppress re-show requests: the
+  // renderer calls SetVideoRect->ShowMainVideo(true) every pass, which would
+  // un-hide the plane over the still-invalid (green) buffer before the first
+  // real frame arrives. HoldVideo() clears the flag, then shows explicitly.
+  if (show && m_videoHoldActive && m_videoHoldAppliedMode == 1)
+    return;
+
   static int saved_disable_video = -1;
 
   int disable_video = show ? 0:1;
@@ -2898,6 +2939,51 @@ void CAMLCodec::ShowMainVideo(const bool show)
             show ? "show" : "hide", disable_video);
   CSysfsPath("/sys/class/video/disable_video", disable_video);
   saved_disable_video = disable_video;
+}
+
+// Hold (hide) or release the video output across a decode (re)start so the brief
+// green flash — the decoder reusing the still-displayed frame buffer — isn't
+// shown. The mode is captured per hold cycle from m_videoHoldMode:
+//   1 = video plane only (disable_video=1; the kernel also frees the keep-frame),
+//   2 = whole HDMI output (amhdmitx vid_mute).
+// Released on the first valid frame (GetPicture) or the GetPicture time cap.
+void CAMLCodec::HoldVideo(bool hold)
+{
+  if (hold)
+  {
+    // Refresh the fail-safe window on every restart so rapid seeks keep the
+    // hold asserted; it releases once decoding settles and a frame arrives.
+    // Cap = the user's "delay after refresh-rate change" (the dominant startup
+    // first-frame delay; the setting is in tenths of a second), floored at 3s so
+    // it can't fire during a legitimately slow seek/FEL first frame.
+    m_videoHoldStart = std::chrono::system_clock::now();
+    m_videoHoldTimeoutMs = std::max(3000,
+        CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+            "videoscreen.delayrefreshchange") * 100);
+    if (m_videoHoldActive)
+      return;
+    m_videoHoldAppliedMode = m_videoHoldMode;
+    m_videoHoldActive = true;
+    if (m_videoHoldAppliedMode == 1)
+      ShowMainVideo(false);
+    else if (m_videoHoldAppliedMode == 2)
+      aml_video_mute(true);
+    CLog::Log(LOGDEBUG, "CAMLCodec::HoldVideo - hold (mode {})", m_videoHoldAppliedMode);
+  }
+  else
+  {
+    if (!m_videoHoldActive)
+      return;
+    const int mode = m_videoHoldAppliedMode;
+    // Clear the flag before re-showing so ShowMainVideo(true) isn't suppressed.
+    m_videoHoldActive = false;
+    m_videoHoldAppliedMode = 0;
+    if (mode == 1)
+      ShowMainVideo(true);
+    else if (mode == 2)
+      aml_video_mute(false);
+    CLog::Log(LOGDEBUG, "CAMLCodec::HoldVideo - release (mode {})", mode);
+  }
 }
 
 void CAMLCodec::SetVideoRect(const CRect &SrcRect, const CRect &DestRect)

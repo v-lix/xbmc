@@ -517,6 +517,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_DETECT_THROTTLE = "coreelec.amlogic.dolbyvision.detect.throttle";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_L5_AUTO_LETTERBOX = "coreelec.amlogic.dolbyvision.l5.auto.letterbox";
   static constexpr auto SETTING_COREELEC_RESET_PTS_ON_SEEK = "coreelec.resetptsonseek";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE = "coreelec.amlogic.video.restart.mute";
   static constexpr auto SETTING_COREELEC_AUDIO_AC3_DIALNORM = "coreelec.audio.ac3.dialnorm";
   static constexpr auto SETTING_COREELEC_AUDIO_EAC3_ATMOS_DIALNORM = "coreelec.audio.eac3.atmos.dialnorm";
   static constexpr auto SETTING_COREELEC_AUDIO_TRUEHD_ATMOS_DIALNORM = "coreelec.audio.truehd.atmos.dialnorm";

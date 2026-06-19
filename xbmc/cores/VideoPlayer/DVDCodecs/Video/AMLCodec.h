@@ -89,6 +89,9 @@ public:
 
 private:
   void          ShowMainVideo(const bool show);
+  // Hide video output across a decode (re)start (startup / seek flush) until the
+  // first valid frame, masking the brief green flash. coreelec.amlogic.video.restart.mute.
+  void          HoldVideo(bool hold);
   bool          OpenAmlVideo(const CDVDStreamInfo &hints);
   void          CloseAmlVideo();
   std::string   GetVfmMap(const std::string &name);
@@ -110,6 +113,14 @@ private:
   // True between a codec_reset and the next AddData: nothing is drainable in
   // that state, see the m_drain branch in GetPicture.
   bool             m_no_data_since_reset = false;
+  // Green-flash mask state (coreelec.amlogic.video.restart.mute): video output is
+  // held hidden across a decode (re)start until the first valid frame.
+  // 0=off, 1=video plane (disable_video), 2=HDMI blank (vid_mute).
+  int              m_videoHoldMode = 0;
+  int              m_videoHoldAppliedMode = 0;
+  bool             m_videoHoldActive = false;
+  int              m_videoHoldTimeoutMs = 3000;
+  std::chrono::time_point<std::chrono::system_clock> m_videoHoldStart;
   am_private_t    *am_private;
 
   int              m_speed;

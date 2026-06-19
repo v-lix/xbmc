@@ -19192,6 +19192,26 @@ msgctxt "#60331"
 msgid "For Dolby Vision video whose black bars are cropped off (non-16:9 resolution, e.g. 3840x1600), synthesise the Level 5 active-area offsets from the coded aspect and send them to the display, so the letterbox bars added when scaling to a 16:9 output are masked black instead of being raised to grey by a positive lift. Matches how the TV's internal player handles cropped content. No file scanning is involved. Disable if your display crops or mispositions cropped Dolby Vision content."
 msgstr "Bei Dolby-Vision-Videos, deren schwarze Balken weggeschnitten wurden (Nicht-16:9-Auflösung, z. B. 3840x1600), die Level-5-Aktivbereichs-Offsets aus dem kodierten Seitenverhältnis berechnen und an das Display senden, damit die beim Skalieren auf ein 16:9-Bild hinzugefügten Letterbox-Balken schwarz maskiert und nicht durch einen positiven Lift grau angehoben werden. Entspricht der Handhabung beschnittener Inhalte durch den internen Player des Fernsehers. Es findet kein Datei-Scan statt. Deaktivieren, falls Ihr Display beschnittene Dolby-Vision-Inhalte falsch beschneidet oder positioniert."
 
+msgctxt "#60340"
+msgid "Video startup/seek flush fix"
+msgstr "Videostart-/Suchlauf-Korrektur"
+
+msgctxt "#60341"
+msgid "Briefly hide the video output at playback start and across seeks/decode flushes so the momentary green flash (the decoder reusing the still-displayed frame buffer) is not shown. \"Video plane\" hides only the video layer and keeps the on-screen display visible; \"HDMI blank\" blanks the whole output (use only if \"Video plane\" still shows green). Released on the first new frame, or — if none arrives — after the \"Delay after change of refresh rate\" time (minimum 3 seconds)."
+msgstr "Blendet die Videoausgabe beim Wiedergabestart sowie bei Suchläufen/Decoder-Flushes kurz aus, damit das kurzzeitige grüne Blinken (der Decoder verwendet den noch angezeigten Bildpuffer erneut) nicht sichtbar wird. \"Gesamte Ausgabe\" (Standard) ersetzt die gesamte Ausgabe im Video-Encoder durch Schwarz und verbirgt das Blinken zuverlässig. \"Videoebene\" blendet nur die Videoebene aus und lässt die Bildschirmanzeige sichtbar, erfasst das Blinken bei schnellen Suchläufen aber möglicherweise nicht. Wird beim ersten neuen Bild aufgehoben oder – falls keines kommt – nach der Zeit aus \"Verzögerung nach Änderung der Bildwiederholrate\" (mindestens 3 Sekunden)."
+
+msgctxt "#60342"
+msgid "Off"
+msgstr "Aus"
+
+msgctxt "#60343"
+msgid "Video plane"
+msgstr "Videoebene"
+
+msgctxt "#60344"
+msgid "Full output"
+msgstr "Gesamte Ausgabe"
+
 msgctxt "#60500"
 msgid "Set Min PQ 20 only"
 msgstr "Nur Min. PQ 20"
