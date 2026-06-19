@@ -40,6 +40,11 @@ public:
 
 protected:
   int GetData(uint8_t** dst);
+  // (Re)apply the configured dynamic range compression to the open codec.
+  // Must be called after every avcodec_flush_buffers(): the AC3/E-AC3
+  // decoder's flush memsets drc_scale (it lives past frame_type in
+  // AC3DecodeContext), silently disabling DRC after a seek.
+  void ApplyDrcScale();
   enum AEDataFormat GetDataFormat();
   int GetSampleRate();
   int GetChannels();

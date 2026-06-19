@@ -114,18 +114,7 @@ bool CDVDAudioCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
     }
   }
 
-  // Dynamic range compression. Only the AC3/E-AC3 decoders expose drc_scale;
-  // for other codecs the option is absent and av_opt_set is a harmless no-op.
-  // advancedsettings.xml <applydrc> wins when explicitly set (>= 0); otherwise
-  // the GUI slider drives it (0-100% -> drc_scale 0.0-1.0, default 100% = full
-  // compression = the previous ffmpeg default, so behaviour is unchanged).
-  float applyDrc = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_audioApplyDrc;
-  if (applyDrc < 0.0f)
-    applyDrc = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
-                   CSettings::SETTING_AUDIOOUTPUT_DRC) /
-               100.0f;
-  av_opt_set_double(m_pCodecContext, "drc_scale", static_cast<double>(applyDrc),
-                    AV_OPT_SEARCH_CHILDREN);
+  ApplyDrcScale();
 
   if (avcodec_open2(m_pCodecContext, pCodec, NULL) < 0)
   {
@@ -302,10 +291,38 @@ int CDVDAudioCodecFFmpeg::GetData(uint8_t** dst)
   return 0;
 }
 
+void CDVDAudioCodecFFmpeg::ApplyDrcScale()
+{
+  if (!m_pCodecContext)
+    return;
+
+  // Dynamic range compression. Only the AC3/E-AC3 decoders expose drc_scale;
+  // for other codecs the option is absent and av_opt_set is a harmless no-op.
+  // advancedsettings.xml <applydrc> wins when explicitly set (>= 0); otherwise
+  // the GUI slider drives it (0-100% -> drc_scale 0.0-1.0, default 100% = full
+  // compression = the previous ffmpeg default, so behaviour is unchanged).
+  float applyDrc = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_audioApplyDrc;
+  if (applyDrc < 0.0f)
+    applyDrc = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+                   CSettings::SETTING_AUDIOOUTPUT_DRC) /
+               100.0f;
+  av_opt_set_double(m_pCodecContext, "drc_scale", static_cast<double>(applyDrc),
+                    AV_OPT_SEARCH_CHILDREN);
+}
+
 void CDVDAudioCodecFFmpeg::Reset()
 {
-  if (m_pCodecContext) avcodec_flush_buffers(m_pCodecContext);
+  if (m_pCodecContext)
+    avcodec_flush_buffers(m_pCodecContext);
   m_eof = false;
+
+  // ffmpeg's ac3_decode_flush() memsets the AC3DecodeContext from frame_type
+  // onward, which includes drc_scale - so avcodec_flush_buffers() silently
+  // zeroes our configured DRC, disabling compression for the rest of playback
+  // after the first seek (the decoder is only re-opened on a stream change,
+  // not on a flush). Re-apply it on every reset to keep DRC consistent across
+  // seeks.
+  ApplyDrcScale();
 }
 
 int CDVDAudioCodecFFmpeg::GetChannels()
