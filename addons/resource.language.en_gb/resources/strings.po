@@ -26058,19 +26058,7 @@ msgid "Video startup/seek flush fix"
 msgstr ""
 
 msgctxt "#60341"
-msgid "Briefly hide the video output at playback start and across seeks/decode flushes so the momentary green flash (the decoder reusing the still-displayed frame buffer) is not shown. \"Full output\" (default) replaces the whole output with black at the video encoder and reliably hides the flash. \"Video plane\" hides only the video layer and keeps the on-screen display visible, but may not catch the flash on fast seeks. Released on the first new frame, or — if none arrives — after the \"Delay after change of refresh rate\" time (minimum 3 seconds)."
-msgstr ""
-
-msgctxt "#60342"
-msgid "Off"
-msgstr ""
-
-msgctxt "#60343"
-msgid "Video plane"
-msgstr ""
-
-msgctxt "#60344"
-msgid "Full output"
+msgid "Briefly blank the whole video output to black (at the video encoder) at playback start and across seeks/decode flushes, so the momentary green flash — the decoder reusing the still-displayed frame buffer — is not shown. The on-screen display is also hidden for that brief moment. Released on the first new frame, or — if none arrives — after the \"Delay after change of refresh rate\" time (minimum 3 seconds)."
 msgstr ""
 
 #. "Dolby Vision Display LL Dolby VSVDB Limit"

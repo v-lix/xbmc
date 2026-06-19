@@ -19197,20 +19197,8 @@ msgid "Video startup/seek flush fix"
 msgstr "Videostart-/Suchlauf-Korrektur"
 
 msgctxt "#60341"
-msgid "Briefly hide the video output at playback start and across seeks/decode flushes so the momentary green flash (the decoder reusing the still-displayed frame buffer) is not shown. \"Video plane\" hides only the video layer and keeps the on-screen display visible; \"HDMI blank\" blanks the whole output (use only if \"Video plane\" still shows green). Released on the first new frame, or — if none arrives — after the \"Delay after change of refresh rate\" time (minimum 3 seconds)."
-msgstr "Blendet die Videoausgabe beim Wiedergabestart sowie bei Suchläufen/Decoder-Flushes kurz aus, damit das kurzzeitige grüne Blinken (der Decoder verwendet den noch angezeigten Bildpuffer erneut) nicht sichtbar wird. \"Gesamte Ausgabe\" (Standard) ersetzt die gesamte Ausgabe im Video-Encoder durch Schwarz und verbirgt das Blinken zuverlässig. \"Videoebene\" blendet nur die Videoebene aus und lässt die Bildschirmanzeige sichtbar, erfasst das Blinken bei schnellen Suchläufen aber möglicherweise nicht. Wird beim ersten neuen Bild aufgehoben oder – falls keines kommt – nach der Zeit aus \"Verzögerung nach Änderung der Bildwiederholrate\" (mindestens 3 Sekunden)."
-
-msgctxt "#60342"
-msgid "Off"
-msgstr "Aus"
-
-msgctxt "#60343"
-msgid "Video plane"
-msgstr "Videoebene"
-
-msgctxt "#60344"
-msgid "Full output"
-msgstr "Gesamte Ausgabe"
+msgid "Briefly blank the whole video output to black (at the video encoder) at playback start and across seeks/decode flushes, so the momentary green flash — the decoder reusing the still-displayed frame buffer — is not shown. The on-screen display is also hidden for that brief moment. Released on the first new frame, or — if none arrives — after the \"Delay after change of refresh rate\" time (minimum 3 seconds)."
+msgstr "Blendet die gesamte Videoausgabe beim Wiedergabestart sowie bei Suchläufen/Decoder-Flushes kurz auf Schwarz aus (im Video-Encoder), damit das kurzzeitige grüne Blinken – der Decoder verwendet den noch angezeigten Bildpuffer erneut – nicht sichtbar wird. Die Bildschirmanzeige wird für diesen kurzen Moment ebenfalls ausgeblendet. Wird beim ersten neuen Bild aufgehoben oder – falls keines kommt – nach der Zeit aus \"Verzögerung nach Änderung der Bildwiederholrate\" (mindestens 3 Sekunden)."
 
 msgctxt "#60500"
 msgid "Set Min PQ 20 only"

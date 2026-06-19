@@ -1954,10 +1954,9 @@ bool CAMLCodec::OpenDecoder()
   ShowMainVideo(false);
 
   // Green-flash mask also covers playback startup (same decode-restart class):
-  // assert the configured hold here, released on the first decoded frame.
-  m_videoHoldMode = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
-      CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE);
-  if (m_videoHoldMode != 0)
+  // assert the hold here, released on the first decoded frame.
+  if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+          CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE))
     HoldVideo(true);
 
   am_packet_init(&am_private->am_pkt);
@@ -2421,13 +2420,12 @@ void CAMLCodec::Reset()
   if (!m_opened)
     return;
 
-  // Green-flash mask: hide the video output across this decode restart so the
+  // Green-flash mask: blank the video output across this decode restart so the
   // brief window where the decoder reallocs over the keeper-pinned frame isn't
-  // shown. Read the mode live so the setting takes effect on the next seek;
-  // released on the first valid frame in GetPicture (fail-safe time cap there).
-  m_videoHoldMode = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
-      CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE);
-  HoldVideo(m_videoHoldMode != 0);
+  // shown. Read live so the setting takes effect on the next seek; released on
+  // the first valid frame in GetPicture (fail-safe time cap there).
+  HoldVideo(CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+      CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE));
 
   SetPollDevice(-1);
 
@@ -2919,13 +2917,6 @@ void CAMLCodec::SetSpeed(int speed)
 
 void CAMLCodec::ShowMainVideo(const bool show)
 {
-  // While a video-plane restart hold is active, suppress re-show requests: the
-  // renderer calls SetVideoRect->ShowMainVideo(true) every pass, which would
-  // un-hide the plane over the still-invalid (green) buffer before the first
-  // real frame arrives. HoldVideo() clears the flag, then shows explicitly.
-  if (show && m_videoHoldActive && m_videoHoldAppliedMode == 1)
-    return;
-
   static int saved_disable_video = -1;
 
   int disable_video = show ? 0:1;
@@ -2941,12 +2932,12 @@ void CAMLCodec::ShowMainVideo(const bool show)
   saved_disable_video = disable_video;
 }
 
-// Hold (hide) or release the video output across a decode (re)start so the brief
+// Blank or release the whole video output across a decode (re)start so the brief
 // green flash — the decoder reusing the still-displayed frame buffer — isn't
-// shown. The mode is captured per hold cycle from m_videoHoldMode:
-//   1 = video plane only (disable_video=1; the kernel also frees the keep-frame),
-//   2 = whole HDMI output (amhdmitx vid_mute).
-// Released on the first valid frame (GetPicture) or the GetPicture time cap.
+// shown. Uses aml_video_mute(): a solid-black VENC test pattern after composition
+// (no HDMI AVMUTE, DV-tunnel safe), the only stage that reliably catches the flash
+// (a plane-disable loses the restart race). Released on the first valid frame
+// (GetPicture) or the GetPicture time cap.
 void CAMLCodec::HoldVideo(bool hold)
 {
   if (hold)
@@ -2962,27 +2953,17 @@ void CAMLCodec::HoldVideo(bool hold)
             "videoscreen.delayrefreshchange") * 100);
     if (m_videoHoldActive)
       return;
-    m_videoHoldAppliedMode = m_videoHoldMode;
     m_videoHoldActive = true;
-    if (m_videoHoldAppliedMode == 1)
-      ShowMainVideo(false);
-    else if (m_videoHoldAppliedMode == 2)
-      aml_video_mute(true);
-    CLog::Log(LOGDEBUG, "CAMLCodec::HoldVideo - hold (mode {})", m_videoHoldAppliedMode);
+    aml_video_mute(true);
+    CLog::Log(LOGDEBUG, "CAMLCodec::HoldVideo - hold");
   }
   else
   {
     if (!m_videoHoldActive)
       return;
-    const int mode = m_videoHoldAppliedMode;
-    // Clear the flag before re-showing so ShowMainVideo(true) isn't suppressed.
     m_videoHoldActive = false;
-    m_videoHoldAppliedMode = 0;
-    if (mode == 1)
-      ShowMainVideo(true);
-    else if (mode == 2)
-      aml_video_mute(false);
-    CLog::Log(LOGDEBUG, "CAMLCodec::HoldVideo - release (mode {})", mode);
+    aml_video_mute(false);
+    CLog::Log(LOGDEBUG, "CAMLCodec::HoldVideo - release");
   }
 }
 
