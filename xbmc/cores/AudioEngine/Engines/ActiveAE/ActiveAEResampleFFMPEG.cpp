@@ -170,8 +170,13 @@ bool CActiveAEResampleFFMPEG::Init(SampleConfig dstConfig,
           }
           else if (inChan == AV_CHAN_LOW_FREQUENCY)
           {
+            // Duplicate the LFE into both fronts at the standard -3 dB
+            // (1/sqrt(2)) per-speaker weight, matching the auto-matrix
+            // "Default" path (swresample build_matrix) and the surround
+            // channels above, so the slider means the same thing in both
+            // LFE-downmix-target modes.
             if (outChan == AV_CHAN_FRONT_LEFT || outChan == AV_CHAN_FRONT_RIGHT)
-              m_rematrix[out][in] = static_cast<double>(sublevel);
+              m_rematrix[out][in] = static_cast<double>(sublevel) * M_SQRT1_2;
           }
           else
           {
