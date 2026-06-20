@@ -2955,7 +2955,16 @@ void CAMLCodec::HoldVideo(bool hold)
       return;
     m_videoHoldActive = true;
     aml_video_mute(true);
-    CLog::Log(LOGDEBUG, "CAMLCodec::HoldVideo - hold");
+    // Let the encoder blanking actually reach the wire before the caller resets
+    // the decoder. The VENC mute engages a vsync or two after the sysfs write;
+    // codec_reset can otherwise scan out a torn first restart frame into that gap
+    // (the ~1-2 frame green seam at the seek edge — an outlier stream whose first
+    // restart frame lands inside the window). Bounded by the display rate (covers
+    // 24p) so it can never hang on a stalled vblank.
+    const double fps = CServiceBroker::GetWinSystem()->GetGfxContext().GetFPS();
+    const int settleMs = 2 * ((fps > 1.0) ? static_cast<int>(1000.0 / fps) : 20);
+    std::this_thread::sleep_for(std::chrono::milliseconds(settleMs));
+    CLog::Log(LOGDEBUG, "CAMLCodec::HoldVideo - hold ({}ms vsync settle)", settleMs);
   }
   else
   {
