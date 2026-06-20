@@ -19200,6 +19200,14 @@ msgctxt "#60341"
 msgid "Briefly blank the whole video output to black (at the video encoder) at playback start and across seeks/decode flushes, so the momentary green flash — the decoder reusing the still-displayed frame buffer — is not shown. The on-screen display is also hidden for that brief moment. Released on the first new frame, or — if none arrives — after the \"Delay after change of refresh rate\" time (minimum 3 seconds)."
 msgstr "Blendet die gesamte Videoausgabe beim Wiedergabestart sowie bei Suchläufen/Decoder-Flushes kurz auf Schwarz aus (im Video-Encoder), damit das kurzzeitige grüne Blinken – der Decoder verwendet den noch angezeigten Bildpuffer erneut – nicht sichtbar wird. Die Bildschirmanzeige wird für diesen kurzen Moment ebenfalls ausgeblendet. Wird beim ersten neuen Bild aufgehoben oder – falls keines kommt – nach der Zeit aus \"Verzögerung nach Änderung der Bildwiederholrate\" (mindestens 3 Sekunden)."
 
+msgctxt "#60342"
+msgid "Close the seek-edge seam (slower seeks)"
+msgstr "Naht am Suchlauf-Rand schließen (langsamere Suchläufe)"
+
+msgctxt "#60343"
+msgid "Waits for the blanking to fully engage before the decoder is restarted, so a torn green frame can't slip through in the one-or-two-frame window right at the edge of a seek. Adds a short delay (one or two frames) to each seek and to playback start. Only enable if a brief green flash still appears right at the seek with the option above turned on."
+msgstr "Wartet, bis die Ausblendung vollständig greift, bevor der Decoder zurückgesetzt wird, damit im Fenster von ein bis zwei Bildern direkt am Rand eines Suchlaufs kein zerrissenes grünes Bild durchrutscht. Fügt jedem Suchlauf und dem Wiedergabestart eine kurze Verzögerung (ein bis zwei Bilder) hinzu. Nur aktivieren, wenn mit der obigen Option weiterhin direkt beim Suchlauf ein kurzes grünes Blinken erscheint."
+
 msgctxt "#60500"
 msgid "Set Min PQ 20 only"
 msgstr "Nur Min. PQ 20"

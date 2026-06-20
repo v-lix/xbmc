@@ -26061,6 +26061,14 @@ msgctxt "#60341"
 msgid "Briefly blank the whole video output to black (at the video encoder) at playback start and across seeks/decode flushes, so the momentary green flash — the decoder reusing the still-displayed frame buffer — is not shown. The on-screen display is also hidden for that brief moment. Released on the first new frame, or — if none arrives — after the \"Delay after change of refresh rate\" time (minimum 3 seconds)."
 msgstr ""
 
+msgctxt "#60342"
+msgid "Close the seek-edge seam (slower seeks)"
+msgstr ""
+
+msgctxt "#60343"
+msgid "Waits for the blanking to fully engage before the decoder is restarted, so a torn green frame can't slip through in the one-or-two-frame window right at the edge of a seek. Adds a short delay (one or two frames) to each seek and to playback start. Only enable if a brief green flash still appears right at the seek with the option above turned on."
+msgstr ""
+
 #. "Dolby Vision Display LL Dolby VSVDB Limit"
 #: system/settings/settings.xml
 msgctxt "#60500"
