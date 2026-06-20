@@ -106,6 +106,12 @@ void CDVDOverlayCodecSSA::Flush()
 {
   m_pOverlay.reset();
   m_order = 0;
+  // On seek/flush the libass render cache still holds the pre-seek pts interval
+  // and image list (it is not dropped by a timeline jump), so RenderImage()
+  // would keep returning a stale/empty frame for embedded subtitles until a
+  // re-demuxed event happens to invalidate it. Drop it here so the next render
+  // reflects the new position immediately.
+  m_libass->FlushRenderCache();
 }
 
 std::shared_ptr<CDVDOverlay> CDVDOverlayCodecSSA::GetOverlay()

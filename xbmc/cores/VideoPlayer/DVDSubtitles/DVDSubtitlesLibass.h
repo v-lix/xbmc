@@ -78,6 +78,14 @@ public:
   void FlushEvents();
 
   /*!
+  * \brief Invalidate the cached render result, e.g. on seek/flush. The render
+  * cache is keyed by pts and is not dropped by a timeline jump, so without this
+  * RenderImage() can keep returning a stale image for the old position until a
+  * re-demuxed event happens to invalidate it.
+  */
+  void FlushRenderCache();
+
+  /*!
   * \brief Get PlayResY value
   * \return The PlayResY value of current track
   */

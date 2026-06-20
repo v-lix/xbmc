@@ -940,6 +940,12 @@ void CDVDSubtitlesLibass::FlushEvents()
   InvalidateRenderCache();
 }
 
+void CDVDSubtitlesLibass::FlushRenderCache()
+{
+  std::unique_lock<CCriticalSection> lock(m_section);
+  InvalidateRenderCache();
+}
+
 int CDVDSubtitlesLibass::DeleteEvents(int nEvents, int threshold)
 {
   std::unique_lock<CCriticalSection> lock(m_section);
