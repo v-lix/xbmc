@@ -96,6 +96,18 @@ re-added.
 - Clear: on file open (`PLAYER_OPENFILE`), close, and subtitle-stream switch.
   **Never** on flush/seek.
 
+### 2b. Re-read duplicate suppression
+`CDVDOverlayCodecSSA::Decode` renumbers each event's libass ReadOrder from its own
+counter, so libass cannot dedup a reinjected event against the demuxer's own
+re-read of it. On an accurate seek `CheckPlayerInit` drops the re-read (dts <
+startpts), but on a keyframe-accurate (fast) seek — default on — it does not, so
+the event would be added twice → doubled overlay. Mitigation: `ReinjectSubtitlePackets`
+records each re-emitted event's pts in `m_subtitleReinjectedPts`; `ProcessSubData`
+drops (from delivery only — still cached) the first demuxed packet whose pts
+matches, then forgets it. Gated on the cache belonging to the current stream so it
+cannot false-match on a different (e.g. image) subtitle. Cleared each seek and on
+cache clear.
+
 ### 3. Secondary subtitle-only demuxer
 - `std::shared_ptr<CDVDDemuxFFmpeg> m_pSubtitleCatchupDemuxer` +
   `std::shared_ptr<CDVDInputStream>` on the same file, created **lazily** on first
@@ -147,12 +159,16 @@ basis is stable across seeks. Secondary-demuxer packets are **raw**, so
 `FetchActiveSubtitleFromFile` applies `UpdateCorrection(pkt, m_offset_pts)` before
 reinject/caching.
 
-## Setting
-New boolean `coreelec.subtitles.seekrecall` (label/help strings added), default
-**ON**. Gates the whole feature (cache fill, reinject, secondary fetch). Rationale:
-the fast path is free and safe, but the feature touches the seek path and adds a
-second file handle on miss, so a kill-switch is prudent. (Easily dropped if panni
-prefers always-on.)
+## Gating
+The cache + reinject **fast path is always on** — it is free (zero extra I/O) and
+safe on any storage, so there is no reason to gate it.
+
+Only the **cache-miss file-read fallback** (the second demuxer) is gated, by
+`coreelec.subtitles.recallfromfile` (boolean, label/help #60612/#60613), **default
+OFF**. That path competes for I/O and, despite the cache pre-check + wall-clock
+budget, can briefly disturb playback on slow disk/USB/network — so it is opt-in.
+The member `m_subtitleSeekRecallFromFile` is read from the setting in
+`OpenInputStream()`.
 
 ## Non-goals / known limitations
 - **PGS / image subs**: out of scope; unchanged.
@@ -163,6 +179,10 @@ prefers always-on.)
   secondary reader is only triggered for targets *outside* coverage. Rare; documented.
 - **Forward-seek into unplayed content**: handled by the secondary reader as a
   side effect, not a primary goal.
+- **Recall needs the cache bound to the current stream first** (set on the first
+  cached packet). An immediate seek-back in the brief window after a fresh resume,
+  before any subtitle packet has been demuxed, won't recall; it self-heals on the
+  next seek. Conservative on purpose — avoids mixing streams in the cache.
 
 ## Testing / verification
 No subtitle unit-test harness exists in-tree. Verification = on-device A/B (panni):

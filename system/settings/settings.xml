@@ -4696,6 +4696,11 @@
           <default>false</default>
           <control type="toggle" />
         </setting>
+        <setting id="coreelec.subtitles.recallfromfile" type="boolean" label="60612" help="60613">
+          <level>2</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
         <setting id="coreelec.amlogic.video.restart.mute" type="boolean" label="60340" help="60341">
           <requirement>HAVE_AMCODEC</requirement>
           <level>2</level>

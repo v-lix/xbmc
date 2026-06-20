@@ -67,7 +67,9 @@
 #include "video/VideoInfoTag.h"
 #include "windowing/WinSystem.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <iterator>
 #include <memory>
 #include <mutex>
@@ -809,6 +811,9 @@ bool CVideoPlayer::OpenInputStream()
   if (m_pInputStream.use_count() > 1)
     throw std::runtime_error("m_pInputStream reference count is greater than 1");
   m_pInputStream.reset();
+
+  m_subtitleSeekRecallFromFile = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+      CSettings::SETTING_COREELEC_SUBTITLES_RECALL_FROM_FILE);
 
   CLog::Log(LOGINFO, "Creating InputStream");
 
@@ -1822,6 +1827,51 @@ void CVideoPlayer::ProcessVideoData(CDemuxStream* pStream, DemuxPacket* pPacket)
     m_CurrentVideo.packets++;
 }
 
+namespace
+{
+// Text subtitle codecs whose events we can cache and re-emit cheaply on seek.
+// Image subtitles (PGS/DVB/DVD/XSUB -> CDVDOverlayCodecFFmpeg) are excluded:
+// large packets, and a windowed cache for them was found unreliable.
+bool IsCachableTextSubtitle(AVCodecID codec)
+{
+  switch (codec)
+  {
+    case AV_CODEC_ID_TEXT:
+    case AV_CODEC_ID_SUBRIP:
+    case AV_CODEC_ID_SSA:
+    case AV_CODEC_ID_ASS:
+    case AV_CODEC_ID_MOV_TEXT:
+    case AV_CODEC_ID_WEBVTT:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Deep-copy the fields a subtitle packet carries. Text subtitles have no crypto
+// and effectively no side data, so neither is copied.
+DemuxPacket* CopySubtitlePacket(const DemuxPacket* src)
+{
+  DemuxPacket* copy = CDVDDemuxUtils::AllocateDemuxPacket(src->iSize);
+  if (!copy)
+    return nullptr;
+  if (src->iSize > 0 && src->pData)
+    std::memcpy(copy->pData, src->pData, src->iSize);
+  copy->iSize = src->iSize;
+  copy->pts = src->pts;
+  copy->dts = src->dts;
+  copy->duration = src->duration;
+  copy->iStreamId = src->iStreamId;
+  copy->demuxerId = src->demuxerId;
+  copy->iGroupId = src->iGroupId;
+  copy->subtitlePlane = src->subtitlePlane;
+  copy->m_ptsOffsetCorrection = src->m_ptsOffsetCorrection;
+  return copy;
+}
+
+constexpr size_t SUBTITLE_SEEK_CACHE_MAX_BYTES = 32 * 1024 * 1024;
+} // namespace
+
 void CVideoPlayer::ProcessSubData(CDemuxStream* pStream, DemuxPacket* pPacket)
 {
   CheckStreamChanges(m_CurrentSubtitle, pStream);
@@ -1834,6 +1884,39 @@ void CVideoPlayer::ProcessSubData(CDemuxStream* pStream, DemuxPacket* pPacket)
 
   if (CheckSceneSkip(m_CurrentSubtitle))
     drop = true;
+
+  // Suppress (from delivery only) a packet that re-reads an event the last seek
+  // already re-emitted, so it is not added to the overlay a second time. Matched
+  // once, then forgotten. The packet is still cached below.
+  if (!m_subtitleReinjectedPts.empty() && pPacket->pts != DVD_NOPTS_VALUE &&
+      m_subtitleSeekCacheStreamId == m_CurrentSubtitle.id)
+  {
+    const double eps = DVD_MSEC_TO_TIME(1);
+    auto it = std::find_if(m_subtitleReinjectedPts.begin(), m_subtitleReinjectedPts.end(),
+                           [&](double p) { return std::abs(p - pPacket->pts) < eps; });
+    if (it != m_subtitleReinjectedPts.end())
+    {
+      drop = true;
+      m_subtitleReinjectedPts.erase(it);
+    }
+  }
+
+  // Cache the selected embedded text subtitle so the event active at a later
+  // seek target can be re-emitted (the demuxer won't re-read it after a seek).
+  // This fast path is always on (free); must happen before SendMessage takes
+  // ownership of the packet.
+  if (STREAM_SOURCE_MASK(pStream->source) == STREAM_SOURCE_DEMUX &&
+      IsCachableTextSubtitle(pStream->codec))
+  {
+    if (m_subtitleSeekCacheStreamId != m_CurrentSubtitle.id ||
+        m_subtitleSeekCacheDemuxerId != m_CurrentSubtitle.demuxerId)
+    {
+      ClearSubtitleSeekCache(); // selection changed -> rebuild for the new stream
+      m_subtitleSeekCacheStreamId = m_CurrentSubtitle.id;
+      m_subtitleSeekCacheDemuxerId = m_CurrentSubtitle.demuxerId;
+    }
+    CacheSubtitlePacket(pPacket);
+  }
 
   m_VideoPlayerSubtitle->SendMessage(std::make_shared<CDVDMsgDemuxerPacket>(pPacket, drop));
 
@@ -1887,6 +1970,224 @@ void CVideoPlayer::ProcessAudioID3Data(CDemuxStream* pStream, DemuxPacket* pPack
     drop = true;
 
   m_VideoPlayerAudioID3->SendMessage(std::make_shared<CDVDMsgDemuxerPacket>(pPacket, drop));
+}
+
+void CVideoPlayer::ClearSubtitleSeekCache()
+{
+  for (auto& [pts, pkt] : m_subtitleSeekCache)
+    CDVDDemuxUtils::FreeDemuxPacket(pkt);
+  m_subtitleSeekCache.clear();
+  m_subtitleSeekCovered.clear();
+  m_subtitleReinjectedPts.clear();
+  m_subtitleSeekNewRun = true;
+  m_subtitleSeekCurRun = -1;
+  m_subtitleSeekCacheStreamId = -1;
+  m_subtitleSeekCacheDemuxerId = -1;
+  m_subtitleSeekCacheBytes = 0;
+  m_pSubtitleCatchupDemuxer.reset();
+  m_pSubtitleCatchupInput.reset();
+}
+
+void CVideoPlayer::CacheSubtitlePacket(DemuxPacket* pPacket)
+{
+  if (!pPacket || pPacket->pts == DVD_NOPTS_VALUE)
+    return;
+
+  const double start = pPacket->pts;
+  const double end = pPacket->duration > 0 ? start + pPacket->duration : start;
+
+  // Extend the current contiguous coverage run (a new run was armed by the last
+  // seek / file open). Gaps between events within a run are absorbed so they
+  // read as "demuxed, no subtitle" rather than "never read".
+  if (m_subtitleSeekNewRun || m_subtitleSeekCurRun < 0 ||
+      m_subtitleSeekCurRun >= static_cast<int>(m_subtitleSeekCovered.size()))
+  {
+    m_subtitleSeekCovered.emplace_back(start, end);
+    m_subtitleSeekCurRun = static_cast<int>(m_subtitleSeekCovered.size()) - 1;
+    m_subtitleSeekNewRun = false;
+  }
+  else
+  {
+    auto& run = m_subtitleSeekCovered[m_subtitleSeekCurRun];
+    run.first = std::min(run.first, start);
+    run.second = std::max(run.second, end);
+  }
+
+  // Already cached (re-read after a seek-back) -> dedup on pts key.
+  if (m_subtitleSeekCache.find(start) != m_subtitleSeekCache.end())
+    return;
+
+  if (m_subtitleSeekCacheBytes + static_cast<size_t>(pPacket->iSize) >
+      SUBTITLE_SEEK_CACHE_MAX_BYTES)
+  {
+    if (m_subtitleSeekCacheBytes < SUBTITLE_SEEK_CACHE_MAX_BYTES)
+      CLog::Log(LOGWARNING,
+                "CVideoPlayer: subtitle seek-recall cache hit {} MiB cap; not caching further",
+                SUBTITLE_SEEK_CACHE_MAX_BYTES / (1024 * 1024));
+    m_subtitleSeekCacheBytes = SUBTITLE_SEEK_CACHE_MAX_BYTES; // latch so the warn fires once
+    return;
+  }
+
+  DemuxPacket* copy = CopySubtitlePacket(pPacket);
+  if (!copy)
+    return;
+  m_subtitleSeekCacheBytes += static_cast<size_t>(copy->iSize);
+  m_subtitleSeekCache[start] = copy;
+}
+
+std::vector<DemuxPacket*> CVideoPlayer::FindActiveSubtitlePackets(double pts)
+{
+  std::vector<DemuxPacket*> active;
+  for (const auto& [start, pkt] : m_subtitleSeekCache)
+  {
+    if (start > pts)
+      break; // map is ordered by start; nothing later can be active at pts
+    if (pkt->duration > 0 && start + pkt->duration > pts)
+      active.push_back(pkt);
+  }
+  return active;
+}
+
+bool CVideoPlayer::IsSubtitlePtsCovered(double pts) const
+{
+  // Small tolerance so a seek that lands a frame inside the run boundary still
+  // counts as covered.
+  const double eps = DVD_MSEC_TO_TIME(200);
+  for (const auto& [from, to] : m_subtitleSeekCovered)
+  {
+    if (pts >= from - eps && pts <= to + eps)
+      return true;
+  }
+  return false;
+}
+
+void CVideoPlayer::ReinjectSubtitlePackets(const std::vector<DemuxPacket*>& packets)
+{
+  for (const DemuxPacket* src : packets)
+  {
+    DemuxPacket* copy = CopySubtitlePacket(src);
+    if (!copy)
+      continue;
+    // Straight to the subtitle player: this bypasses ProcessSubData/CheckPlayerInit,
+    // whose dts < startpts rule would otherwise drop an event that began before the
+    // seek target. drop=false -> the overlay codec decodes it and adds the overlay.
+    m_VideoPlayerSubtitle->SendMessage(std::make_shared<CDVDMsgDemuxerPacket>(copy, false));
+    // Remember it so the demuxer's own re-read of the same event is suppressed
+    // once (see ProcessSubData), preventing a doubled overlay.
+    if (src->pts != DVD_NOPTS_VALUE)
+      m_subtitleReinjectedPts.push_back(src->pts);
+  }
+}
+
+void CVideoPlayer::FetchActiveSubtitleFromFile(double seekTimeMs, double targetPts, int streamId)
+{
+  // Lazily stand up a second demuxer on the same file. Its own input stream means
+  // its own file position, so seeking it cannot disturb playback. Mirrors the
+  // .sup branch of AddSubtitleFile().
+  if (!m_pSubtitleCatchupDemuxer)
+  {
+    auto input = CDVDFactoryInputStream::CreateInputStream(nullptr, m_item);
+    if (!input || !input->Open())
+      return;
+    auto demux = std::make_shared<CDVDDemuxFFmpeg>();
+    if (!demux->Open(input, false))
+      return;
+    m_pSubtitleCatchupInput = input;
+    m_pSubtitleCatchupDemuxer = demux;
+  }
+
+  // Don't pile a second reader onto storage that was already struggling before
+  // the seek. This mirrors the spirit of the L5 active-area detector's cache-aware
+  // throttle (961a1a730b); the level here is the pre-seek value (this runs on the
+  // Process thread, which won't update it again until we return), so it only gates
+  // the start - the wall-clock budget below is what bounds the cost once reading.
+  constexpr int kRecallCacheFloorPct = 50;
+  if (m_State.caching || GetCacheLevel() < kRecallCacheFloorPct)
+  {
+    CLog::Log(LOGDEBUG,
+              "CVideoPlayer: subtitle seek-recall fallback skipped (caching={}, cache={}%)",
+              m_State.caching, GetCacheLevel());
+    return;
+  }
+
+  // Read from a window before the target so an event that began earlier (a long
+  // sign) is still seen; the backward seek lands on the video keyframe <= that,
+  // so the effective reach is >= the window.
+  constexpr double CATCHUP_WINDOW_MS = 30000.0;
+  double from = seekTimeMs - CATCHUP_WINDOW_MS;
+  if (from < 0)
+    from = 0;
+  if (!m_pSubtitleCatchupDemuxer->SeekTime(from, true))
+    return;
+
+  // Read forward to the target, keeping the active event(s) for the wanted stream.
+  // The wall-clock budget bounds how long this synchronous read can delay playback
+  // resume on slow storage (we block the Process thread while reading); a packet
+  // count caps pathological input. On a budget/packet abort the recall is simply
+  // skipped - best-effort, never a stall.
+  constexpr int MAX_PACKETS = 8000;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(700);
+  for (int i = 0; i < MAX_PACKETS; ++i)
+  {
+    if (std::chrono::steady_clock::now() >= deadline)
+    {
+      CLog::Log(LOGDEBUG, "CVideoPlayer: subtitle seek-recall fallback hit time budget");
+      break;
+    }
+
+    DemuxPacket* pkt = m_pSubtitleCatchupDemuxer->Read();
+    if (!pkt)
+      break;
+
+    // Bring raw demuxer timestamps onto the player's corrected timeline (same as
+    // CVideoPlayer::ReadPacket does for the main demuxer), so they match the
+    // cache keys and the playback clock.
+    UpdateCorrection(pkt, m_offset_pts);
+
+    const bool isWanted = pkt->iStreamId == streamId && pkt->pts != DVD_NOPTS_VALUE;
+    if (isWanted)
+      CacheSubtitlePacket(pkt); // copies into the cache + extends coverage
+
+    // Stop once any stream has advanced past the target (pts increase monotonically
+    // within the contiguous read).
+    const double ref = pkt->pts != DVD_NOPTS_VALUE ? pkt->pts : pkt->dts;
+    const bool passedTarget = ref != DVD_NOPTS_VALUE && ref > targetPts;
+    CDVDDemuxUtils::FreeDemuxPacket(pkt);
+    if (passedTarget)
+      break;
+  }
+
+  ReinjectSubtitlePackets(FindActiveSubtitlePackets(targetPts));
+}
+
+void CVideoPlayer::RecallSubtitlesAfterSeek(double startPts, double seekTimeMs)
+{
+  // Only embedded text subtitles; the cache must be for the current stream.
+  if (m_CurrentSubtitle.id < 0 || startPts == DVD_NOPTS_VALUE ||
+      m_subtitleSeekCacheStreamId != m_CurrentSubtitle.id)
+    return;
+
+  m_subtitleReinjectedPts.clear();
+
+  // Fast path (always on): the active event was already demuxed during playback.
+  std::vector<DemuxPacket*> active = FindActiveSubtitlePackets(startPts);
+  if (!active.empty())
+  {
+    CLog::Log(LOGDEBUG, "CVideoPlayer: subtitle seek-recall hit ({} event(s)) at {:.3f}s",
+              active.size(), startPts / DVD_TIME_BASE);
+    ReinjectSubtitlePackets(active);
+    return;
+  }
+
+  // Cache miss: the target is in never-demuxed territory (e.g. seeking back before
+  // a resume point). Reading it from the file competes for I/O, so it is gated by
+  // a setting (default on) and skipped if the cache is already low.
+  if (m_subtitleSeekRecallFromFile && !IsSubtitlePtsCovered(startPts))
+  {
+    CLog::Log(LOGDEBUG, "CVideoPlayer: subtitle seek-recall miss at {:.3f}s; reading from file",
+              startPts / DVD_TIME_BASE);
+    FetchActiveSubtitleFromFile(seekTimeMs, startPts, m_CurrentSubtitle.id);
+  }
 }
 
 CacheInfo CVideoPlayer::GetCachingTimes()
@@ -2806,6 +3107,7 @@ void CVideoPlayer::OnExit()
   m_pDemuxer.reset();
   m_pSubtitleDemuxer.reset();
   m_subtitleDemuxerMap.clear();
+  ClearSubtitleSeekCache();
   m_pCCDemuxer.reset();
   if (m_pInputStream.use_count() > 1)
     throw std::runtime_error("m_pInputStream reference count is greater than 1");
@@ -2878,6 +3180,7 @@ void CVideoPlayer::HandleMessages()
       m_pDemuxer.reset();
       m_pSubtitleDemuxer.reset();
       m_subtitleDemuxerMap.clear();
+      ClearSubtitleSeekCache();
       m_pCCDemuxer.reset();
       if (m_pInputStream.use_count() > 1)
         throw std::runtime_error("m_pInputStream reference count is greater than 1");
@@ -2965,6 +3268,12 @@ void CVideoPlayer::HandleMessages()
 
         FlushBuffers(start, msg.GetAccurate(), msg.GetSync());
         CLog::Log(LOGDEBUG, LOGVIDEO, "CVideoPlayer::HandleMessages: flush buffers: dts:{:.3f} lastSeek:{:.3f} clock:{:.3f}", start / 1000000., m_State.lastSeek / 1000000.0, m_clock.GetClock() / 1000000.0);
+
+        // The flush emptied the subtitle player; re-emit the event active at the
+        // target so an embedded text subtitle that began before the seek lands
+        // does not vanish until the next event. Coverage starts a fresh run here.
+        m_subtitleSeekNewRun = true;
+        RecallSubtitlesAfterSeek(start, time);
       }
       else if (m_pDemuxer)
       {
@@ -2976,6 +3285,7 @@ void CVideoPlayer::HandleMessages()
         m_State.dts = start;
 
         FlushBuffers(start, false, true);
+        m_subtitleSeekNewRun = true;
         if (m_playSpeed != DVD_PLAYSPEED_PAUSE)
         {
           SetPlaySpeed(DVD_PLAYSPEED_NORMAL);

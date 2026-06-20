@@ -27,6 +27,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <map>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -416,6 +417,19 @@ protected:
 
   int  AddSubtitleFile(const std::string& filename, const std::string& subfilename = "");
 
+  // Embedded text-subtitle seek-back recall: cache the selected text subtitle's
+  // packets during playback and re-emit the event active at the target after a
+  // seek (a cache miss falls back to a second demuxer on the same file). The
+  // active subtitle is otherwise lost because its block sits before the seek's
+  // keyframe landing. See docs/superpowers/specs/2026-06-20-embedded-sub-seekback-cache-design.md
+  void CacheSubtitlePacket(DemuxPacket* pPacket);
+  std::vector<DemuxPacket*> FindActiveSubtitlePackets(double pts);
+  bool IsSubtitlePtsCovered(double pts) const;
+  void ReinjectSubtitlePackets(const std::vector<DemuxPacket*>& packets);
+  void FetchActiveSubtitleFromFile(double seekTimeMs, double targetPts, int streamId);
+  void RecallSubtitlesAfterSeek(double startPts, double seekTimeMs);
+  void ClearSubtitleSeekCache();
+
   /*!
    * \brief Propagate enable stream callbacks to demuxers.
    * \param current The current stream
@@ -565,6 +579,31 @@ protected:
   std::shared_ptr<CDVDDemux> m_pSubtitleDemuxer;
   std::unordered_map<int64_t, std::shared_ptr<CDVDDemux>> m_subtitleDemuxerMap;
   std::unique_ptr<CDVDDemuxCC> m_pCCDemuxer;
+
+  // Seek-back recall for the selected embedded text subtitle. Packets are keyed
+  // by pts (corrected/clock timeline) so re-reads after a seek dedupe. Coverage
+  // is the set of contiguous pts ranges actually demuxed (a fresh run begins
+  // after each seek), so a real dialogue gap is distinguished from never-read
+  // territory; the latter falls back to m_pSubtitleCatchupDemuxer.
+  std::map<double, DemuxPacket*> m_subtitleSeekCache;
+  std::vector<std::pair<double, double>> m_subtitleSeekCovered;
+  // pts of events re-emitted by the last seek-recall. The demuxer re-reads from
+  // the keyframe and would deliver these again (on a non-accurate/keyframe seek
+  // CheckPlayerInit does not drop them), so the matching demuxed packet is
+  // suppressed once to avoid a doubled overlay.
+  std::vector<double> m_subtitleReinjectedPts;
+  bool m_subtitleSeekNewRun{true};
+  int m_subtitleSeekCurRun{-1};
+  int m_subtitleSeekCacheStreamId{-1};
+  int64_t m_subtitleSeekCacheDemuxerId{-1};
+  size_t m_subtitleSeekCacheBytes{0};
+  // The cache + reinject (fast path) is always on (free, zero extra I/O). This
+  // gates only the cache-miss fallback that reads from a second demuxer, since
+  // that competes for I/O and can disturb playback on slow storage; opt-in
+  // (default off).
+  bool m_subtitleSeekRecallFromFile{false};
+  std::shared_ptr<CDVDInputStream> m_pSubtitleCatchupInput;
+  std::shared_ptr<CDVDDemux> m_pSubtitleCatchupDemuxer;
 
   CRenderManager m_renderManager;
 

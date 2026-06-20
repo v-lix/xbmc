@@ -19656,6 +19656,14 @@ msgctxt "#60611"
 msgid "When enabled, Dolby Vision mode switching is suppressed for windowed video playback. This avoids HDMI handshakes during e.g. trailer previews in skins, but also prevents DV activation in video screensavers. Disable this if you want screensavers to trigger Dolby Vision."
 msgstr "Wenn aktiviert, wird der Dolby-Vision-Moduswechsel bei Videowiedergabe im Fenstermodus unterdrückt. Dies vermeidet HDMI-Handshakes z.B. bei Trailer-Vorschauen in Skins, verhindert aber auch die DV-Aktivierung in Video-Bildschirmschonern. Deaktivieren, wenn Bildschirmschoner Dolby Vision auslösen sollen."
 
+msgctxt "#60612"
+msgid "Read subtitles from file when seeking into unplayed parts"
+msgstr "Untertitel beim Springen in nicht abgespielte Bereiche aus der Datei lesen"
+
+msgctxt "#60613"
+msgid "Embedded text subtitles (ASS/SRT) that disappear after a seek are always restored for free from already-played video. This option additionally restores them when you seek into a part you have not played yet (for example seeking back before a resume point), by reading the subtitle from the file. That second read competes for I/O and is skipped if storage is too slow, but on a slow disk, USB drive or network share it can still briefly disturb playback, so it is off by default. Does not affect image subtitles (PGS/DVB) or external subtitle files."
+msgstr "Eingebettete Text-Untertitel (z. B. ASS, SRT), die nach einem Sprung verschwinden, werden immer kostenlos aus bereits abgespieltem Video wiederhergestellt. Diese Option stellt sie zusätzlich wieder her, wenn in einen noch nicht abgespielten Bereich gesprungen wird (z. B. zurück vor einen Fortsetzungspunkt), indem der Untertitel aus der Datei gelesen wird. Dieser zweite Lesevorgang konkurriert um die Datenträger-E/A und wird übersprungen, wenn der Speicher zu langsam ist; auf langsamen Festplatten, USB-Laufwerken oder Netzwerkfreigaben kann er die Wiedergabe dennoch kurz stören und ist daher standardmäßig deaktiviert. Betrifft keine Bild-Untertitel (PGS/DVB) oder externen Untertiteldateien."
+
 msgctxt "#60614"
 msgid "12-bit Deep Color pipeline"
 msgstr "12-Bit-Deep-Color-Pipeline"
