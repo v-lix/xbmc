@@ -3468,7 +3468,7 @@
           <constraints>
             <minimum>0</minimum>
             <step>1</step>
-            <maximum>200</maximum>
+            <maximum>300</maximum>
           </constraints>
           <control type="slider" format="integer">
             <format>{:d} %</format>
