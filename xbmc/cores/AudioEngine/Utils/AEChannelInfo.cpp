@@ -313,7 +313,10 @@ bool CAEChannelInfo::ContainsChannels(const CAEChannelInfo& rhs) const
 {
   for (unsigned int i = 0; i < rhs.m_channelCount; ++i)
   {
-    if (!HasChannel(rhs.m_channels[i]))
+    /* AE_CH_UNKNOWN1 is a placeholder/padding channel (e.g. an inactive slot in
+     * an ALSA channel map), not a real speaker - treat it as always contained so
+     * it never blocks a layout match. */
+    if (rhs.m_channels[i] != AE_CH_UNKNOWN1 && !HasChannel(rhs.m_channels[i]))
       return false;
   }
   return true;

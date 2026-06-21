@@ -417,6 +417,18 @@ std::string CAESinkALSA::ALSAchmapToString(snd_pcm_chmap_t* alsaMap)
   return std::string(buf);
 }
 
+unsigned int CAESinkALSA::ALSAchmapActiveCount(const snd_pcm_chmap_t& chmap)
+{
+  /* Count only real channels; SND_CHMAP_NA marks an inactive slot in a fixed
+   * hardware map (e.g. a 4-channel layout carried inside a 6-channel device).
+   * Matching on the active count lets us pick such a partial map exactly. */
+  unsigned int count = 0;
+  for (unsigned int i = 0; i < chmap.channels; ++i)
+    if (chmap.pos[i] != SND_CHMAP_NA)
+      ++count;
+  return count;
+}
+
 CAEChannelInfo CAESinkALSA::GetAlternateLayoutForm(const CAEChannelInfo& info)
 {
   CAEChannelInfo altLayout;
@@ -482,7 +494,7 @@ snd_pcm_chmap_t* CAESinkALSA::SelectALSAChannelMap(const CAEChannelInfo& info)
   for (snd_pcm_chmap_query_t* supportedMap = supportedMaps[i++];
        supportedMap; supportedMap = supportedMaps[i++])
   {
-    if (supportedMap->map.channels == info.Count())
+    if (ALSAchmapActiveCount(supportedMap->map) == info.Count())
     {
       CAEChannelInfo candidate = ALSAchmapToAEChannelMap(&supportedMap->map);
       const CAEChannelInfo* selectedInfo = &info;
@@ -841,6 +853,22 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
 
   if (selectedChmap)
   {
+    /* On Amlogic HDMI the driver programs the HDMI channel allocation in its
+     * chmap kcontrol put handler, but a set_chmap to the already-current map is
+     * ignored, so the put never runs. Bounce through the first advertised
+     * (stereo) map first so the set to the real map below always triggers it.
+     * Confined to AML HDMI to avoid perturbing other ALSA sinks. */
+    if (amlDeviceType != AML_NONE)
+    {
+      snd_pcm_chmap_query_t** maps = snd_pcm_query_chmaps(m_pcm);
+      if (maps)
+      {
+        if (maps[0])
+          snd_pcm_set_chmap(m_pcm, &maps[0]->map);
+        snd_pcm_free_chmaps(maps);
+      }
+    }
+
     /* failure is OK, that likely just means the selected chmap is fixed already */
     snd_pcm_set_chmap(m_pcm, selectedChmap);
     free(selectedChmap);
