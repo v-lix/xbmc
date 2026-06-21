@@ -463,7 +463,14 @@ void CDVDSubtitlesLibass::UpdateRenderCache(int64_t ptsMs)
     }
   }
 
-  if (dynamic || until <= ptsMs)
+  // Only cache when the interval is bounded above by a real event boundary.
+  // After a flush the track is empty (and past the last subtitle no event lies
+  // ahead), so the loop leaves until == max(): caching that would mark the
+  // render valid over the whole remaining timeline with the current (usually
+  // empty) image. The flush on a backward seek cannot keep that dropped - the
+  // very next render rebuilds it - so it would mask later lines until a demuxed
+  // event happens to invalidate it. This completes the on-seek flush (62c3d3f0).
+  if (dynamic || until <= ptsMs || until == std::numeric_limits<int64_t>::max())
   {
     m_renderCacheValid = false;
   }
