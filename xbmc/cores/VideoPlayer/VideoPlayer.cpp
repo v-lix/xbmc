@@ -2096,24 +2096,17 @@ void CVideoPlayer::FetchActiveSubtitleFromFile(double seekTimeMs, double targetP
     m_pSubtitleCatchupDemuxer = demux;
   }
 
-  // Don't pile a second reader onto storage that was already struggling before
-  // the seek. This mirrors the spirit of the L5 active-area detector's cache-aware
-  // throttle (961a1a730b); the level here is the pre-seek value (this runs on the
-  // Process thread, which won't update it again until we return), so it only gates
-  // the start - the wall-clock budget below is what bounds the cost once reading.
-  constexpr int kRecallCacheFloorPct = 50;
-  if (m_State.caching || GetCacheLevel() < kRecallCacheFloorPct)
-  {
-    CLog::Log(LOGDEBUG,
-              "CVideoPlayer: subtitle seek-recall fallback skipped (caching={}, cache={}%)",
-              m_State.caching, GetCacheLevel());
-    return;
-  }
+  // No cache-level pre-check here: this runs straight after FlushBuffers /
+  // SetCaching(CACHESTATE_FLUSH), so the player is always in the caching state
+  // with level 0 at this point - a pre-check would skip the fallback every time
+  // (it did). The wall-clock budget below is the real guard: it bounds how long
+  // this synchronous read can hold up playback on slow storage, regardless.
 
   // Read from a window before the target so an event that began earlier (a long
   // sign) is still seen; the backward seek lands on the video keyframe <= that,
-  // so the effective reach is >= the window.
-  constexpr double CATCHUP_WINDOW_MS = 30000.0;
+  // so the effective reach is >= the window. Kept modest so the bounded read can
+  // actually finish - dialogue events are short.
+  constexpr double CATCHUP_WINDOW_MS = 10000.0;
   double from = seekTimeMs - CATCHUP_WINDOW_MS;
   if (from < 0)
     from = 0;
