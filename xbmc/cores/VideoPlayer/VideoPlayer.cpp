@@ -2120,6 +2120,8 @@ void CVideoPlayer::FetchActiveSubtitleFromFile(double seekTimeMs, double targetP
   // skipped - best-effort, never a stall.
   constexpr int MAX_PACKETS = 8000;
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(700);
+  int wanted = 0;
+  bool reachedTarget = false;
   for (int i = 0; i < MAX_PACKETS; ++i)
   {
     if (std::chrono::steady_clock::now() >= deadline)
@@ -2139,7 +2141,10 @@ void CVideoPlayer::FetchActiveSubtitleFromFile(double seekTimeMs, double targetP
 
     const bool isWanted = pkt->iStreamId == streamId && pkt->pts != DVD_NOPTS_VALUE;
     if (isWanted)
+    {
       CacheSubtitlePacket(pkt); // copies into the cache + extends coverage
+      ++wanted;
+    }
 
     // Stop once any stream has advanced past the target (pts increase monotonically
     // within the contiguous read).
@@ -2147,10 +2152,36 @@ void CVideoPlayer::FetchActiveSubtitleFromFile(double seekTimeMs, double targetP
     const bool passedTarget = ref != DVD_NOPTS_VALUE && ref > targetPts;
     CDVDDemuxUtils::FreeDemuxPacket(pkt);
     if (passedTarget)
+    {
+      reachedTarget = true;
       break;
+    }
   }
 
-  ReinjectSubtitlePackets(FindActiveSubtitlePackets(targetPts));
+  auto active = FindActiveSubtitlePackets(targetPts);
+  ReinjectSubtitlePackets(active);
+  if (active.empty())
+  {
+    // Still nothing active: distinguish a genuine dialogue gap at the target from
+    // an event that began before the read window (a long sign). Log the cached
+    // events bracketing the target.
+    double prevS = -1.0, prevE = -1.0, nextS = -1.0;
+    auto next = m_subtitleSeekCache.lower_bound(targetPts);
+    if (next != m_subtitleSeekCache.end())
+      nextS = next->first / DVD_TIME_BASE;
+    if (next != m_subtitleSeekCache.begin())
+    {
+      auto prev = std::prev(next);
+      prevS = prev->first / DVD_TIME_BASE;
+      prevE = (prev->second->duration > 0 ? prev->first + prev->second->duration : prev->first) /
+              DVD_TIME_BASE;
+    }
+    CLog::Log(LOGDEBUG,
+              "CVideoPlayer: subtitle seek-recall fallback no active event at {:.3f}s "
+              "(reachedTarget={}, read {} events, prev [{:.3f}..{:.3f}]s, next {:.3f}s, cache {})",
+              targetPts / DVD_TIME_BASE, reachedTarget, wanted, prevS, prevE, nextS,
+              m_subtitleSeekCache.size());
+  }
 }
 
 void CVideoPlayer::RecallSubtitlesAfterSeek(double startPts, double seekTimeMs)
