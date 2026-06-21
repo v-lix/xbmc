@@ -1,7 +1,11 @@
 # Embedded text-subtitle seek-back recall (hybrid cache + secondary demuxer)
 
-Date: 2026-06-20
-Status: design approved (panni), pre-implementation
+Date: 2026-06-20 (updated 2026-06-21 to as-built)
+Status: implemented. Fast path confirmed on-device (nissel, 5/5 seeks); file-read
+fallback runs and works for the common case, one edge (long sign before the read
+window) pending a diagnostic log. Commits on `aml-4.9-21.3_dev` (not pushed):
+`abc78ace2c` cache+reinject, `3837177203` libass track flush, `852839f74a` fallback
+guard fix, `bd2e1f1288` setting help, `53e0b8639f` fallback diagnostic log.
 Scope: Kodi (`/home/panni/xbmc`, branch `aml-4.9-21.3_dev`)
 
 ## Problem
@@ -29,9 +33,16 @@ only fires on subtitle *stream change*, not on plain seeks. An earlier rolling-
 window packet cache failed for **PGS image subs** on BD — not relevant here since
 this is text-only and a full (not windowed) cache.
 
-The render-cache invalidation commit `62c3d3f02a` is a separate, already-confirmed
-bug (pts-keyed libass render cache surviving a seek). It stays; it is unrelated to
-this fix.
+**Second root layer (found during on-device testing — see component 6).** Even
+once the active line is re-fed, the *retained* libass track stops rendering after a
+backward seek: its event / prune / read-order state is stuck on the pre-seek
+timeline, so neither the re-emitted line nor subsequently demuxed events render —
+recoverable only by a fresh `ass_new_track` (which today only a subtitle stream
+switch triggers). The earlier render-cache-only flush (`62c3d3f02a`,
+`FlushRenderCache`) was **not** enough. Fix: `CDVDOverlayCodecSSA::Flush()` now
+calls `m_libass->FlushEvents()` (`ass_flush_events` + render-cache invalidation),
+clearing the track on every seek = the fresh-track state. This supersedes
+`62c3d3f02a` (still in tree, now redundant).
 
 ## Approach: hybrid
 
@@ -117,15 +128,25 @@ cache clear.
 - `std::vector<DemuxPacket*> FetchActiveSubtitleFromFile(double T, int streamId)`:
   - Same physical file → same stream indices; target the same subtitle stream id.
   - `SeekTime(T - CATCHUP_WINDOW, true /*backward*/)` on the secondary demuxer
-    (`CATCHUP_WINDOW = 60s`; backward seek lands on the video keyframe ≤ that, so
-    effective reach is ≥ window).
+    (`CATCHUP_WINDOW = 10s` as-built; backward seek lands on the video keyframe ≤
+    that, so effective reach is ≥ window). The window is the fundamental knob:
+    Matroska stores each line's end *inside* the block at its start, so to find a
+    line active at T you must read back to its start — a sign longer than the
+    window is missed. Larger window = more coverage but the near-T line is read
+    last, so a budget abort on slow storage misses it.
   - `Read()` forward, keeping only packets of `streamId`; apply
     `UpdateCorrection(pkt, m_offset_pts)` (secondary packets are raw); collect
     those with `pts ≤ T < pts + duration`. Stop once `pts > T`.
   - Also insert collected packets into `m_subtitleSeekCache` + extend coverage, so
     nearby subsequent seeks become fast-path hits.
-  - Cap the read loop (packet count / time budget) so a pathological file cannot
-    spin.
+  - **Guards (as-built):** a **700 ms wall-clock budget** + an 8000-packet cap bound
+    the synchronous read so it can't stall playback on slow storage; on abort the
+    recall is simply skipped (best-effort). There is **no** cache-level pre-check —
+    an earlier one (`m_State.caching || GetCacheLevel()<50`) ran right after
+    `SetCaching(CACHESTATE_FLUSH)`, where the player is *always* caching at 0%, so it
+    skipped the fallback 100% of the time (`852839f74a` removed it).
+  - If nothing is active after the read, a debug line logs the events bracketing T
+    (`53e0b8639f`) to tell long-sign-before-window from a genuine gap.
 - Lifecycle: created lazily, kept alive for the file, reset on file open/close.
 
 ### 4. Text-vs-image codec gate
@@ -150,6 +171,17 @@ In `HandleMessages`, `PLAYER_SEEK` case, **after** `FlushBuffers(start, ...)`:
 Threading: `ProcessSubData` (fill) and `HandleMessages` (reinject/fetch) both run on
 `CVideoPlayer::Process()` — single thread, **no locking**.
 
+### 6. libass track flush on seek (render re-engage — the key fix)
+`CDVDOverlayCodecSSA::Flush()` (invoked on every seek via `CVideoPlayerSubtitle::Flush()`
+→ `GENERAL_FLUSH`) now calls `m_libass->FlushEvents()` (clears the track's events +
+read-order bitmap and invalidates the render cache) instead of the earlier
+render-cache-only `FlushRenderCache()`. Without this the retained track does not
+re-render after a backward seek (second root layer above). Clearing the track would
+normally lose the on-screen line, but the reinject (components 1/5) restores the
+line active at the target and the dup-suppression (2b) stops the re-demux double —
+so the track is fresh *and* the current line is back. Only affects embedded SSA;
+external ASS uses a separate libass via the file parser.
+
 ## Timestamps
 Cached packets are captured in `ProcessSubData`, i.e. after `ReadPacket` applied
 `UpdateCorrection(pkt, m_offset_pts)` — they are on the corrected/clock timeline,
@@ -165,10 +197,10 @@ safe on any storage, so there is no reason to gate it.
 
 Only the **cache-miss file-read fallback** (the second demuxer) is gated, by
 `coreelec.subtitles.recallfromfile` (boolean, label/help #60612/#60613), **default
-OFF**. That path competes for I/O and, despite the cache pre-check + wall-clock
-budget, can briefly disturb playback on slow disk/USB/network — so it is opt-in.
-The member `m_subtitleSeekRecallFromFile` is read from the setting in
-`OpenInputStream()`.
+OFF**. That path competes for I/O and, despite the wall-clock budget, can briefly
+disturb playback on slow disk/USB/network — so it is opt-in. The member
+`m_subtitleSeekRecallFromFile` is read from the setting in `OpenInputStream()`,
+i.e. **at playback start** — toggling it mid-playback needs a replay to take effect.
 
 ## Non-goals / known limitations
 - **PGS / image subs**: out of scope; unchanged.
@@ -195,8 +227,11 @@ No subtitle unit-test harness exists in-tree. Verification = on-device A/B (pann
 5. Watch for: no double-free/leak on close; no playback hitch beyond a brief,
    bounded pause on the rare secondary-fetch.
 
-## Files (anticipated)
-- `xbmc/cores/VideoPlayer/VideoPlayer.h` — members + method decls.
-- `xbmc/cores/VideoPlayer/VideoPlayer.cpp` — cache, reinject, secondary fetch,
-  `ProcessSubData` fill hook, `PLAYER_SEEK` recall hook, lifecycle clears, gate.
-- `xbmc/settings/...` + strings — the toggle (if kept).
+## Files (as-built)
+- `xbmc/cores/VideoPlayer/VideoPlayer.h` / `.cpp` — cache, reinject, dup-suppression,
+  secondary fetch + guards, `ProcessSubData` fill hook, `PLAYER_SEEK` recall hook,
+  lifecycle clears, setting read.
+- `xbmc/cores/VideoPlayer/DVDCodecs/Overlay/DVDOverlayCodecSSA.cpp` — `Flush()` →
+  `m_libass->FlushEvents()` (component 6, the render re-engage fix).
+- `xbmc/settings/Settings.h` + `system/settings/settings.xml` + en_gb/de_de
+  `strings.po` (#60612/#60613) — the `coreelec.subtitles.recallfromfile` toggle.
