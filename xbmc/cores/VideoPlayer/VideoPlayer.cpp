@@ -2409,6 +2409,51 @@ void CVideoPlayer::HandlePlaySpeed()
           }
         }
       }
+
+      // Video feed/drain WEDGE recovery. Distinct from the IsStalled()/buffering
+      // cases above (those have an EMPTY input queue): here the decoder INPUT is
+      // saturated (byte buffer full, !AcceptsData) yet no decoded frame has
+      // reached the screen for a while (render pts frozen) while we are playing.
+      // That is the Amlogic single-thread feed/drain deadlock -- VideoPlayerVideo
+      // is spun inside AddData on codec_write EAGAIN so it never drains
+      // GetPicture; audio and the clock run on. GetFramePts() is the right probe:
+      // it is written only by the render present path, so it freezes exactly when
+      // the pipeline wedges and is not owned by the stuck decode thread. Recover
+      // with the same accurate+sync reseek the audio-stall path uses --
+      // FlushBuffers Abort()s the codec, which trips m_abort and breaks AddData's
+      // spin so the flush completes (this is how a manual seek already recovers
+      // it), giving a clean A/V resync instead of the codec's own loop==100
+      // video-only reset (which leaves audio ahead -> a 2-10x catch-up).
+      {
+        const double rpts = m_renderManager.GetFramePts();
+        const bool saturated =
+            m_CurrentVideo.id >= 0 && m_CurrentVideo.inited &&
+            m_CurrentVideo.syncState == IDVDStreamPlayer::SYNC_INSYNC &&
+            !m_VideoPlayerVideo->AcceptsData();
+
+        if (!saturated || rpts == DVD_NOPTS_VALUE || rpts != m_videoWedgePts)
+        {
+          // output advancing, not rendering yet, or input not saturated: re-arm
+          m_videoWedgePts = rpts;
+          m_videoWedgeStart = std::chrono::steady_clock::now();
+        }
+        else if (std::chrono::steady_clock::now() - m_videoWedgeStart >
+                 std::chrono::milliseconds(2000))
+        {
+          CLog::Log(LOGWARNING,
+                    "CVideoPlayer::HandlePlaySpeed - video output wedged (input "
+                    "full, render pts frozen at {:.3f}s for >2s) - reseeking to recover",
+                    rpts / DVD_TIME_BASE);
+          m_videoWedgePts = DVD_NOPTS_VALUE; // disarm; re-arms next pass
+          FlushBuffers(DVD_NOPTS_VALUE, true, true);
+          CDVDMsgPlayerSeek::CMode mode;
+          mode.time = (int)GetUpdatedTime();
+          mode.backward = false;
+          mode.accurate = true;
+          mode.sync = true;
+          m_messenger.Put(std::make_shared<CDVDMsgPlayerSeek>(mode));
+        }
+      }
     }
   }
 

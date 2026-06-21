@@ -640,6 +640,11 @@ protected:
   bool m_brokenFileNotified = false;
   bool m_brokenFileStallStarveLogged = false;
 
+  // Video feed/drain wedge recovery (see HandlePlaySpeed): the render pts last
+  // seen while the video input byte-buffer was full, and when it froze.
+  double m_videoWedgePts = DVD_NOPTS_VALUE;
+  std::chrono::steady_clock::time_point m_videoWedgeStart;
+
   CEdl m_Edl;
   bool m_SkipCommercials;
 
