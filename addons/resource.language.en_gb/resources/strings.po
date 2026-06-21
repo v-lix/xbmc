@@ -26737,7 +26737,7 @@ msgstr ""
 #. Help text for subtitle seek-recall file-read fallback setting
 #: system/settings/settings.xml
 msgctxt "#60613"
-msgid "Embedded text subtitles (e.g. ASS, SRT) that disappear after a seek are always restored for free from already-played video. This option additionally restores them when you seek into a part you have not played yet (for example seeking back before a resume point), by reading the subtitle from the file. That second read competes for I/O and is skipped if storage is too slow, but on a slow disk, USB drive or network share it can still briefly disturb playback, so it is off by default. Does not affect image subtitles (PGS/DVB) or external subtitle files."
+msgid "Embedded text subtitles (e.g. ASS, SRT) that disappear after a seek are always restored for free from already-played video. This option additionally restores them when you seek into a part you have not played yet (for example seeking back before a resume point), by reading the subtitle from the file. That second read competes for I/O; it is time-limited so it cannot stall playback, but on a slow disk, USB drive or network share it may briefly disturb playback or not finish in time, so it is off by default. Does not affect image subtitles (PGS/DVB) or external subtitle files."
 msgstr ""
 
 msgctxt "#60614"
