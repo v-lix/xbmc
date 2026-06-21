@@ -21370,7 +21370,7 @@ msgstr ""
 #. Description of setting with label #14126 "Whitelist"
 #: system/settings/settings.xml
 msgctxt "#36443"
-msgid "Whitelisted modes give the user the control to choose which display modes are allowed or not allowed to be used"
+msgid "Sets which display modes (resolution and refresh rate) Kodi is allowed to switch to during video playback. When a video's resolution and frame rate match a mode on this list, it is sent to the display at native resolution and refresh rate (no scaling or frame-rate conversion); otherwise Kodi falls back to the closest available mode and scales / frame-rate-converts to fit. Leave the list empty to let Kodi choose automatically from all modes at or above the desktop resolution. Has no effect unless \"Adjust display refresh rate\" is enabled."
 msgstr ""
 
 #. Description of setting with label #14127 "Whitelist"
