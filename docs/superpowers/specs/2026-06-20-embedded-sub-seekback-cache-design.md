@@ -1,11 +1,14 @@
 # Embedded text-subtitle seek-back recall (hybrid cache + secondary demuxer)
 
 Date: 2026-06-20 (updated 2026-06-21 to as-built)
-Status: implemented. Fast path confirmed on-device (nissel, 5/5 seeks); file-read
-fallback runs and works for the common case, one edge (long sign before the read
-window) pending a diagnostic log. Commits on `aml-4.9-21.3_dev` (not pushed):
-`abc78ace2c` cache+reinject, `3837177203` libass track flush, `852839f74a` fallback
-guard fix, `bd2e1f1288` setting help, `53e0b8639f` fallback diagnostic log.
+Status: implemented; embedded seek-back subtitle loss **CONFIRMED FIXED on-device**
+(nissel). **Three** root layers, all addressed (see below). Commits on
+`aml-4.9-21.3_dev` (not pushed): `abc78ace2c` cache+reinject, `3837177203` libass
+track flush, `852839f74a` fallback guard fix, `bd2e1f1288` setting help,
+`53e0b8639f` fallback diagnostic log, `9bdfe6111f` render-cache empty-track guard,
+and the prune-disable fix ("Subtitles: stop pruning libass events" — SHA shifts
+once the temporary per-event decode-diagnostic commit is dropped, so re-check
+`git log` for the current hash).
 Scope: Kodi (`/home/panni/xbmc`, branch `aml-4.9-21.3_dev`)
 
 ## Problem
@@ -43,6 +46,22 @@ switch triggers). The earlier render-cache-only flush (`62c3d3f02a`,
 calls `m_libass->FlushEvents()` (`ass_flush_events` + render-cache invalidation),
 clearing the track on every seek = the fresh-track state. This supersedes
 `62c3d3f02a` (still in tree, now redundant).
+
+**Third root layer (the actual cause of the persistent "~30s missing then returns"
+reports — found via the per-event decode diagnostic + the pinned libass source).**
+libass auto-prunes events inside `ass_render_frame` via
+`ass_prune_events(now − prune_delay)` (`ass_render.c:3437`), keyed on the **render
+clock**. After a backward seek the demuxer read-ahead bursts the upcoming lines into
+the track, but a subtitle render can fire while the video clock still holds the
+**old pre-seek position** (log: `Clock:747.852` right after seeking to 632 s, before
+the `GENERAL_RESYNC`). That stale-ahead deadline (`now − 10 s`) deletes every
+just-decoded event ending before it; the demuxer will not re-deliver them, so
+subtitles stay blank from the landing until playback reaches a line decoded *after*
+the clock corrected (visible duration ∝ the backward-jump size; fast-path hits land
+in dense dialogue so recovery is ~2 s and went unnoticed). Fix: **disable pruning**
+(component 7). The render cache (`96e2dfe8`) was the prime suspect and was
+**exonerated** — its empty-track interval was a real latent bug (fixed, component 7)
+but it self-corrects on the next decode and never caused the loss.
 
 ## Approach: hybrid
 
@@ -182,6 +201,22 @@ line active at the target and the dup-suppression (2b) stops the re-demux double
 so the track is fresh *and* the current line is back. Only affects embedded SSA;
 external ASS uses a separate libass via the file parser.
 
+### 7. libass prune disabled + render-cache empty-track guard (the seek-loss fix)
+- **Prune disabled** (`DecodeHeader`): `ass_configure_prune()` is deliberately not
+  called, so libass keeps all events until the track is flushed/freed. Removes the
+  third root layer: a stale post-seek render clock can no longer delete upcoming
+  events. Memory is still bounded — flush-on-seek clears the track every seek, and an
+  un-seeked track only grows by the file's total event count (~a few thousand,
+  ~1 MB). Reverts the speculative `181f808b3c` enable; libass's own default is no
+  pruning. Independent of the recall setting (any backward seek hits the prune).
+- **Render-cache empty-track guard** (`UpdateRenderCache`, `9bdfe6111f`): never mark
+  the pts-keyed render cache valid over an interval not bounded above by a real event
+  (`until == INT64_MAX`, i.e. an empty or past-the-last-subtitle track). Completes the
+  on-seek flush (`62c3d3f02a`): the flush invalidated the cache, but the next render
+  on the just-flushed empty track re-armed it over `[MIN, MAX]` with a NULL image.
+  Latent on its own (self-corrects on the next decode) but correct to fix, and it
+  also stops the stale-clock render from caching a blank frame.
+
 ## Timestamps
 Cached packets are captured in `ProcessSubData`, i.e. after `ReadPacket` applied
 `UpdateCorrection(pkt, m_offset_pts)` — they are on the corrected/clock timeline,
@@ -201,6 +236,29 @@ OFF**. That path competes for I/O and, despite the wall-clock budget, can briefl
 disturb playback on slow disk/USB/network — so it is opt-in. The member
 `m_subtitleSeekRecallFromFile` is read from the setting in `OpenInputStream()`,
 i.e. **at playback start** — toggling it mid-playback needs a replay to take effect.
+
+## Scope (what runs when) — verified against the gates
+
+- **Components 1–5 (cache / reinject / secondary demuxer): embedded text subtitle
+  only.** The fill hook requires `STREAM_SOURCE_MASK(source) == STREAM_SOURCE_DEMUX
+  && IsCachableTextSubtitle(codec)`; the recall hook early-returns unless the cache
+  belongs to the current `m_CurrentSubtitle`. External subs (added via
+  `AddSubtitleFile` → `STREAM_SOURCE_DEMUX_SUB` (0x300), or `STREAM_SOURCE_TEXT`
+  (0x400)) fail the `== STREAM_SOURCE_DEMUX` (0x100) gate, so they never populate the
+  cache and the recall (incl. the **secondary demuxer**, only reachable past that
+  early-return) never fires for them — an external SRT spawns no second demuxer.
+  Image subs (PGS/DVB/DVD → `CDVDOverlayCodecFFmpeg`, not cachable) and no-subtitle
+  playback likewise run none of it.
+- **Component 6 (`FlushEvents`): embedded SSA/ASS only** — it lives in
+  `CDVDOverlayCodecSSA::Flush()`, the embedded codec; external ASS uses the file
+  parser (`Reset()` on seek), not this codec.
+- **Component 7 (prune disabled + render-cache guard): all libass rendering.**
+  `CDVDSubtitlesLibass` is shared by the embedded SSA codec, the external ASS parser
+  (`DVDSubtitleParserSSA`), and `SubtitlesAdapter` (external SRT/VTT → libass), so 7
+  applies to embedded *and* external libass tracks. This is intentional and safe: the
+  stale-clock prune and the empty-track cache hit external ASS too, the memory
+  argument is identical, and the code is inert when no libass track exists (no
+  subtitle, or image subs on the FFmpeg overlay codec — untouched).
 
 ## Non-goals / known limitations
 - **PGS / image subs**: out of scope; unchanged.
@@ -233,5 +291,9 @@ No subtitle unit-test harness exists in-tree. Verification = on-device A/B (pann
   lifecycle clears, setting read.
 - `xbmc/cores/VideoPlayer/DVDCodecs/Overlay/DVDOverlayCodecSSA.cpp` — `Flush()` →
   `m_libass->FlushEvents()` (component 6, the render re-engage fix).
+- `xbmc/cores/VideoPlayer/DVDSubtitles/DVDSubtitlesLibass.cpp` — component 7: prune
+  disabled in `DecodeHeader`, empty-track guard in `UpdateRenderCache`. NB this is the
+  **shared** libass wrapper (embedded SSA *and* external ASS), so component 7 applies
+  to both; components 1–6 (recall) are embedded-text only — see Scope note below.
 - `xbmc/settings/Settings.h` + `system/settings/settings.xml` + en_gb/de_de
   `strings.po` (#60612/#60613) — the `coreelec.subtitles.recallfromfile` toggle.

@@ -183,11 +183,16 @@ bool CDVDSubtitlesLibass::DecodeHeader(char* data, int size)
 
   ass_process_codec_private(m_track, data, size);
 
-#if LIBASS_VERSION >= 0x01704000
-  // Automatically prune events that ended more than 10s ago.
-  // This keeps memory bounded for long playback with many subtitle events.
-  ass_configure_prune(m_track, 10000);
-#endif
+  // NOTE: ass_configure_prune() is deliberately NOT enabled. libass prunes via
+  // ass_render_frame(now - prune_delay), keyed on the render clock. Right after
+  // a backward seek the render clock can briefly still hold the OLD pre-seek
+  // position before it resyncs; with prune on, that stale-ahead clock deletes
+  // the freshly decoded upcoming events the demuxer just delivered (and will not
+  // re-deliver), blanking subtitles for ~the jump distance until playback
+  // reaches a line decoded after the clock corrected. Flush-on-seek
+  // (FlushEvents) already resets the track every seek, and an un-seeked track
+  // only grows by the file's total event count (~a few thousand at most), so
+  // the bounded-memory benefit pruning gave is negligible next to that hazard.
 
   return true;
 }
