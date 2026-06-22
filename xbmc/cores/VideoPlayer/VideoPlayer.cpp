@@ -1885,9 +1885,16 @@ void CVideoPlayer::ProcessSubData(CDemuxStream* pStream, DemuxPacket* pPacket)
   if (CheckSceneSkip(m_CurrentSubtitle))
     drop = true;
 
-  // Suppress (from delivery only) a packet that re-reads an event the last seek
-  // already re-emitted, so it is not added to the overlay a second time. Matched
-  // once, then forgotten. The packet is still cached below.
+  // Drop from delivery a packet that re-reads an event the last seek already
+  // re-emitted, so it is not added a second time. NOTE: the subtitle player
+  // ignores the message drop flag, so flagging the packet is not enough - it must
+  // not be handed over at all. Both ASS and SubRip render via libass, but the add
+  // paths differ: the SSA codec uses ass_process_chunk, which dedups re-reads by
+  // the file's ReadOrder (so this stayed invisible for ASS); SubRip/text goes
+  // through CSubtitlesAdapter::AddEvent, which allocates a fresh event with no
+  // dedup, so a delivered re-read becomes a visible second copy. Matched once,
+  // then forgotten. The packet is still cached below.
+  bool suppressDup = false;
   if (!m_subtitleReinjectedPts.empty() && pPacket->pts != DVD_NOPTS_VALUE &&
       m_subtitleSeekCacheStreamId == m_CurrentSubtitle.id)
   {
@@ -1896,7 +1903,7 @@ void CVideoPlayer::ProcessSubData(CDemuxStream* pStream, DemuxPacket* pPacket)
                            [&](double p) { return std::abs(p - pPacket->pts) < eps; });
     if (it != m_subtitleReinjectedPts.end())
     {
-      drop = true;
+      suppressDup = true;
       m_subtitleReinjectedPts.erase(it);
       // TEMP (doubled-subtitle-on-seek diagnostic): re-read matched a reinjected line.
       CLog::Log(LOGDEBUG, "CVideoPlayer: subtitle re-read suppressed at {:.3f}s",
@@ -1934,7 +1941,10 @@ void CVideoPlayer::ProcessSubData(CDemuxStream* pStream, DemuxPacket* pPacket)
     CacheSubtitlePacket(pPacket);
   }
 
-  m_VideoPlayerSubtitle->SendMessage(std::make_shared<CDVDMsgDemuxerPacket>(pPacket, drop));
+  if (suppressDup)
+    CDVDDemuxUtils::FreeDemuxPacket(pPacket); // own it; free since we won't deliver it
+  else
+    m_VideoPlayerSubtitle->SendMessage(std::make_shared<CDVDMsgDemuxerPacket>(pPacket, drop));
 
   if(m_pInputStream && m_pInputStream->IsStreamType(DVDSTREAM_TYPE_DVD))
     m_VideoPlayerSubtitle->UpdateOverlayInfo(std::static_pointer_cast<CDVDInputStreamNavigator>(m_pInputStream), LIBDVDNAV_BUTTON_NORMAL);

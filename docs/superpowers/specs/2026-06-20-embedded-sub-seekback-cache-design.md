@@ -127,16 +127,21 @@ re-added.
   **Never** on flush/seek.
 
 ### 2b. Re-read duplicate suppression
-`CDVDOverlayCodecSSA::Decode` renumbers each event's libass ReadOrder from its own
-counter, so libass cannot dedup a reinjected event against the demuxer's own
-re-read of it. On an accurate seek `CheckPlayerInit` drops the re-read (dts <
-startpts), but on a keyframe-accurate (fast) seek — default on — it does not, so
-the event would be added twice → doubled overlay. Mitigation: `ReinjectSubtitlePackets`
-records each re-emitted event's pts in `m_subtitleReinjectedPts`; `ProcessSubData`
-drops (from delivery only — still cached) the first demuxed packet whose pts
-matches, then forgets it. Gated on the cache belonging to the current stream so it
-cannot false-match on a different (e.g. image) subtitle. Cleared each seek and on
-cache clear.
+On a keyframe-accurate (fast) seek — default on — the demuxer re-reads the event
+the recall just reinjected, so it would be added a second time. Key gotcha: the
+subtitle player (`CVideoPlayerSubtitle::SendMessage`) **ignores the message `drop`
+flag** and decodes every packet, so merely flagging the re-read does nothing. Both
+ASS and SubRip render via libass, but the *add* paths differ: the SSA codec adds
+with `ass_process_chunk`, which dedups re-reads by the file's ReadOrder (so this
+stays invisible for ASS); SubRip/text (`CDVDOverlayCodecText` → `CSubtitlesAdapter`
+→ `CDVDSubtitlesLibass::AddEvent`) allocates a fresh event with no dedup, so the
+re-read renders as a visible second copy (confirmed on a SubRip file, log dokikamori).
+Fix: `ReinjectSubtitlePackets` records each re-emitted event's pts in
+`m_subtitleReinjectedPts`; `ProcessSubData` matches the first re-demuxed packet
+within 1 ms and **frees it instead of delivering it** (still caching a copy), then
+forgets the entry — so the duplicate never reaches the overlay container at all.
+Gated on the cache belonging to the current stream so it cannot false-match a
+different (e.g. image) subtitle. Cleared each seek and on cache clear.
 
 ### 3. Secondary subtitle-only demuxer
 - `std::shared_ptr<CDVDDemuxFFmpeg> m_pSubtitleCatchupDemuxer` +
