@@ -771,6 +771,16 @@ static void schedule_tv_preset_apply(int preset)
 // run time, so bursts (e.g. a TV-preset apply writing several settings)
 // coalesce into one write and scheduling order is irrelevant.
 static std::atomic<bool> s_vsvdb_apply_scheduled{false};
+// True while the deferred VSVDB recompute is writing its derived settings
+// (DV_VSVDB_CS / DV_VSVDB_MAX_LUM, both registered callbacks). Like
+// s_applying_tv_preset, this suppresses the flip-to-Manual guard: the recompute
+// is programmatic, not a user edit. Critically it also closes the reset-time
+// hole — a TV-preset apply writes DV mode/type, which schedules this recompute;
+// that recompute runs *after* both s_applying_tv_preset and
+// s_tv_preset_apply_scheduled have cleared, so without this flag its CS/MaxLum
+// write would trip the guard and flip the just-applied preset back to Manual
+// (the "reset needs two clicks" bug).
+static std::atomic<bool> s_applying_vsvdb{false};
 static void schedule_vsvdb_payload_apply()
 {
   if (s_vsvdb_apply_scheduled.exchange(true)) return;
@@ -787,7 +797,9 @@ static void schedule_vsvdb_payload_apply()
         settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
     int max_lum_nits_value(
         settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VSVDB_MAX_LUM));
+    s_applying_vsvdb = true;
     set_vsvdb_payload_ver(dv_type, max_lum_nits_value, source_max_pq);
+    s_applying_vsvdb = false;
   }).detach();
 }
 
@@ -896,11 +908,16 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
 
   // Any direct user edit of a DV setting (not driven by a preset apply) invalidates
   // the preset state — flip it to Manual so the label doesn't misrepresent what's active.
-  // Suppressed while a preset apply is in flight (either currently running, or scheduled
-  // and waiting for the current event — e.g. a reset — to finish before it writes).
-  if (!s_applying_tv_preset && !s_tv_preset_apply_scheduled.load() &&
+  // Suppressed while a preset apply is in flight (currently running, or scheduled and
+  // waiting for the current event — e.g. a reset — to finish before it writes) and while
+  // the deferred VSVDB recompute writes its derived settings — that recompute is triggered
+  // by the preset apply's own mode/type writes and lands after the two preset flags clear,
+  // so without s_applying_vsvdb it would flip the just-applied preset back to Manual.
+  if (!s_applying_tv_preset && !s_tv_preset_apply_scheduled.load() && !s_applying_vsvdb.load() &&
       settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TV_PRESET) != TV_PRESET_MANUAL)
   {
+    CLog::Log(LOGINFO,
+      "CDolbyVisionAML::OnSettingChanged - flipping tv.preset -> Manual (trigger={})", settingId);
     settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TV_PRESET, TV_PRESET_MANUAL);
   }
 
