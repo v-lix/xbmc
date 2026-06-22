@@ -645,6 +645,11 @@ protected:
   double m_videoWedgePts = DVD_NOPTS_VALUE;
   std::chrono::steady_clock::time_point m_videoWedgeStart;
 
+  // HandlePlaySpeed: bounded wait for a real start PTS before anchoring the
+  // master clock after a (re)sync, so a transient all-NOPTS start (e.g. a
+  // spurious post-seek VC_EOF on Amlogic) does not pin the clock to 0. Reset on flush.
+  std::chrono::steady_clock::time_point m_syncStartPtsWait{};
+
   CEdl m_Edl;
   bool m_SkipCommercials;
 
