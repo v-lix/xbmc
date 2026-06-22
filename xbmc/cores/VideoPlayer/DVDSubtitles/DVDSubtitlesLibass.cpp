@@ -210,6 +210,11 @@ bool CDVDSubtitlesLibass::DecodeDemuxPkt(const char* data, int size, double star
   ass_process_chunk(m_track, const_cast<char*>(data), size, DVD_TIME_TO_MSEC(start),
                     DVD_TIME_TO_MSEC(duration));
 
+  // TEMP (doubled-subtitle-on-seek diagnostic): each event entering libass with its
+  // span + resulting count. Two adds of the same [start..end] = the double on screen.
+  CLog::Log(LOGDEBUG, "CDVDSubtitlesLibass: event [{:.3f}..{:.3f}]s -> {} events",
+            start / DVD_TIME_BASE, (start + duration) / DVD_TIME_BASE, m_track->n_events);
+
   // A newly added event that begins before the current cached interval ends
   // can change the visible set within it, so the cache must be dropped. Events
   // that start later than the interval are picked up by the re-render at the

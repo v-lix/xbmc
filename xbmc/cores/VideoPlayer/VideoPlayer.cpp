@@ -1898,6 +1898,22 @@ void CVideoPlayer::ProcessSubData(CDemuxStream* pStream, DemuxPacket* pPacket)
     {
       drop = true;
       m_subtitleReinjectedPts.erase(it);
+      // TEMP (doubled-subtitle-on-seek diagnostic): re-read matched a reinjected line.
+      CLog::Log(LOGDEBUG, "CVideoPlayer: subtitle re-read suppressed at {:.3f}s",
+                pPacket->pts / DVD_TIME_BASE);
+    }
+    else
+    {
+      // TEMP diagnostic: a re-read that did NOT match. If it is near a reinjected pts
+      // (just outside the 1ms window) it is the same line drifted -> the double.
+      double best = std::abs(m_subtitleReinjectedPts.front() - pPacket->pts);
+      for (double p : m_subtitleReinjectedPts)
+        best = std::min(best, std::abs(p - pPacket->pts));
+      if (best < DVD_MSEC_TO_TIME(100))
+        CLog::Log(LOGDEBUG,
+                  "CVideoPlayer: subtitle re-read NOT suppressed at {:.3f}s (nearest "
+                  "reinjected {:.1f}ms away) - possible double",
+                  pPacket->pts / DVD_TIME_BASE, best * 1000.0 / DVD_TIME_BASE);
     }
   }
 
@@ -2072,6 +2088,10 @@ void CVideoPlayer::ReinjectSubtitlePackets(const std::vector<DemuxPacket*>& pack
     // whose dts < startpts rule would otherwise drop an event that began before the
     // seek target. drop=false -> the overlay codec decodes it and adds the overlay.
     m_VideoPlayerSubtitle->SendMessage(std::make_shared<CDVDMsgDemuxerPacket>(copy, false));
+    // TEMP (doubled-subtitle-on-seek diagnostic): what was re-fed at the seek.
+    CLog::Log(LOGDEBUG, "CVideoPlayer: subtitle reinject [{:.3f}..{:.3f}]s",
+              src->pts / DVD_TIME_BASE,
+              (src->pts + (src->duration > 0 ? src->duration : 0)) / DVD_TIME_BASE);
     // Remember it so the demuxer's own re-read of the same event is suppressed
     // once (see ProcessSubData), preventing a doubled overlay.
     if (src->pts != DVD_NOPTS_VALUE)
