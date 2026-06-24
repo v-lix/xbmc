@@ -111,8 +111,9 @@ bool CPackerMAT::PackTrueHD(const uint8_t* data, int size)
       // NOTE: Do NOT reset prevMatFramesize - LAV keeps it for proper padding calculation
       // NOTE: Do NOT reset numberOfSamplesOffset - LAV preserves it for timing accuracy (commit 213c69d0)
       m_state.prevFrametimeValid = false;
-      // Standard padding: 40 samples * (64 >> ratebits) bytes = 2560 bytes for 48kHz
-      spaceSize = 40 * (64 >> (m_state.ratebits & 7));
+      // Standard padding: frameSamples * (64 >> ratebits) bytes = 2560 bytes at every rate
+      // (frameSamples is 40/80/160 for 48/96/192 kHz; a bare 40 only yields 2560 at 48 kHz).
+      spaceSize = frameSamples * (64 >> (m_state.ratebits & 7));
 
       // LAV fix: Calculate and carry forward padding based on output time offset
       // The output timing is always one frame ahead for buffering reasons, so deduct one frame worth
