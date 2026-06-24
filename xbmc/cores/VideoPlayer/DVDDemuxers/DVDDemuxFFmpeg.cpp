@@ -1227,7 +1227,12 @@ DemuxPacket* CDVDDemuxFFmpeg::ReadInternal(bool keep)
         pPacket->recoveryPoint = m_seekToKeyFrame;
       m_seekToKeyFrame = false;
 
-      if (m_pFormatContext->streams[pPacket->iStreamId]->id == 0x1015 &&
+      // A dependency-layer EL is the non-primary video track (UHD BD PID 0x1015
+      // or a DT-DL MP4 track > 0), identified here the same way as the
+      // isELPackage tagging below: uniqueId > 0. EL packets that arrive before
+      // the first BL packet have nothing to pair with — drop them to keep the
+      // BL/EL pairing aligned at start-of-stream.
+      if (stream && stream->uniqueId > 0 &&
          m_dv_dual_stream && !m_dv_dual_stream_started)
       {
         CLog::Log(LOGDEBUG, "CDVDDemuxFFmpeg::{}: EL packet arrived before BL packet on Dolby Vision dual stream, drop it!", __FUNCTION__);
@@ -1922,17 +1927,42 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
               av_packet_side_data_get(pStream->codecpar->coded_side_data,
                                       pStream->codecpar->nb_coded_side_data, AV_PKT_DATA_DOVI_CONF);
 
-          // UHD BD has a dependency-layer EL on a separate track with PID 0x1015.
-          // That is the only case where dual-stream BL+EL combining is needed.
-          // MKV dual-layer DV uses BlockAddition instead of separate tracks.
-          // Any other DV track (with its own dvcC) is an independent stream —
-          // never combine layers between independent streams. Which of several
-          // independent video streams to actually play is decided once, after
-          // every stream is known, in ComputePreferredVideoStream().
-          if (streamIdx > 0 && !m_dv_dual_stream && pStream->id == 0x1015)
+          // A dependency-layer EL lives on its own track and must be combined
+          // with the base layer on track 0 — but only when Dolby Vision is
+          // enabled. With DV off the HDR10 base layer should play on its own:
+          // combining tags the EL packets for the base decoder, which then
+          // feeds the raw EL NALs to the hardware decoder because the codec's
+          // BL+EL pairing is itself DV-gated (see DVDVideoCodecAmlogic). Two
+          // transports carry a dependency EL on a separate track:
+          //   - UHD BD: the EL track has transport PID 0x1015.
+          //   - MP4/MOV dual-track (DT-DL): a later HEVC track whose Dolby
+          //     Vision config is a pure enhancement layer (el_present set,
+          //     bl_present clear — its base layer is track 0).
+          // MKV dual-layer DV uses BlockAddition instead of a separate track.
+          // Independent DV streams (P5/P8, or a second graded variant) carry
+          // their own base layer (bl_present set) and must NEVER be combined —
+          // which of several independent video streams to play is decided once,
+          // after every stream is known, in ComputePreferredVideoStream().
+          bool isDependencyEl = false;
+          if (aml_dolby_vision_enabled())
+          {
+            if (pStream->id == 0x1015) // UHD BD transport
+              isDependencyEl = true;
+            else if (sideData && sideData->size) // DT-DL MP4: pure EL config
+            {
+              const auto* conf =
+                  reinterpret_cast<const AVDOVIDecoderConfigurationRecord*>(sideData->data);
+              isDependencyEl = conf->el_present_flag && !conf->bl_present_flag;
+            }
+          }
+
+          if (streamIdx > 0 && !m_dv_dual_stream && isDependencyEl)
           {
             m_dv_dual_stream = true;
-            CLog::Log(LOGDEBUG, "DVDDemuxFFmpeg::AddStream - UHD BD DV EL (PID 0x1015), combining BL+EL");
+            CLog::Log(LOGDEBUG,
+                      "DVDDemuxFFmpeg::AddStream - DV dependency-layer EL (stream {}, PID {:#x}), "
+                      "combining BL+EL",
+                      streamIdx, pStream->id);
           }
 
           if (!m_dv_dual_stream)
