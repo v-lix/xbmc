@@ -409,6 +409,7 @@ public:
   static constexpr auto SETTING_AUDIOOUTPUT_STREAMNOISE = "audiooutput.streamnoise";
   static constexpr auto SETTING_AUDIOOUTPUT_MIXSUBLEVEL = "audiooutput.mixsublevel";
   static constexpr auto SETTING_AUDIOOUTPUT_DRC = "audiooutput.drc";
+  static constexpr auto SETTING_AUDIOOUTPUT_EXTRAPCMLAYOUTS = "audiooutput.extrapcmlayouts";
   static constexpr auto SETTING_AUDIOOUTPUT_LFEMIXTO = "audiooutput.lfemixto";
   static constexpr auto SETTING_AUDIOOUTPUT_BOOSTCENTER = "audiooutput.boostcenter";
   static constexpr auto SETTING_AUDIOOUTPUT_GUISOUNDMODE = "audiooutput.guisoundmode";

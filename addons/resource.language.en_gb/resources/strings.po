@@ -22773,6 +22773,18 @@ msgctxt "#38030"
 msgid "How much of the dynamic range compression carried in AC3/EAC3 streams to apply when decoding to PCM (no passthrough). 100% applies full compression for consistent, dialogue-friendly levels (e.g. on TV speakers); 0% keeps the full dynamic range. This is separate from \"Maintain original volume on downmix\": that sets the downmix level, while this sets how much the dynamics are compressed. For the most faithful playback, leave that off and set this to 0%. No effect on passthrough output or on non-AC3/EAC3 formats. The advancedsettings.xml <applydrc> value overrides this when set."
 msgstr ""
 
+#. Label for the setting with id #38084 (extra HDMI PCM channel layouts)
+#: system/settings/settings.xml
+msgctxt "#38084"
+msgid "Extra HDMI PCM channel layouts (4.0/5.0)"
+msgstr ""
+
+#. Description for the setting with label #38084 "Extra HDMI PCM channel layouts (4.0/5.0)"
+#: system/settings/settings.xml
+msgctxt "#38085"
+msgid "Advertise additional HDMI PCM channel layouts (4.0 and 5.0) and send their exact channel allocation, so the AV receiver reports the real layout and no silent channels are output for these rare PCM streams. Only affects multi-channel PCM over HDMI; passthrough and the standard 2.0/3.1/5.1/7.1 layouts are unchanged. Takes effect on the next playback, no reboot needed."
+msgstr ""
+
 #. Used for the rating selection
 #: xbmc/music/MusicUtils.cpp
 #: xbmc/video/dialogs/GUIDialogVideoInfo.cpp

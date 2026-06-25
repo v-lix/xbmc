@@ -17,6 +17,8 @@
 #include "cores/AudioEngine/Utils/AEELDParser.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 #include "platform/Platform.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/XTimeUtils.h"
 #include "utils/log.h"
 
@@ -785,6 +787,22 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
 
     aml_set_audio_passthrough(m_passthrough);
     aml_configure_simple_control(device, codec);
+
+    /* Drive the kernel's extra-PCM-layouts knob from the GUI setting so 4.0/5.0
+     * HDMI channel allocations can be toggled without an on-device sysfs poke.
+     * It is a global module param written before the device is opened, so the
+     * chmap advertisement queried later reflects it. Takes effect on the next
+     * stream open - no reboot. CSysfsPath no-ops if the node is absent. */
+    if (devType == AE_DEVTYPE_HDMI)
+    {
+      const auto settingsComponent = CServiceBroker::GetSettingsComponent();
+      if (settingsComponent)
+      {
+        const bool extraLayouts = settingsComponent->GetSettings()->GetBool(
+            CSettings::SETTING_AUDIOOUTPUT_EXTRAPCMLAYOUTS);
+        CSysfsPath knob{"/sys/module/tdm/parameters/extra_pcm_layouts", extraLayouts ? 1 : 0};
+      }
+    }
 
     // The TDM-B/I2S path used by the surround71 (HDMI Multi Channel PCM) device
     // on AML G12B (S922X) and SC2 (S905X4) does not reliably support 44.1kHz-

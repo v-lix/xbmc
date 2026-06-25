@@ -16974,6 +16974,14 @@ msgctxt "#38030"
 msgid "How much of the dynamic range compression carried in AC3/E-AC3 streams to apply when decoding to PCM (no passthrough). 100% applies full compression for consistent, dialogue-friendly levels (e.g. on TV speakers); 0% keeps the full dynamic range. This is separate from \"Maintain original volume on downmix\": that sets the downmix level, while this sets how much the dynamics are compressed. For the most faithful playback, leave that off and set this to 0%. No effect on passthrough output or on non-AC3/E-AC3 formats. The advancedsettings.xml <applydrc> value overrides this when set."
 msgstr "Legt fest, wie stark die in AC3/E-AC3-Streams enthaltene Dynamikkompression beim Dekodieren zu PCM (keine Durchschleifung) angewendet wird. 100 % wendet die volle Kompression an und sorgt für gleichmäßige, dialogfreundliche Pegel (z. B. über TV-Lautsprecher); 0 % erhält den vollen Dynamikumfang. Dies ist unabhängig von \"Originallautstärke beim Heruntermischen beibehalten\": jene Option legt den Downmix-Pegel fest, diese hingegen, wie stark die Dynamik komprimiert wird. Für die originalgetreueste Wiedergabe jene Option deaktivieren und diese auf 0 % setzen. Keine Auswirkung auf durchgeschleifte Ausgabe oder auf Formate außer AC3/E-AC3. Der Wert <applydrc> in der advancedsettings.xml hat Vorrang, sofern gesetzt."
 
+msgctxt "#38084"
+msgid "Extra HDMI PCM channel layouts (4.0/5.0)"
+msgstr "Zusätzliche HDMI-PCM-Kanallayouts (4.0/5.0)"
+
+msgctxt "#38085"
+msgid "Advertise additional HDMI PCM channel layouts (4.0 and 5.0) and send their exact channel allocation, so the AV receiver reports the real layout and no silent channels are output for these rare PCM streams. Only affects multi-channel PCM over HDMI; passthrough and the standard 2.0/3.1/5.1/7.1 layouts are unchanged. Takes effect on the next playback, no reboot needed."
+msgstr "Bietet zusätzliche HDMI-PCM-Kanallayouts (4.0 und 5.0) an und sendet deren exakte Kanalzuordnung, damit der AV-Receiver das tatsächliche Layout anzeigt und für diese seltenen PCM-Streams keine stummen Kanäle ausgegeben werden. Betrifft nur Mehrkanal-PCM über HDMI; durchgeschleifte Ausgabe und die Standard-Layouts 2.0/3.1/5.1/7.1 bleiben unverändert. Wird bei der nächsten Wiedergabe wirksam, kein Neustart erforderlich."
+
 msgctxt "#38023"
 msgid "Set my rating"
 msgstr "Bewerten"
