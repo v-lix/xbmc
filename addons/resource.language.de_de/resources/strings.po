@@ -16982,6 +16982,14 @@ msgctxt "#38085"
 msgid "Advertise additional HDMI PCM channel layouts (4.0 and 5.0) and send their exact channel allocation, so the AV receiver reports the real layout and no silent channels are output for these rare PCM streams. Only affects multi-channel PCM over HDMI; passthrough and the standard 2.0/3.1/5.1/7.1 layouts are unchanged. Takes effect on the next playback, no reboot needed."
 msgstr "Bietet zusätzliche HDMI-PCM-Kanallayouts (4.0 und 5.0) an und sendet deren exakte Kanalzuordnung, damit der AV-Receiver das tatsächliche Layout anzeigt und für diese seltenen PCM-Streams keine stummen Kanäle ausgegeben werden. Betrifft nur Mehrkanal-PCM über HDMI; durchgeschleifte Ausgabe und die Standard-Layouts 2.0/3.1/5.1/7.1 bleiben unverändert. Wird bei der nächsten Wiedergabe wirksam, kein Neustart erforderlich."
 
+msgctxt "#38086"
+msgid "Prioritise audio on the memory bus"
+msgstr "Audio auf dem Speicherbus bevorzugen"
+
+msgctxt "#38087"
+msgid "Give the audio path the same high memory-bus priority that the video and display path already has, so heavy 4K/Dolby Vision decoding cannot briefly starve the audio buffer and cause rare split-second dropouts. Audio and video then share the top priority equally (video is not deprioritised), and audio adds only a tiny fraction of memory traffic. On by default; takes effect immediately."
+msgstr "Gibt dem Audiopfad dieselbe hohe Speicherbus-Priorität, die der Video- und Anzeigepfad bereits hat, damit das aufwendige Dekodieren von 4K-/Dolby-Vision-Video den Audiopuffer nicht kurzzeitig aushungern und seltene, sekundenbruchteilkurze Aussetzer verursachen kann. Audio und Video teilen sich dann gleichberechtigt die höchste Priorität (Video wird nicht benachteiligt), und Audio verursacht nur einen winzigen Bruchteil des Speicherverkehrs. Standardmäßig aktiviert; wird sofort wirksam."
+
 msgctxt "#38023"
 msgid "Set my rating"
 msgstr "Bewerten"

@@ -852,6 +852,20 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
 
   CLog::Log(LOGINFO, "CAESinkALSA::Initialize - Opened device \"{}\"", device);
 
+  /* CoreELEC: on Amlogic, lift the audio DMA's system-DDR priority so heavy 4K/DV
+   * decode cannot briefly starve the small audio FIFO (rare split-second dropouts).
+   * Re-applied on every audio start; honours the GUI toggle (default on). */
+  if (GetAMLDeviceType(device) != AML_NONE)
+  {
+    const auto settingsComponent = CServiceBroker::GetSettingsComponent();
+    if (settingsComponent)
+    {
+      const auto settings = settingsComponent->GetSettings();
+      if (settings)
+        aml_set_audio_ddr_urgent(settings->GetBool(CSettings::SETTING_COREELEC_AUDIO_DDR_PRIORITY));
+    }
+  }
+
   snd_pcm_chmap_t* selectedChmap = NULL;
   if (!m_passthrough)
   {

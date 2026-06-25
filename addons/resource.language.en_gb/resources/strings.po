@@ -22785,6 +22785,18 @@ msgctxt "#38085"
 msgid "Advertise additional HDMI PCM channel layouts (4.0 and 5.0) and send their exact channel allocation, so the AV receiver reports the real layout and no silent channels are output for these rare PCM streams. Only affects multi-channel PCM over HDMI; passthrough and the standard 2.0/3.1/5.1/7.1 layouts are unchanged. Takes effect on the next playback, no reboot needed."
 msgstr ""
 
+#. Label for the setting with id #38086 (prioritise audio on the memory bus)
+#: system/settings/settings.xml
+msgctxt "#38086"
+msgid "Prioritise audio on the memory bus"
+msgstr ""
+
+#. Description for the setting with label #38086 "Prioritise audio on the memory bus"
+#: system/settings/settings.xml
+msgctxt "#38087"
+msgid "Give the audio path the same high memory-bus priority that the video and display path already has, so heavy 4K/Dolby Vision decoding cannot briefly starve the audio buffer and cause rare split-second dropouts. Audio and video then share the top priority equally (video is not deprioritised), and audio adds only a tiny fraction of memory traffic. On by default; takes effect immediately."
+msgstr ""
+
 #. Used for the rating selection
 #: xbmc/music/MusicUtils.cpp
 #: xbmc/video/dialogs/GUIDialogVideoInfo.cpp

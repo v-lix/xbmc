@@ -3411,6 +3411,12 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
+        <setting id="coreelec.audio.ddr_priority" type="boolean" label="38086" help="38087">
+          <requirement>HAVE_AMCODEC</requirement>
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
         <setting id="audiooutput.processquality" type="integer" label="13505" help="36169">
           <requirement>HAS_AE_QUALITY_LEVELS</requirement>
           <level>2</level>

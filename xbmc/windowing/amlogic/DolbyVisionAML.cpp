@@ -851,6 +851,7 @@ bool CDolbyVisionAML::Setup()
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_OVERRIDE_EDID);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP);
+  settingSet.insert(CSettings::SETTING_COREELEC_AUDIO_DDR_PRIORITY);
   settingsManager->RegisterCallback(this, settingSet);
 
   // Override EDID is always visible (no DV mode dependency) so users can enable DV on non-DV displays
@@ -885,6 +886,14 @@ bool CDolbyVisionAML::Setup()
 void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
 {
   if (!setting) return;
+
+  // Audio DDR-priority toggle applies live (no DV state involved) — write the
+  // DMC urgent for the DEVICE port immediately and return before the DV logic.
+  if (setting->GetId() == CSettings::SETTING_COREELEC_AUDIO_DDR_PRIORITY)
+  {
+    aml_set_audio_ddr_urgent(settings()->GetBool(CSettings::SETTING_COREELEC_AUDIO_DDR_PRIORITY));
+    return;
+  }
 
   enum DV_TYPE dv_type(static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
 

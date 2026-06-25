@@ -263,6 +263,7 @@ std::string aml_video_fps_info();
 std::string aml_video_fps_drop();
 unsigned int aml_dv_video_processor_mode();
 void aml_toogle_video_freerun_mode();
+void aml_set_audio_ddr_urgent(bool enable);
 void aml_reset_audio_from_vs10_change();
 void aml_reset_audio_from_player_open();
 void aml_reset_audio_from_player_pause();

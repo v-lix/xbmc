@@ -273,6 +273,25 @@ void aml_reset_audio_from_vs10_change()
   CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetLastResetTime(0.0);
 }
 
+void aml_set_audio_ddr_urgent(bool enable)
+{
+  // The audio DMA (FRDDR) shares the system DMC "DEVICE" port (bit 7). Under heavy
+  // 4K/Dolby Vision decode the super-urgent display reads can saturate DDR at peak
+  // frames and starve the small audio FIFO for a few hundred microseconds, producing
+  // a rare split-second HDMI audio dropout. Lift the DEVICE port to super-urgent so
+  // audio's tiny requests are served in the top tier alongside the display — audio is
+  // ~3 MB/s and cannot starve the display, which pulls hundreds of MB/s.
+  CSysfsPath urgent{"/sys/class/aml_ddr/urgent"};
+  if (!urgent.Exists())
+    return;
+
+  // format: "<port_bitmask_hex> <level>"; bit 7 = DEVICE port. 4 = super-urgent;
+  // 0 clears bits[18:16] back to the firmware default (honour the request's own
+  // urgency) — i.e. the original un-prioritised state. NOT 1, which would force
+  // non-urgent and never return the register to its native 0.
+  urgent.Set(std::string(enable ? "80 4" : "80 0"));
+}
+
 void aml_dv_set_vs10_mode(unsigned int mode, StreamHdrType hdrType)
 {
   aml_dv_dump_state("vs10_change/pre");
