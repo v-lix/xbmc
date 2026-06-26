@@ -792,8 +792,12 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
      * HDMI channel allocations can be toggled without an on-device sysfs poke.
      * It is a global module param written before the device is opened, so the
      * chmap advertisement queried later reflects it. Takes effect on the next
-     * stream open - no reboot. CSysfsPath no-ops if the node is absent. */
-    if (devType == AE_DEVTYPE_HDMI)
+     * stream open - no reboot. CSysfsPath no-ops if the node is absent.
+     *
+     * Do NOT gate on AE_DEVTYPE_HDMI: the AML HDMI multi-channel PCM device
+     * ("surround71" / "HDMI Multi Ch PCM") enumerates as AE_DEVTYPE_PCM, so that
+     * gate would skip exactly the device this targets. The knob only affects the
+     * HDMI TDM path and is a harmless no-op for the SPDIF/analog AML outputs. */
     {
       const auto settingsComponent = CServiceBroker::GetSettingsComponent();
       if (settingsComponent)
