@@ -144,10 +144,12 @@ bool CLinuxRendererGLES::Configure(const VideoPicture &picture, float fps, unsig
   // SW-decoded content bypasses AMLCodec, so aml_dv_open() (which manages
   // the DV pipeline for VS10 settings) is never called.  Do it here so that
   // e.g. SDR content with VS10 SDR8 = Bypass correctly turns DV off instead
-  // of inheriting the boot-time IPT Tunnel mode.
+  // of inheriting the boot-time IPT Tunnel mode.  swDecoded=true forces VS10
+  // Bypass: there is no VD1 hardware video layer for the DV core to convert,
+  // so any conversion mode would corrupt the picture.
   if (!m_dvOpened)
   {
-    aml_dv_open(picture.hdrType, picture.colorBits, picture.color_primaries);
+    aml_dv_open(picture.hdrType, picture.colorBits, picture.color_primaries, /*swDecoded=*/true);
     m_dvOpened = true;
   }
 

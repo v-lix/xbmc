@@ -19224,6 +19224,14 @@ msgctxt "#60343"
 msgid "Waits for the blanking to fully engage before the decoder is restarted, so a torn green frame can't slip through in the one-or-two-frame window right at the edge of a seek. Adds a short delay (one or two frames) to each seek and to playback start. Only enable if a brief green flash still appears right at the seek with the option above turned on."
 msgstr "Wartet, bis die Ausblendung vollständig greift, bevor der Decoder zurückgesetzt wird, damit im Fenster von ein bis zwei Bildern direkt am Rand eines Suchlaufs kein zerrissenes grünes Bild durchrutscht. Fügt jedem Suchlauf und dem Wiedergabestart eine kurze Verzögerung (ein bis zwei Bilder) hinzu. Nur aktivieren, wenn mit der obigen Option weiterhin direkt beim Suchlauf ein kurzes grünes Blinken erscheint."
 
+msgctxt "#60344"
+msgid "VS10 conversion unavailable"
+msgstr "VS10-Konvertierung nicht verfügbar"
+
+msgctxt "#60345"
+msgid "This video is software-decoded; VS10 mapping needs a hardware-decoded stream."
+msgstr "Dieses Video wird per Software dekodiert; VS10-Mapping benötigt einen hardware-dekodierten Stream."
+
 msgctxt "#60500"
 msgid "Set Min PQ 20 only"
 msgstr "Nur Min. PQ 20"

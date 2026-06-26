@@ -39,6 +39,8 @@
 #include "settings/SettingsComponent.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
+#include "dialogs/GUIDialogKaiToast.h"
 #include "ServiceBroker.h"
 
 #include "settings/AdvancedSettings.h"
@@ -297,6 +299,24 @@ void aml_dv_set_vs10_mode(unsigned int mode, StreamHdrType hdrType)
   aml_dv_dump_state("vs10_change/pre");
   enum DV_TYPE dv_type(static_cast<DV_TYPE>(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE)));
   if (dv_type == DV_TYPE_VS10_ONLY) return;
+
+  // VS10 conversion is a hardware video-layer (VD1) feature: the DV core maps the
+  // YUV that the amcodec decoder places on VD1. Software-decoded streams (codecs
+  // the AML decoder declines, e.g. small MPEG-4/XVID) are composited by GLES
+  // straight into the GUI/EGL plane and never reach VD1. Engaging the DV core
+  // (IPT/HDR10/SDR10 tunnel) for them makes the sink de-tunnel plain SDR pixels as
+  // Dolby Vision -> magenta/yellow chroma corruption. Refuse the conversion modes
+  // for SW decode; Bypass (turn DV off) stays allowed so the toggle can still undo.
+  if (mode != DOLBY_VISION_OUTPUT_MODE_BYPASS &&
+      !CServiceBroker::GetDataCacheCore().IsVideoHwDecoder())
+  {
+    CLog::Log(LOGINFO, "AMLUtils::{} - refusing VS10 mode [{}] for software-decoded video (no hardware video layer)",
+              __FUNCTION__, aml_dv_output_mode_to_string(mode));
+    CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info,
+                                          g_localizeStrings.Get(60344),
+                                          g_localizeStrings.Get(60345));
+    return;
+  }
 
   CSysfsPath dolby_vision_mode{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
   unsigned int existing_mode = dolby_vision_mode.Get<unsigned int>().value();
@@ -1451,7 +1471,7 @@ unsigned int aml_dv_dolby_vision_mode()
   return dolby_vision_mode.Get<unsigned int>().value();
 }
 
-void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries)
+void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries, bool swDecoded)
 {
   // Detect PM4K once at playback start for OSD visibility override.
   // MUST stay above the CDVCoreGuard: GetWindow()/GetProperty() take the gfx
@@ -1472,6 +1492,23 @@ void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries 
   enum DV_MODE dv_mode(aml_dv_mode());
   CLog::Log(LOGINFO, "AMLUtils::{} - Checking DV for DV mode: [{}], DV type: [{}]", __FUNCTION__, aml_dv_mode_to_string(dv_mode), aml_dv_type_to_string(aml_dv_type()));
   if (dv_mode == DV_MODE_ON || dv_mode == DV_MODE_ON_DEMAND) {
+
+    // Software-decoded content has no AML hardware video layer (VD1): SW frames are
+    // composited by GLES into the GUI plane and never reach VD1, which is what the DV
+    // core converts. Engaging any VS10 conversion (IPT/HDR10/SDR10) would make the sink
+    // de-tunnel plain SDR pixels as Dolby Vision -> magenta/yellow corruption. Force
+    // Bypass (DV off) regardless of the VS10 SDR/HDR mapping setting. swDecoded comes
+    // straight from the call site (CLinuxRendererGLES = SW/GLES path; AMLCodec = VD1),
+    // so it is authoritative even when a background HW title leaves the global decoder
+    // flag set. The live VS10 toggle is guarded separately in aml_dv_set_vs10_mode().
+    if (swDecoded)
+    {
+      CLog::Log(LOGINFO, "AMLUtils::{} - software-decoded video, forcing VS10 Bypass (no hardware video layer)", __FUNCTION__);
+      if (aml_is_dv_enable())
+        aml_dv_off();
+      aml_dv_dump_state("dv_open/post(sw_decode_bypass)");
+      return;
+    }
 
     // SDR BT.2020 content: bypass VS10 — the DV library assumes SDR is BT.709
     // and can't handle BT.2020 gamut correctly. Bypass preserves original signaling.

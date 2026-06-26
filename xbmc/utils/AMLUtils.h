@@ -160,7 +160,9 @@ struct xbmc_dv_cap
   static inline std::string edid_pnpid = "";
 };
 unsigned int aml_dv_dolby_vision_mode();
-void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries = AVCOL_PRI_UNSPECIFIED);
+// swDecoded: true when the caller is the software/GLES render path (no AML hardware
+// video layer / VD1). Such streams cannot use VS10 conversion — see aml_dv_open().
+void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries = AVCOL_PRI_UNSPECIFIED, bool swDecoded = false);
 void aml_dv_close();
 bool aml_dv_playback_active();
 void aml_dv_set_osd_max(int max);

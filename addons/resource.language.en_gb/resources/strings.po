@@ -26093,6 +26093,14 @@ msgctxt "#60343"
 msgid "Waits for the blanking to fully engage before the decoder is restarted, so a torn green frame can't slip through in the one-or-two-frame window right at the edge of a seek. Adds a short delay (one or two frames) to each seek and to playback start. Only enable if a brief green flash still appears right at the seek with the option above turned on."
 msgstr ""
 
+msgctxt "#60344"
+msgid "VS10 conversion unavailable"
+msgstr ""
+
+msgctxt "#60345"
+msgid "This video is software-decoded; VS10 mapping needs a hardware-decoded stream."
+msgstr ""
+
 #. "Dolby Vision Display LL Dolby VSVDB Limit"
 #: system/settings/settings.xml
 msgctxt "#60500"
