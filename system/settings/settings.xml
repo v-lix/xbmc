@@ -4546,14 +4546,14 @@
           </dependencies>
           <control type="toggle" />
         </setting>
-        <setting id="coreelec.amlogic.dolbyvision.l5.auto.letterbox" type="boolean" label="60330" help="60331" parent="coreelec.amlogic.dolbyvision.level5">
+        <setting id="coreelec.amlogic.dolbyvision.l5.auto.letterbox" type="boolean" label="60330" help="60331" parent="coreelec.amlogic.dolbyvision.type">
           <requirement>HAVE_AMCODEC</requirement>
           <visible>true</visible>
           <level>2</level>
           <default>true</default>
           <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.type" operator="is">0</dependency>
-            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.level5" operator="is">true</dependency>
           </dependencies>
           <control type="toggle" />
         </setting>

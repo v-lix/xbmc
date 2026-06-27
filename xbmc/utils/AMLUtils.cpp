@@ -794,10 +794,13 @@ void aml_dv_apply_l5_sysfs()
    * substitution path. The user's auto-detect setting is one source of
    * substitution values; service.p3i.override is another. Either one
    * needs the master enable on. */
-  bool dv_detect_active_area = dv_level5_enabled &&
-                               (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA) ||
-                                aml_dv_l5_override_active() ||
-                                aml_dv_auto_letterbox_active());
+  // Auto-letterbox stands on its own — it enables the substitution master
+  // regardless of the L5 setting (the detect/override sources still require it).
+  bool dv_detect_active_area =
+      (dv_level5_enabled &&
+       (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_DETECT_ACTIVE_AREA) ||
+        aml_dv_l5_override_active())) ||
+      aml_dv_auto_letterbox_active();
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_detect_active_area", dv_detect_active_area);
   CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_sysfs - l5_enabled={} src_l5={} osdst={} subt_mode={} detect={}",
             dv_level5_enabled, dv_source_level_5, dv_source_level_5_osdst,
@@ -1883,8 +1886,7 @@ static bool _auto_letterbox_geometry(uint16_t& top, uint16_t& bottom,
   top = bottom = left = right = 0;
   if (!s_autoLbNativeDV.load())
     return false;
-  if (!settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_LEVEL5))
-    return false;
+  /* Stands on its own — intentionally NOT gated on the L5 master setting. */
   if (!settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_L5_AUTO_LETTERBOX))
     return false;
   if (aml_dv_l5_override_active()) /* manual per-folder override wins */
