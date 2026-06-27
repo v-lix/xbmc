@@ -723,7 +723,7 @@ static void apply_tv_preset(int preset)
       // 12-bit Deep Color pipeline targets the VS10 → HDMI TX path on Display-LED
       // and CMv4.0 append is only consumed by the TV in Display-LED too.
       settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_PREFER_12BIT, true);
-      settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, 2); // Always
+      settings()->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_APPEND, 3); // Smart
       // Down-convert to CMv2.9 is the opposite of append; keep it off on the
       // Display-LED auto-default (mutually exclusive with append above).
       settings()->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_CMV40_STRIP, false);
