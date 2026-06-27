@@ -211,6 +211,36 @@ void CWinSystemAmlogic::UpdateResolutions()
   if (aml_get_native_resolution(&curDisplay))
   {
     resDesktop = curDisplay;
+
+    // The GUI is rendered at <=1080p and hardware-scaled, so a 2160p50/60
+    // desktop buys no GUI sharpness - it only drives the HDMI link to its
+    // bandwidth ceiling (594MHz TMDS at 4:2:2/12-bit), which marginal
+    // sink/AVR repeater chains fail to lock onto (continuous re-sync in the
+    // menus). Default the desktop to the 1080p mode at the same refresh rate
+    // instead. This only changes the out-of-the-box default (RES_DESKTOP); an
+    // explicitly-selected 2160p50/60 screenmode still wins, the mode stays in
+    // the list for manual selection, and whitelist refresh-switching can still
+    // drive 2160p50/60 for matching video.
+    if (resDesktop.iScreenHeight >= 2160 && resDesktop.fRefreshRate > 40.0f)
+    {
+      const RESOLUTION_INFO *cand = nullptr;
+      for (const auto &r : resolutions)
+      {
+        if (r.iScreenWidth != 1920 || r.iScreenHeight != 1080)
+          continue;
+        if ((r.dwFlags & D3DPRESENTFLAG_MODEMASK) != (resDesktop.dwFlags & D3DPRESENTFLAG_MODEMASK))
+          continue;
+        // pick the closest refresh so 59.94 maps to 59.94, not 60.000
+        if (!cand || fabs(r.fRefreshRate - resDesktop.fRefreshRate) < fabs(cand->fRefreshRate - resDesktop.fRefreshRate))
+          cand = &r;
+      }
+      if (cand && fabs(cand->fRefreshRate - resDesktop.fRefreshRate) < 1.0f)
+      {
+        CLog::Log(LOGINFO, "{}: defaulting desktop to {:d}x{:d}@{:f} instead of native 2160p@{:f} to stay within the HDMI link budget (2160p50/60 stays selectable)",
+          __FUNCTION__, cand->iScreenWidth, cand->iScreenHeight, cand->fRefreshRate, resDesktop.fRefreshRate);
+        resDesktop = *cand;
+      }
+    }
   }
 
   RESOLUTION ResDesktop = RES_INVALID;

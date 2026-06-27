@@ -15619,12 +15619,12 @@ msgid "Changes the way this application is displayed on the selected screen. Eit
 msgstr "Ändert, wie das Programm auf dem ausgewählten Bildschirm dargestellt wird – in einem Fenster oder als Vollbild."
 
 msgctxt "#36352"
-msgid "Changes the resolution that the user interface is displayed in."
-msgstr "Ändern der Bildauflösung, mit der die Benutzeroberfläche angezeigt wird."
+msgid "Changes the resolution that the user interface is displayed in. A 4K (2160p) desktop can make high-resolution skin artwork look sharper, but 2160p at 50/60Hz uses far more HDMI bandwidth than lower modes. Some TVs, AVRs or projectors cannot handle it, and a near-limit cable in a long chain can struggle too, so the picture keeps dropping out (loss of sync). If 2160p60 does not sync, either stay at 1080p60 (smooth, not 4K) or pick 2160p at 24/25Hz (4K, less smooth). Video still switches to its native mode through the whitelist, whatever you set here."
+msgstr "Ändert die Bildauflösung, mit der die Benutzeroberfläche angezeigt wird. Ein 4K-Desktop (2160p) kann hochauflösende Skin-Grafiken schärfer darstellen, aber 2160p mit 50/60 Hz benötigt deutlich mehr HDMI-Bandbreite als niedrigere Modi. Manche Fernseher, AV-Receiver oder Projektoren kommen damit nicht zurecht, und auch ein grenzwertiges Kabel in einer langen Kette kann an seine Grenzen stoßen, sodass das Bild immer wieder aussetzt (Synchronisationsverlust). Wenn 2160p60 nicht synchronisiert, entweder bei 1080p60 bleiben (flüssig, kein 4K) oder 2160p mit 24/25 Hz wählen (4K, weniger flüssig). Videos wechseln über die Whitelist weiterhin in ihren nativen Modus, unabhängig von dieser Einstellung."
 
 msgctxt "#36353"
-msgid "Changes the refresh rate that the user interface is displayed in."
-msgstr "Ändern der Bildwiederholrate, mit der die Benutzeroberfläche angezeigt wird."
+msgid "Changes the refresh rate that the user interface is displayed in. Higher rates make menus and scrolling smoother, but 2160p50/60 needs far more HDMI bandwidth than 2160p24/25 and will not sync on some displays, AVRs or projectors. If 2160p60 does not sync, drop to 1080p60 to keep motion smooth, or to 2160p24/25 to keep 4K."
+msgstr "Ändert die Bildwiederholrate, mit der die Benutzeroberfläche angezeigt wird. Höhere Raten machen Menüs und das Scrollen flüssiger, aber 2160p50/60 benötigt deutlich mehr HDMI-Bandbreite als 2160p24/25 und synchronisiert auf manchen Bildschirmen, AV-Receivern oder Projektoren nicht. Wenn 2160p60 nicht synchronisiert, auf 1080p60 wechseln für flüssige Bewegung, oder auf 2160p24/25, um 4K zu behalten."
 
 msgctxt "#36354"
 msgid "If enabled, fullscreen mode will be applied by using a window instead of a real fullscreen mode. The main benefit is for multi-screen configurations, so that other applications can be used in parallel more easily. This uses more resources so playback may be less smooth."
@@ -15983,8 +15983,8 @@ msgid "Set the number of volume control steps."
 msgstr "Anzahl der Lautstärkeschritte festlegen."
 
 msgctxt "#36443"
-msgid "Whitelisted modes give the user the control to choose which display modes are allowed or not allowed to be used"
-msgstr "Legt fest, welche Bildschirmmodi verwendet werden dürfen und welche nicht"
+msgid "Sets which display modes (resolution and refresh rate) Kodi is allowed to switch to during video playback. When a video's resolution and frame rate match a mode on this list, it is sent to the display at native resolution and refresh rate (no scaling or frame-rate conversion); otherwise Kodi falls back to the closest available mode and scales / frame-rate-converts to fit. Leave the list empty to let Kodi choose automatically from all modes at or above the desktop resolution. Has no effect unless \"Adjust display refresh rate\" is enabled. Only add 2160p 50/60Hz here if you actually play 50/60fps 4K video and your display/AVR chain handles it reliably - those modes use the most HDMI bandwidth and can drop sync. Lower-frame-rate video (24/25/30fps) does not need them."
+msgstr "Legt fest, zu welchen Bildschirmmodi (Auflösung und Bildwiederholrate) Kodi während der Videowiedergabe wechseln darf. Wenn Auflösung und Bildrate eines Videos einem Modus in dieser Liste entsprechen, wird es mit nativer Auflösung und Bildwiederholrate an den Bildschirm ausgegeben (keine Skalierung oder Bildratenkonvertierung); andernfalls wählt Kodi den nächstgelegenen verfügbaren Modus und skaliert bzw. konvertiert die Bildrate passend. Die Liste leer lassen, damit Kodi automatisch aus allen Modi ab der Desktop-Auflösung wählt. Hat nur Wirkung, wenn \"Bildwiederholrate anpassen\" aktiviert ist. 2160p mit 50/60 Hz nur dann hinzufügen, wenn tatsächlich 4K-Videos mit 50/60 fps abgespielt werden und die Bildschirm-/AVR-Kette dies zuverlässig unterstützt - diese Modi benötigen die meiste HDMI-Bandbreite und können die Synchronisation verlieren. Videos mit niedrigerer Bildrate (24/25/30 fps) benötigen sie nicht."
 
 msgctxt "#36444"
 msgid "Select this option to allow using 3:2 pulldown refresh rates (playing 23.976 FPS video on a 59.94 Hz monitor or playing 24 FPS video on a 60 Hz monitor). You may want to use this option if your monitor doesn't have a 23.976 Hz or 24 Hz mode."
