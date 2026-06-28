@@ -59,6 +59,7 @@ CDVDAudioCodecPassthrough::CDVDAudioCodecPassthrough(CProcessInfo &processInfo, 
       settings->RegisterCallback(this, {CSettings::SETTING_COREELEC_AUDIO_AC3_DIALNORM,
                                         CSettings::SETTING_COREELEC_AUDIO_EAC3_ATMOS_DIALNORM,
                                         CSettings::SETTING_COREELEC_AUDIO_TRUEHD_ATMOS_DIALNORM,
+                                        CSettings::SETTING_COREELEC_AUDIO_DTS_DIALNORM,
                                         CSettings::SETTING_COREELEC_AMLOGIC_DV_AUDIO_SEAMLESSBRANCH});
     }
   }
@@ -95,6 +96,7 @@ void CDVDAudioCodecPassthrough::UpdateDialNormSettings()
   m_defeatAC3DialNorm.store(settings->GetBool(CSettings::SETTING_COREELEC_AUDIO_AC3_DIALNORM));
   m_defeatEAC3AtmosDialNorm.store(settings->GetBool(CSettings::SETTING_COREELEC_AUDIO_EAC3_ATMOS_DIALNORM));
   m_defeatTrueHDDialNorm.store(settings->GetBool(CSettings::SETTING_COREELEC_AUDIO_TRUEHD_ATMOS_DIALNORM));
+  m_defeatDTSDialNorm.store(settings->GetBool(CSettings::SETTING_COREELEC_AUDIO_DTS_DIALNORM));
 }
 
 void CDVDAudioCodecPassthrough::UpdateLavModeSettings()
@@ -122,7 +124,8 @@ void CDVDAudioCodecPassthrough::OnSettingChanged(const std::shared_ptr<const CSe
   const std::string& settingId = setting->GetId();
   if (settingId == CSettings::SETTING_COREELEC_AUDIO_AC3_DIALNORM ||
       settingId == CSettings::SETTING_COREELEC_AUDIO_EAC3_ATMOS_DIALNORM ||
-      settingId == CSettings::SETTING_COREELEC_AUDIO_TRUEHD_ATMOS_DIALNORM)
+      settingId == CSettings::SETTING_COREELEC_AUDIO_TRUEHD_ATMOS_DIALNORM ||
+      settingId == CSettings::SETTING_COREELEC_AUDIO_DTS_DIALNORM)
   {
     UpdateDialNormSettings();
   }
@@ -257,6 +260,7 @@ bool CDVDAudioCodecPassthrough::AddData(const DemuxPacket &packet)
   m_parser.SetDefeatAC3DialNorm(
     m_defeatAC3DialNorm.load() && (!m_isEAC3JOC || m_defeatEAC3AtmosDialNorm.load()));
   m_parser.SetDefeatTrueHDDialNorm(m_defeatTrueHDDialNorm.load());
+  m_parser.SetDefeatDTSDialNorm(m_defeatDTSDialNorm.load());
 
   if (m_backlogSize)
   {

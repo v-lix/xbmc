@@ -238,6 +238,18 @@ void CAEStreamParser::GetPacket(uint8_t** buffer, unsigned int* bufferSize)
       DefeatAC3DialNorm(m_buffer, size);
     }
 
+    // Defeat DTS / DTS-HD dialnorm on the full frame before copying out
+    if (m_defeatDTSDialNorm &&
+        (m_info.m_type == CAEStreamInfo::STREAM_TYPE_DTS_512 ||
+         m_info.m_type == CAEStreamInfo::STREAM_TYPE_DTS_1024 ||
+         m_info.m_type == CAEStreamInfo::STREAM_TYPE_DTS_2048 ||
+         m_info.m_type == CAEStreamInfo::STREAM_TYPE_DTSHD ||
+         m_info.m_type == CAEStreamInfo::STREAM_TYPE_DTSHD_CORE ||
+         m_info.m_type == CAEStreamInfo::STREAM_TYPE_DTSHD_MA))
+    {
+      DefeatDTSDialNorm(m_buffer, size);
+    }
+
     // make sure the buffer is allocated and big enough
     if (!*buffer || !bufferSize || *bufferSize < size)
     {
@@ -514,6 +526,202 @@ void CAEStreamParser::DefeatAC3DialNorm(uint8_t* data, unsigned int size)
 
     offset += frame_bytes;
   }
+}
+
+// ---------------------------------------------------------------------------
+// DTS dialnorm defeat — core DNG (4-bit) + DTS-HD extension-substream asset
+// nuDialNormCode (5-bit). DTS convention: the field is the dB of attenuation,
+// 0 = none (eac3to prints "dialnorm: 0dB"), so defeating it means writing 0
+// (the opposite of AC-3, where 31 = 0 dB). Layout per ETSI TS 102 114; the
+// extension-substream header is protected by a CRC-16-CCITT (poly 0x1021,
+// init 0xFFFF) over EXSS bytes [5, headerSize). Validated against eac3to v3.62
+// and real DTS-HD MA streams. Only the 16-bit big-endian core is handled; the
+// 14-bit and little-endian packings are left untouched rather than risk damage.
+// ---------------------------------------------------------------------------
+static inline uint32_t DTS_ReadBits(const uint8_t* d, unsigned int& pos, unsigned int n)
+{
+  uint32_t v = 0;
+  while (n--)
+  {
+    v = (v << 1) | ((d[pos >> 3] >> (7 - (pos & 7))) & 1);
+    ++pos;
+  }
+  return v;
+}
+
+static inline void DTS_WriteBits(uint8_t* d, unsigned int pos, unsigned int n, uint32_t value)
+{
+  for (unsigned int i = 0; i < n; ++i)
+  {
+    const uint8_t mask = 1 << (7 - ((pos + i) & 7));
+    if ((value >> (n - 1 - i)) & 1)
+      d[(pos + i) >> 3] |= mask;
+    else
+      d[(pos + i) >> 3] &= ~mask;
+  }
+}
+
+static inline unsigned int DTS_PopCount(uint32_t x)
+{
+  unsigned int c = 0;
+  for (; x; x >>= 1)
+    c += x & 1;
+  return c;
+}
+
+void CAEStreamParser::DefeatDTSDialNorm(uint8_t* data, unsigned int size)
+{
+  if (size < 16)
+    return;
+
+  // Only the 16-bit big-endian DTS core is handled (the DTS-HD MA / passthrough
+  // case). The 14-bit and little-endian packings interleave bytes differently;
+  // leave them untouched rather than risk corrupting the bitstream.
+  const uint32_t sync = (static_cast<uint32_t>(data[0]) << 24) |
+                        (static_cast<uint32_t>(data[1]) << 16) |
+                        (static_cast<uint32_t>(data[2]) << 8) | data[3];
+  if (sync != DTS_SYNC_CORE_16BE)
+    return;
+
+  // --- core header: DNG (4-bit), after FILTS/VERNUM/CHIST/PCMR/SUMF/SUMS ---
+  unsigned int pos = 32;
+  DTS_ReadBits(data, pos, 1);                       // FTYPE
+  DTS_ReadBits(data, pos, 5);                       // deficit sample count
+  const unsigned int cpf = DTS_ReadBits(data, pos, 1);
+  DTS_ReadBits(data, pos, 7);                       // NBLKS
+  const unsigned int fsize = DTS_ReadBits(data, pos, 14) + 1;
+  DTS_ReadBits(data, pos, 6 + 4 + 5);               // AMODE, SFREQ, RATE
+  DTS_ReadBits(data, pos, 1 + 1 + 1 + 1 + 1);       // FIXED, DYNF, TIMEF, AUXF, HDCD
+  DTS_ReadBits(data, pos, 3 + 1 + 1 + 2 + 1);       // EXT_AUDIO_ID/AUDIO, ASPF, LFF, HFLAG
+  if (cpf)
+    DTS_ReadBits(data, pos, 16);                    // header CRC (HCRC)
+  DTS_ReadBits(data, pos, 1 + 4 + 2 + 3 + 1 + 1);   // FILTS, VERNUM, CHIST, PCMR, SUMF, SUMS
+  const unsigned int dngPos = pos;
+  const unsigned int dng = DTS_ReadBits(data, pos, 4);
+
+  // Zero the core DNG only when there is no core header CRC (cpf == 0) — this
+  // holds for every DTS-HD MA stream. With cpf == 1 an HCRC recompute would be
+  // required, so leave the core untouched in that (rare) case.
+  if (cpf == 0 && dng != 0)
+    DTS_WriteBits(data, dngPos, 4, 0);
+
+  // --- DTS-HD extension substream: asset-descriptor nuDialNormCode (5-bit) ---
+  if (fsize + 4 > size)
+    return;
+  const unsigned int exss = fsize;
+  const uint32_t exssSync = (static_cast<uint32_t>(data[exss]) << 24) |
+                            (static_cast<uint32_t>(data[exss + 1]) << 16) |
+                            (static_cast<uint32_t>(data[exss + 2]) << 8) | data[exss + 3];
+  if (exssSync != DTS_SYNC_EXTENTION)
+    return;
+
+  uint8_t* eb = data + exss;
+  unsigned int ep = 32;                             // skip the 32-bit sync
+  DTS_ReadBits(eb, ep, 8);                          // nuUserDefinedBits
+  const unsigned int nExtSSIndex = DTS_ReadBits(eb, ep, 2);
+  const unsigned int bHeaderSizeType = DTS_ReadBits(eb, ep, 1);
+  const unsigned int nBitsHdr = bHeaderSizeType ? 12 : 8;
+  const unsigned int nBitsFsize = bHeaderSizeType ? 20 : 16;
+  const unsigned int headerSize = DTS_ReadBits(eb, ep, nBitsHdr) + 1;
+  if (exss + headerSize > size || headerSize < 7)
+    return;
+
+  // Safety gate: only proceed if the existing EXSS header CRC validates. This
+  // confirms we parsed the header layout correctly for this particular stream
+  // (and matches FFmpeg's ff_dca_check_crc); on any mismatch we leave the frame
+  // untouched, so an unexpected variant can never be corrupted.
+  const AVCRC* crcTable = av_crc_get_table(AV_CRC_16_CCITT);
+  if (av_crc(crcTable, 0xFFFF, eb + 5, headerSize - 5) != 0)
+    return;
+
+  DTS_ReadBits(eb, ep, nBitsFsize);                 // nuExtSSFsize
+  const unsigned int staticFields = DTS_ReadBits(eb, ep, 1);
+  unsigned int numAssets = 1;
+  if (staticFields)
+  {
+    DTS_ReadBits(eb, ep, 2 + 3);                    // nuRefClockCode, frame duration
+    if (DTS_ReadBits(eb, ep, 1))                    // bTimeStampFlag
+    {
+      DTS_ReadBits(eb, ep, 32);
+      DTS_ReadBits(eb, ep, 4);
+    }
+    const unsigned int numAudioPresnt = DTS_ReadBits(eb, ep, 3) + 1;
+    numAssets = DTS_ReadBits(eb, ep, 3) + 1;
+    if (numAudioPresnt > 8)
+      return;
+    uint32_t masks[8] = {0};
+    for (unsigned int i = 0; i < numAudioPresnt; ++i)
+      masks[i] = DTS_ReadBits(eb, ep, nExtSSIndex + 1);
+    for (unsigned int i = 0; i < numAudioPresnt; ++i)
+      for (unsigned int ss = 0; ss < nExtSSIndex + 1u; ++ss)
+        if ((masks[i] >> ss) & 1)
+          DTS_ReadBits(eb, ep, 8);
+    if (DTS_ReadBits(eb, ep, 1))                    // bMixMetadataEnbl — too complex; bail
+      return;
+  }
+  for (unsigned int i = 0; i < numAssets; ++i)
+    DTS_ReadBits(eb, ep, nBitsFsize);               // nuAssetFsize[i]
+
+  // First (primary) audio-asset descriptor. DTS-HD MA / DTS:X carry a single
+  // asset; a rare multi-asset stream would only have its first asset defeated.
+  DTS_ReadBits(eb, ep, 9);                          // nuAssetDescriptFsize
+  DTS_ReadBits(eb, ep, 3);                          // nuAssetIndex
+  if (staticFields)
+  {
+    if (DTS_ReadBits(eb, ep, 1)) DTS_ReadBits(eb, ep, 4);   // asset type descriptor
+    if (DTS_ReadBits(eb, ep, 1)) DTS_ReadBits(eb, ep, 24);  // language descriptor
+    if (DTS_ReadBits(eb, ep, 1))                            // info text
+      ep += (DTS_ReadBits(eb, ep, 10) + 1) * 8;
+    DTS_ReadBits(eb, ep, 5);                        // nuBitResolution
+    DTS_ReadBits(eb, ep, 4);                        // nuMaxSampleRate
+    const unsigned int nch = DTS_ReadBits(eb, ep, 8) + 1;   // nuTotalNumChs
+    if (DTS_ReadBits(eb, ep, 1))                    // bOne2OneMapChannels2Speakers
+    {
+      if (nch > 2) DTS_ReadBits(eb, ep, 1);         // bEmbeddedStereoFlag
+      if (nch > 6) DTS_ReadBits(eb, ep, 1);         // bEmbeddedSixChFlag
+      unsigned int w = 0;
+      if (DTS_ReadBits(eb, ep, 1))                  // bSpkrMaskEnabled
+      {
+        w = (DTS_ReadBits(eb, ep, 2) + 1) * 4;
+        DTS_ReadBits(eb, ep, w);                    // nuSpkrActivityMask
+      }
+      const unsigned int nremap = DTS_ReadBits(eb, ep, 3);
+      if (nremap > 8)
+        return;
+      uint32_t layouts[8] = {0};
+      for (unsigned int i = 0; i < nremap; ++i)
+        layouts[i] = DTS_ReadBits(eb, ep, w);
+      for (unsigned int i = 0; i < nremap; ++i)
+      {
+        const unsigned int ndec = DTS_ReadBits(eb, ep, 5) + 1;
+        const unsigned int nspk = DTS_PopCount(layouts[i]);
+        for (unsigned int c = 0; c < nspk; ++c)
+        {
+          const unsigned int ncoef = DTS_PopCount(DTS_ReadBits(eb, ep, ndec));
+          for (unsigned int k = 0; k < ncoef; ++k)
+            DTS_ReadBits(eb, ep, 5);
+        }
+      }
+    }
+    else
+      DTS_ReadBits(eb, ep, 3);                      // nuRepresentationType
+  }
+  if (DTS_ReadBits(eb, ep, 1))                      // bDRCCoefPresent
+    DTS_ReadBits(eb, ep, 8);                        // nuDRCCode
+  if (!DTS_ReadBits(eb, ep, 1))                     // bDialNormPresent
+    return;
+  const unsigned int dnPos = ep;
+  if (dnPos + 5 > headerSize * 8)                   // must lie within the header
+    return;
+  if (DTS_ReadBits(eb, ep, 5) == 0)                 // nuDialNormCode already 0
+    return;
+
+  // Zero nuDialNormCode and recompute the EXSS header CRC over [5, headerSize-2).
+  DTS_WriteBits(eb, dnPos, 5, 0);
+  const uint16_t crc =
+      static_cast<uint16_t>(av_crc(crcTable, 0xFFFF, eb + 5, headerSize - 2 - 5));
+  eb[headerSize - 2] = (crc >> 8) & 0xFF;
+  eb[headerSize - 1] = crc & 0xFF;
 }
 
 bool CAEStreamParser::TrySyncAC3(uint8_t* data,

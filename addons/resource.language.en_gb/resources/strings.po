@@ -25363,6 +25363,18 @@ msgctxt "#55010"
 msgid "Stopping playback to prevent decoder issues."
 msgstr ""
 
+#. Setting label for DTS / DTS-HD dialogue normalisation defeat
+#: system/settings/settings.xml
+msgctxt "#55011"
+msgid "DTS / DTS-HD dialogue normalisation defeat (0 dB)"
+msgstr ""
+
+#. Setting help for DTS / DTS-HD dialogue normalisation defeat
+#: system/settings/settings.xml
+msgctxt "#55012"
+msgid "Force the dialogue normalisation value to (0 dB) in DTS, DTS-HD High Resolution and DTS-HD Master Audio bitstreams (including DTS:X). This disables receiver-side dialogue normalisation, preventing unwanted volume reduction during passthrough playback. Many DTS titles carry no dialogue normalisation, so this has no effect on them."
+msgstr ""
+
 #. "Dolby Vision"
 #: system/settings/settings.xml
 msgctxt "#60001"

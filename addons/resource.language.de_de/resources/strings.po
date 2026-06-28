@@ -18731,6 +18731,14 @@ msgctxt "#55006"
 msgid "Also apply dialogue normalisation defeat to E-AC-3 Dolby Atmos (DD+ Atmos) streams. This will disable Dolby Atmos object audio rendering — your receiver will fall back to standard Dolby Digital Plus surround. Safe to enable if your setup does not support Atmos."
 msgstr "Deaktivierung der Dialognormalisierung auch auf E-AC-3 Dolby Atmos (DD+ Atmos)-Streams anwenden. Dadurch wird das Dolby Atmos-Objektaudio-Rendering deaktiviert — der Receiver fällt auf standardmäßiges Dolby Digital Plus Surround zurück. Kann bedenkenlos aktiviert werden, wenn die Anlage kein Atmos unterstützt."
 
+msgctxt "#55011"
+msgid "DTS / DTS-HD dialogue normalisation defeat (0 dB)"
+msgstr "DTS / DTS-HD-Dialognormalisierung deaktivieren (0 dB)"
+
+msgctxt "#55012"
+msgid "Force the dialogue normalisation value to (0 dB) in DTS, DTS-HD High Resolution and DTS-HD Master Audio bitstreams (including DTS:X). This disables receiver-side dialogue normalisation, preventing unwanted volume reduction during passthrough playback. Many DTS titles carry no dialogue normalisation, so this has no effect on them."
+msgstr "Dialognormalisierungswert in DTS, DTS-HD High Resolution und DTS-HD Master Audio-Bitstreams (einschließlich DTS:X) auf 0 dB erzwingen. Dadurch wird die receiverseitige Dialognormalisierung deaktiviert und eine unerwünschte Lautstärkereduzierung bei Passthrough-Wiedergabe verhindert. Viele DTS-Titel enthalten keine Dialognormalisierung, sodass dies bei ihnen keine Auswirkung hat."
+
 #. 60001 to 69999 are reserved for avdvplus
 msgctxt "#60001"
 msgid "Dolby Vision (DV)"

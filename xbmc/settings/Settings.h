@@ -524,6 +524,7 @@ public:
   static constexpr auto SETTING_COREELEC_AUDIO_AC3_DIALNORM = "coreelec.audio.ac3.dialnorm";
   static constexpr auto SETTING_COREELEC_AUDIO_EAC3_ATMOS_DIALNORM = "coreelec.audio.eac3.atmos.dialnorm";
   static constexpr auto SETTING_COREELEC_AUDIO_TRUEHD_ATMOS_DIALNORM = "coreelec.audio.truehd.atmos.dialnorm";
+  static constexpr auto SETTING_COREELEC_AUDIO_DTS_DIALNORM = "coreelec.audio.dts.dialnorm";
   static constexpr auto SETTING_COREELEC_AUDIO_DDR_PRIORITY = "coreelec.audio.ddr_priority";
   static constexpr auto SETTING_COREELEC_VIDEOPLAYER_DETECT_BROKEN_FILES = "coreelec.videoplayer.detectbrokenfiles";
   static constexpr auto SETTING_CACHE_HARDDISK = "cache.harddisk";

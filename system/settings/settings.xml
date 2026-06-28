@@ -3704,6 +3704,18 @@
           </dependencies>
           <control type="toggle" />
         </setting>
+        <setting id="coreelec.audio.dts.dialnorm" type="boolean" label="55011" help="55012">
+          <level>2</level>
+          <default>true</default>
+          <dependencies>
+            <dependency type="enable">
+              <and>
+                <condition setting="audiooutput.passthrough" operator="is">true</condition>
+              </and>
+            </dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
       </group>
     </category>
     <category id="input" label="14125" help="36374">
