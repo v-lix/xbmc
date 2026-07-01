@@ -529,10 +529,12 @@ void CAEStreamParser::DefeatAC3DialNorm(uint8_t* data, unsigned int size)
 }
 
 // ---------------------------------------------------------------------------
-// DTS dialnorm defeat — core DNG (4-bit) + DTS-HD extension-substream asset
-// nuDialNormCode (5-bit). DTS convention: the field is the dB of attenuation,
-// 0 = none (eac3to prints "dialnorm: 0dB"), so defeating it means writing 0
-// (the opposite of AC-3, where 31 = 0 dB). Layout per ETSI TS 102 114; the
+// DTS dialnorm defeat — pure DTS: core DNG (4-bit). DTS-HD MA/HR: the
+// extension-substream asset nuDialNormCode (5-bit) ONLY (the embedded core is
+// left pristine — rewriting it silences the XLL decode on some AVRs; see below).
+// DTS convention: the field is the dB of attenuation, 0 = none (eac3to prints
+// "dialnorm: 0dB"), so defeating it means writing 0 (the opposite of AC-3,
+// where 31 = 0 dB). Layout per ETSI TS 102 114; the
 // extension-substream header is protected by a CRC-16-CCITT (poly 0x1021,
 // init 0xFFFF) over EXSS bytes [5, headerSize). Validated against eac3to v3.62
 // and real DTS-HD MA streams. Only the 16-bit big-endian core is handled; the
@@ -599,22 +601,33 @@ void CAEStreamParser::DefeatDTSDialNorm(uint8_t* data, unsigned int size)
   const unsigned int dngPos = pos;
   const unsigned int dng = DTS_ReadBits(data, pos, 4);
 
-  // Zero the core DNG only when there is no core header CRC (cpf == 0) — this
-  // holds for every DTS-HD MA stream. With cpf == 1 an HCRC recompute would be
-  // required, so leave the core untouched in that (rare) case.
-  if (cpf == 0 && dng != 0)
-    DTS_WriteBits(data, dngPos, 4, 0);
+  // Does a DTS-HD extension substream (DTS-HD MA / HR) follow this core frame?
+  const unsigned int exss = fsize;
+  bool hasExss = false;
+  if (fsize + 4 <= size)
+  {
+    const uint32_t es = (static_cast<uint32_t>(data[exss]) << 24) |
+                        (static_cast<uint32_t>(data[exss + 1]) << 16) |
+                        (static_cast<uint32_t>(data[exss + 2]) << 8) | data[exss + 3];
+    hasExss = (es == DTS_SYNC_EXTENTION);
+  }
+
+  // PURE DTS (no extension): the core DNG is the only dialnorm — defeat it here
+  // (cpf == 0 ⇒ no header CRC to recompute; cpf == 1 is left untouched).
+  //
+  // DTS-HD MA / HR: do NOT rewrite the embedded backward-compatible core. Doing
+  // so silences the lossless (XLL) decode on several AVRs/soundbars, and the
+  // receiver uses the *asset* dialnorm for MA anyway — so the core write was both
+  // superfluous and harmful. On-device confirmed: core-only rewrite = silence,
+  // asset-only = correct playback. HD paths therefore defeat the asset only.
+  if (!hasExss)
+  {
+    if (cpf == 0 && dng != 0)
+      DTS_WriteBits(data, dngPos, 4, 0);
+    return;
+  }
 
   // --- DTS-HD extension substream: asset-descriptor nuDialNormCode (5-bit) ---
-  if (fsize + 4 > size)
-    return;
-  const unsigned int exss = fsize;
-  const uint32_t exssSync = (static_cast<uint32_t>(data[exss]) << 24) |
-                            (static_cast<uint32_t>(data[exss + 1]) << 16) |
-                            (static_cast<uint32_t>(data[exss + 2]) << 8) | data[exss + 3];
-  if (exssSync != DTS_SYNC_EXTENTION)
-    return;
-
   uint8_t* eb = data + exss;
   unsigned int ep = 32;                             // skip the 32-bit sync
   DTS_ReadBits(eb, ep, 8);                          // nuUserDefinedBits
