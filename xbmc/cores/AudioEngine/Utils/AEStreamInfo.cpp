@@ -530,8 +530,10 @@ void CAEStreamParser::DefeatAC3DialNorm(uint8_t* data, unsigned int size)
 
 // ---------------------------------------------------------------------------
 // DTS dialnorm defeat — pure DTS: core DNG (4-bit). DTS-HD MA/HR: the
-// extension-substream asset nuDialNormCode (5-bit) ONLY (the embedded core is
-// left pristine — rewriting it silences the XLL decode on some AVRs; see below).
+// extension-substream asset nuDialNormCode (5-bit) ONLY (the AVR uses the asset
+// dialnorm for MA, so the embedded core is left pristine). The header CRC MUST
+// be recomputed with the local CRC-16-CCITT below — av_crc(AV_CRC_16_CCITT) is
+// unusable here (table absent from Kodi's libavutil → garbage CRC → muted MA).
 // DTS convention: the field is the dB of attenuation, 0 = none (eac3to prints
 // "dialnorm: 0dB"), so defeating it means writing 0 (the opposite of AC-3,
 // where 31 = 0 dB). Layout per ETSI TS 102 114; the
@@ -569,6 +571,23 @@ static inline unsigned int DTS_PopCount(uint32_t x)
   for (; x; x >>= 1)
     c += x & 1;
   return c;
+}
+
+// CRC-16-CCITT (poly 0x1021, init 0xFFFF, MSB-first) — the DTS extension-substream
+// header CRC. Implemented locally: Kodi's libavutil does not ship the
+// AV_CRC_16_CCITT table, so av_crc()/av_crc_get_table() returned an invalid CRC on
+// device, corrupting the recomputed header and muting DTS-HD MA on strict AVRs.
+static inline uint16_t DTS_CRC16_CCITT(const uint8_t* d, unsigned int len)
+{
+  uint16_t crc = 0xFFFF;
+  for (unsigned int i = 0; i < len; ++i)
+  {
+    crc ^= static_cast<uint16_t>(d[i]) << 8;
+    for (int b = 0; b < 8; ++b)
+      crc = (crc & 0x8000) ? static_cast<uint16_t>((crc << 1) ^ 0x1021)
+                           : static_cast<uint16_t>(crc << 1);
+  }
+  return crc;
 }
 
 void CAEStreamParser::DefeatDTSDialNorm(uint8_t* data, unsigned int size)
@@ -615,11 +634,11 @@ void CAEStreamParser::DefeatDTSDialNorm(uint8_t* data, unsigned int size)
   // PURE DTS (no extension): the core DNG is the only dialnorm — defeat it here
   // (cpf == 0 ⇒ no header CRC to recompute; cpf == 1 is left untouched).
   //
-  // DTS-HD MA / HR: do NOT rewrite the embedded backward-compatible core. Doing
-  // so silences the lossless (XLL) decode on several AVRs/soundbars, and the
-  // receiver uses the *asset* dialnorm for MA anyway — so the core write was both
-  // superfluous and harmful. On-device confirmed: core-only rewrite = silence,
-  // asset-only = correct playback. HD paths therefore defeat the asset only.
+  // DTS-HD MA / HR: the receiver uses the extension-substream *asset* dialnorm,
+  // so rewriting the embedded backward-compatible core buys nothing — defeat the
+  // asset only and leave the core pristine. (The MA silencing bug was the invalid
+  // header CRC from av_crc(AV_CRC_16_CCITT), fixed above; the core write itself is
+  // harmless but pointless here.)
   if (!hasExss)
   {
     if (cpf == 0 && dng != 0)
@@ -643,8 +662,7 @@ void CAEStreamParser::DefeatDTSDialNorm(uint8_t* data, unsigned int size)
   // confirms we parsed the header layout correctly for this particular stream
   // (and matches FFmpeg's ff_dca_check_crc); on any mismatch we leave the frame
   // untouched, so an unexpected variant can never be corrupted.
-  const AVCRC* crcTable = av_crc_get_table(AV_CRC_16_CCITT);
-  if (av_crc(crcTable, 0xFFFF, eb + 5, headerSize - 5) != 0)
+  if (DTS_CRC16_CCITT(eb + 5, headerSize - 5) != 0)
     return;
 
   DTS_ReadBits(eb, ep, nBitsFsize);                 // nuExtSSFsize
@@ -731,8 +749,7 @@ void CAEStreamParser::DefeatDTSDialNorm(uint8_t* data, unsigned int size)
 
   // Zero nuDialNormCode and recompute the EXSS header CRC over [5, headerSize-2).
   DTS_WriteBits(eb, dnPos, 5, 0);
-  const uint16_t crc =
-      static_cast<uint16_t>(av_crc(crcTable, 0xFFFF, eb + 5, headerSize - 2 - 5));
+  const uint16_t crc = DTS_CRC16_CCITT(eb + 5, headerSize - 2 - 5);
   eb[headerSize - 2] = (crc >> 8) & 0xFF;
   eb[headerSize - 1] = crc & 0xFF;
 }
