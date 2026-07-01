@@ -569,6 +569,23 @@ static inline unsigned int DTS_PopCount(uint32_t x)
   return c;
 }
 
+// CRC-16-CCITT (poly 0x1021, init 0xFFFF, MSB-first) — the DTS extension-substream
+// header CRC. Implemented locally: Kodi's libavutil does not ship the
+// AV_CRC_16_CCITT table, so av_crc()/av_crc_get_table() returned an invalid CRC on
+// device, corrupting the recomputed header and muting DTS-HD MA on strict AVRs.
+static inline uint16_t DTS_CRC16_CCITT(const uint8_t* d, unsigned int len)
+{
+  uint16_t crc = 0xFFFF;
+  for (unsigned int i = 0; i < len; ++i)
+  {
+    crc ^= static_cast<uint16_t>(d[i]) << 8;
+    for (int b = 0; b < 8; ++b)
+      crc = (crc & 0x8000) ? static_cast<uint16_t>((crc << 1) ^ 0x1021)
+                           : static_cast<uint16_t>(crc << 1);
+  }
+  return crc;
+}
+
 void CAEStreamParser::DefeatDTSDialNorm(uint8_t* data, unsigned int size)
 {
   if (size < 16)
@@ -630,8 +647,7 @@ void CAEStreamParser::DefeatDTSDialNorm(uint8_t* data, unsigned int size)
   // confirms we parsed the header layout correctly for this particular stream
   // (and matches FFmpeg's ff_dca_check_crc); on any mismatch we leave the frame
   // untouched, so an unexpected variant can never be corrupted.
-  const AVCRC* crcTable = av_crc_get_table(AV_CRC_16_CCITT);
-  if (av_crc(crcTable, 0xFFFF, eb + 5, headerSize - 5) != 0)
+  if (DTS_CRC16_CCITT(eb + 5, headerSize - 5) != 0)
     return;
 
   DTS_ReadBits(eb, ep, nBitsFsize);                 // nuExtSSFsize
@@ -718,8 +734,7 @@ void CAEStreamParser::DefeatDTSDialNorm(uint8_t* data, unsigned int size)
 
   // Zero nuDialNormCode and recompute the EXSS header CRC over [5, headerSize-2).
   DTS_WriteBits(eb, dnPos, 5, 0);
-  const uint16_t crc =
-      static_cast<uint16_t>(av_crc(crcTable, 0xFFFF, eb + 5, headerSize - 2 - 5));
+  const uint16_t crc = DTS_CRC16_CCITT(eb + 5, headerSize - 2 - 5);
   eb[headerSize - 2] = (crc >> 8) & 0xFF;
   eb[headerSize - 1] = crc & 0xFF;
 }
