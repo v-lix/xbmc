@@ -25630,7 +25630,7 @@ msgstr ""
 #. "Dolby Vision VS10 SDR Target Peak Brightness"
 #: system/settings/settings.xml
 msgctxt "#60633"
-msgid "Ceiling for the assumed source peak of the SDR brightness boost. Titles whose actual content peak (MaxCLL) is below it get the full no-clipping Auto boost; brighter titles are treated as peaking here, so their content above it clips. Lower is brighter. Also used directly for titles without peak metadata and for HLG (experimental)."
+msgid "Ceiling for the assumed source peak of the SDR brightness boost. Titles whose actual content peak (MaxCLL) is below it get the full no-clipping Auto boost; brighter titles are treated as peaking here, so their content above it clips. Lower is brighter. Also used directly for titles without peak metadata."
 msgstr ""
 
 #. "Dolby Vision VS10 SDR Brightness Boost"
@@ -25642,7 +25642,7 @@ msgstr ""
 #. "Dolby Vision VS10 SDR Brightness Boost"
 #: system/settings/settings.xml
 msgctxt "#60635"
-msgid "Brightens DV and HDR10 content converted to SDR via VS10, which otherwise looks dim next to the GUI and native SDR files. Off keeps the stock tone mapping. Auto assumes the source peaks at its actual content peak brightness (MaxCLL) instead of its mastering display peak - the strongest boost that cannot clip; does nothing when that metadata is missing, and for HLG. Manual sets a ceiling on the assumed source peak: titles below the ceiling get the Auto boost, brighter titles are treated as peaking at the ceiling and their content above it clips; the ceiling is also used for titles without metadata and for HLG (experimental)."
+msgid "Brightens DV and HDR10 content converted to SDR via VS10, which otherwise looks dim next to the GUI and native SDR files. Off keeps the stock tone mapping. Auto assumes the source peaks at its actual content peak brightness (MaxCLL) instead of its mastering display peak - the strongest boost that cannot clip; does nothing when that metadata is missing. Manual sets a ceiling on the assumed source peak: titles below the ceiling get the Auto boost, brighter titles are treated as peaking at the ceiling and their content above it clips; the ceiling is also used for titles without metadata. HLG sources are not affected."
 msgstr ""
 
 #. "Dolby Vision VS10 HDR10 OSD Peak Brightness"
