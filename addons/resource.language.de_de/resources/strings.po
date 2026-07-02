@@ -18905,12 +18905,20 @@ msgid "Set the maximum luminance for OSD graphics (GUI, subtitles) in nits durin
 msgstr "Maximale Luminanz für OSD-Grafiken (GUI, Untertitel) in Nits während der DV-Wiedergabe festlegen. Steuert, wie hell Overlays erscheinen, wenn der DV-Compositor aktiv ist. Der Standardwert 300 entspricht dem im Compositor integrierten Wert."
 
 msgctxt "#60632"
-msgid "SDR target peak brightness (nits)"
-msgstr "SDR-Ziel-Spitzenhelligkeit (Nits)"
+msgid "Maximum source luminance (nits)"
+msgstr "Maximale Quell-Luminanz (Nits)"
 
 msgctxt "#60633"
-msgid "Target display luminance the DV engine maps to when converting DV/HDR to SDR via VS10. The kernel default of 100 (SDR reference white) makes tone-mapped output look dim next to the GUI and native SDR files. Raise it towards your panel's actual SDR brightness to lift mid-tones (may clip highlights). 100 keeps stock behaviour."
-msgstr "Ziel-Display-Luminanz, auf die die DV-Engine abbildet, wenn DV/HDR über VS10 nach SDR konvertiert wird. Der Kernel-Standardwert 100 (SDR-Referenzweiß) lässt das tone-gemappte Bild neben der GUI und nativen SDR-Dateien dunkel wirken. Erhöhe ihn in Richtung der tatsächlichen SDR-Helligkeit deines Panels, um die Mitteltöne anzuheben (kann Spitzlichter beschneiden). 100 behält das Standardverhalten bei."
+msgid "Ceiling for the assumed source peak of the SDR brightness boost. Titles whose actual content peak (MaxCLL) is below it get the full no-clipping Auto boost; brighter titles are treated as peaking here, so their content above it clips. Lower is brighter. Also used directly for titles without peak metadata and for HLG (experimental)."
+msgstr "Obergrenze für die angenommene Quell-Spitzenhelligkeit der SDR-Helligkeitsanhebung. Titel, deren tatsächliche Inhalts-Spitze (MaxCLL) darunter liegt, erhalten die volle Auto-Anhebung ohne Beschneidung; hellere Titel werden behandelt, als läge ihre Spitze hier, sodass Inhalte darüber beschnitten werden. Niedriger ist heller. Wird bei Titeln ohne Peak-Metadaten und bei HLG direkt verwendet (experimentell)."
+
+msgctxt "#60634"
+msgid "Boost VS10 SDR output brightness"
+msgstr "VS10-SDR-Ausgabehelligkeit anheben"
+
+msgctxt "#60635"
+msgid "Brightens DV and HDR10 content converted to SDR via VS10, which otherwise looks dim next to the GUI and native SDR files. Off keeps the stock tone mapping. Auto assumes the source peaks at its actual content peak brightness (MaxCLL) instead of its mastering display peak - the strongest boost that cannot clip; does nothing when that metadata is missing, and for HLG. Manual sets a ceiling on the assumed source peak: titles below the ceiling get the Auto boost, brighter titles are treated as peaking at the ceiling and their content above it clips; the ceiling is also used for titles without metadata and for HLG (experimental)."
+msgstr "Hellt DV- und HDR10-Inhalte auf, die über VS10 nach SDR konvertiert werden und sonst neben der GUI und nativen SDR-Dateien dunkel wirken. Aus behält das Standard-Tone-Mapping bei. Automatisch nimmt als Quell-Spitze die tatsächliche Spitzenhelligkeit des Inhalts (MaxCLL) statt der Mastering-Display-Spitze an - die stärkste Anhebung, die nicht beschneiden kann; ohne diese Metadaten und bei HLG passiert nichts. Manuell setzt eine Obergrenze für die angenommene Quell-Spitze: Titel darunter erhalten die automatische Anhebung, hellere Titel werden behandelt, als läge ihre Spitze an der Obergrenze, und Inhalte darüber werden beschnitten; die Obergrenze gilt auch für Titel ohne Metadaten und für HLG (experimentell)."
 
 msgctxt "#60069"
 msgid "HDR10 OSD peak brightness (nits)"

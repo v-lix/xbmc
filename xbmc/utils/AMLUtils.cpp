@@ -1036,7 +1036,7 @@ unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
   {
     CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
     CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
-    aml_dv_set_sdr_target_nits(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_TARGET_NITS));
+    aml_dv_set_sdr_source_max_nits(aml_dv_sdr_boost_param());
   }
 
   // force_hdmi: re-run the HDMI re-assertion (toggle_frame + attr/eotf) for the
@@ -1583,19 +1583,27 @@ void aml_dv_set_hdr10_osd_brightness(int nits)
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", nits);
 }
 
-void aml_dv_set_sdr_target_nits(int nits)
+int aml_dv_sdr_boost_param()
 {
-  // Override the DV core's SDR-output target display luminance: the *->SDR
-  // column of dolby_vision_target_lum_max[src][dst] (flat indices 2/5/8). The
-  // kernel hardcodes this to 100 nits (SDR reference white), so DV/HDR content
-  // tone-mapped to SDR via VS10 lands well below the panel's actual SDR
-  // brightness and reads as dim next to the GUI and native SDR files. Raising
-  // the target tells the CVM to map for a brighter SDR display, lifting
-  // mid-tones. Non-SDR columns keep the kernel defaults; nits==100 reproduces
-  // stock behaviour. Values must be comma-separated: kernel param_array()
-  // splits on ',' only and rejects the whole write otherwise.
-  std::string lum_max = StringUtils::Format("4000,1000,{},1000,1000,{},600,1000,{}", nits, nits, nits);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_target_lum_max", lum_max);
+  // Resolve the SDR brightness boost settings to the kernel param value:
+  // Off -> 0, Auto -> 1 (kernel caps at the content's MaxCLL), Manual ->
+  // the assumed source peak in nits from the sub-slider.
+  int mode = settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_BOOST);
+  if (mode == 2)
+    return settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_SRC_MAX_NITS);
+  return mode;
+}
+
+void aml_dv_set_sdr_source_max_nits(int value)
+{
+  // VS10 ->SDR brightness boost: cap the source's declared peak luminance
+  // (DV source_max_pq / HDR10 mastering peak) kernel-side before the DV
+  // library tone-maps, so it compresses less and lifts the SDR output.
+  // Content brighter than the cap clips. 0 = off, 1 = auto (content
+  // MaxCLL), >= 100 = manual nits. This is the working lever for dim VS10
+  // SDR output - the *->SDR column of dolby_vision_target_lum_max is
+  // ignored by the DV library (proven on-device, 10 vs 4000 identical).
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_sdr_src_max_nits", value);
 }
 
 bool aml_is_dv_enable()

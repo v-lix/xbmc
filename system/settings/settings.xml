@@ -4444,18 +4444,36 @@
           </constraints>
           <control type="spinner" format="string" />
         </setting>
-        <setting id="coreelec.amlogic.dolbyvision.vs10.sdr.target.nits" type="integer" label="60632" help="60633" parent="coreelec.amlogic.dolbyvision.type">
+        <setting id="coreelec.amlogic.dolbyvision.vs10.sdr.boost" type="integer" label="60634" help="60635" parent="coreelec.amlogic.dolbyvision.type">
           <requirement>HAVE_AMCODEC</requirement>
           <visible>false</visible>
           <level>2</level>
-          <default>100</default>
+          <default>0</default>
           <dependencies>
             <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
           </dependencies>
           <constraints>
+            <options>
+              <option label="351">0</option> <!-- Off -->
+              <option label="16316">1</option> <!-- Auto -->
+              <option label="60618">2</option> <!-- Manual -->
+            </options>
+          </constraints>
+          <control type="spinner" format="string" />
+        </setting>
+        <setting id="coreelec.amlogic.dolbyvision.vs10.sdr.source.max.nits" type="integer" label="60632" help="60633" parent="coreelec.amlogic.dolbyvision.vs10.sdr.boost">
+          <requirement>HAVE_AMCODEC</requirement>
+          <visible>false</visible>
+          <level>2</level>
+          <default>1000</default>
+          <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.vs10.sdr.boost" operator="is">2</dependency>
+          </dependencies>
+          <constraints>
             <minimum>100</minimum>
-            <step>10</step>
-            <maximum>500</maximum>
+            <step>100</step>
+            <maximum>4000</maximum>
           </constraints>
           <control type="slider" format="integer" />
         </setting>
