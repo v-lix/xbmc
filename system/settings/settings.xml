@@ -4371,21 +4371,6 @@
           </constraints>
           <control type="spinner" format="string" />
         </setting>
-        <setting id="coreelec.amlogic.dolbyvision.vs10.sdr.target.nits" type="integer" label="60632" help="60633" parent="coreelec.amlogic.dolbyvision.type">
-          <requirement>HAVE_AMCODEC</requirement>
-          <visible>false</visible>
-          <level>2</level>
-          <default>100</default>
-          <dependencies>
-            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
-          </dependencies>
-          <constraints>
-            <minimum>100</minimum>
-            <step>10</step>
-            <maximum>500</maximum>
-          </constraints>
-          <control type="slider" format="integer" />
-        </setting>
         <setting id="coreelec.amlogic.dolbyvision.vs10.hdr10" type="integer" label="60055" help="60056" parent="coreelec.amlogic.dolbyvision.type">
           <requirement>HAVE_AMCODEC</requirement>
           <visible>false</visible>
@@ -4458,6 +4443,21 @@
             <options>DolbyVisionVS10DV</options>
           </constraints>
           <control type="spinner" format="string" />
+        </setting>
+        <setting id="coreelec.amlogic.dolbyvision.vs10.sdr.target.nits" type="integer" label="60632" help="60633" parent="coreelec.amlogic.dolbyvision.type">
+          <requirement>HAVE_AMCODEC</requirement>
+          <visible>false</visible>
+          <level>2</level>
+          <default>100</default>
+          <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
+          </dependencies>
+          <constraints>
+            <minimum>100</minimum>
+            <step>10</step>
+            <maximum>500</maximum>
+          </constraints>
+          <control type="slider" format="integer" />
         </setting>
         <!-- DV Level 5 active area handling group -->
         <setting id="coreelec.amlogic.dolbyvision.level5" type="boolean" label="60154" help="60155" parent="coreelec.amlogic.dolbyvision.type">

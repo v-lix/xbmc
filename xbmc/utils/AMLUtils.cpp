@@ -1592,8 +1592,9 @@ void aml_dv_set_sdr_target_nits(int nits)
   // brightness and reads as dim next to the GUI and native SDR files. Raising
   // the target tells the CVM to map for a brighter SDR display, lifting
   // mid-tones. Non-SDR columns keep the kernel defaults; nits==100 reproduces
-  // stock behaviour.
-  std::string lum_max = StringUtils::Format("4000 1000 {} 1000 1000 {} 600 1000 {}", nits, nits, nits);
+  // stock behaviour. Values must be comma-separated: kernel param_array()
+  // splits on ',' only and rejects the whole write otherwise.
+  std::string lum_max = StringUtils::Format("4000,1000,{},1000,1000,{},600,1000,{}", nits, nits, nits);
   CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_target_lum_max", lum_max);
 }
 
