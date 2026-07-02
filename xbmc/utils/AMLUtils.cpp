@@ -1018,6 +1018,13 @@ unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
   // VP modes always use the DV OSD Brightness slider (dolby_vision_graphic_max) — the
   // kernel scales the g_2_l degamma table by this value. The HDR10-specific slider is
   // only conditionally visible and not applicable to VP.
+
+  // Refresh the SDR brightness boost param on every DV engage regardless of
+  // mode/VP — the kernel only applies it for SDR output, but writing it
+  // unconditionally prevents a stale value when the SDR branch below is
+  // skipped (e.g. VP enabled while playing HDR10->SDR).
+  aml_dv_set_sdr_source_max_nits(aml_dv_sdr_boost_param());
+
   if (dv_vp != 0)
   {
     CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
@@ -1036,7 +1043,6 @@ unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
   {
     CSysfsPath("/sys/module/amdolby_vision/parameters/dv_graphic_blend_test", 0);
     CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max", 0);
-    aml_dv_set_sdr_source_max_nits(aml_dv_sdr_boost_param());
   }
 
   // force_hdmi: re-run the HDMI re-assertion (toggle_frame + attr/eotf) for the
