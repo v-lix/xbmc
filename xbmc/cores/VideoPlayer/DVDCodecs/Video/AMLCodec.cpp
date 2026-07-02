@@ -1955,8 +1955,7 @@ bool CAMLCodec::OpenDecoder()
 
   // Green-flash mask also covers playback startup (same decode-restart class):
   // assert the hold here, released on the first decoded frame.
-  if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
-          CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE))
+  if (VideoRestartHoldWanted())
     HoldVideo(true);
 
   am_packet_init(&am_private->am_pkt);
@@ -2422,10 +2421,9 @@ void CAMLCodec::Reset()
 
   // Green-flash mask: blank the video output across this decode restart so the
   // brief window where the decoder reallocs over the keeper-pinned frame isn't
-  // shown. Read live so the setting takes effect on the next seek; released on
+  // shown. Read live so the settings take effect on the next seek; released on
   // the first valid frame in GetPicture (fail-safe time cap there).
-  HoldVideo(CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
-      CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE));
+  HoldVideo(VideoRestartHoldWanted());
 
   SetPollDevice(-1);
 
@@ -2930,6 +2928,21 @@ void CAMLCodec::ShowMainVideo(const bool show)
             show ? "show" : "hide", disable_video);
   CSysfsPath("/sys/class/video/disable_video", disable_video);
   saved_disable_video = disable_video;
+}
+
+// Master toggle, optionally narrowed to Dolby Vision streams by the DV-only
+// sub-setting; the seek-edge settle only runs inside an engaged hold, so this
+// gates both. m_hints references the codec's live stream info, valid at both
+// the OpenDecoder and Reset call sites.
+bool CAMLCodec::VideoRestartHoldWanted() const
+{
+  const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  if (!settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE))
+    return false;
+  if (settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_VIDEO_RESTART_MUTE_DV_ONLY) &&
+      m_hints.hdrType != StreamHdrType::HDR_TYPE_DOLBYVISION)
+    return false;
+  return true;
 }
 
 // Blank or release the whole video output across a decode (re)start so the brief

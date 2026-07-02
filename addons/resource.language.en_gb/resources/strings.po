@@ -26113,6 +26113,14 @@ msgctxt "#60345"
 msgid "This video is software-decoded; VS10 mapping needs a hardware-decoded stream."
 msgstr ""
 
+msgctxt "#60346"
+msgid "Only for Dolby Vision content"
+msgstr ""
+
+msgctxt "#60347"
+msgid "Applies the blanking (and the seek-edge option below, if enabled) only when the playing video is Dolby Vision. All other content starts and seeks without the black hold. Enable this if the green flash only appears with Dolby Vision content."
+msgstr ""
+
 #. "Dolby Vision Display LL Dolby VSVDB Limit"
 #: system/settings/settings.xml
 msgctxt "#60500"

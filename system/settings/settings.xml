@@ -4730,6 +4730,15 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
+        <setting id="coreelec.amlogic.video.restart.mute.dvonly" type="boolean" label="60346" help="60347" parent="coreelec.amlogic.video.restart.mute">
+          <requirement>HAVE_AMCODEC</requirement>
+          <level>2</level>
+          <default>false</default>
+          <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.video.restart.mute" operator="is">true</dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
         <setting id="coreelec.amlogic.video.restart.mute.settle" type="boolean" label="60342" help="60343" parent="coreelec.amlogic.video.restart.mute">
           <requirement>HAVE_AMCODEC</requirement>
           <level>2</level>

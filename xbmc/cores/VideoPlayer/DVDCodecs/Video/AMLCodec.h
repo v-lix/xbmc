@@ -92,6 +92,10 @@ private:
   // Hide video output across a decode (re)start (startup / seek flush) until the
   // first valid frame, masking the brief green flash. coreelec.amlogic.video.restart.mute.
   void          HoldVideo(bool hold);
+  // Whether the hold should engage for this stream: the master toggle above,
+  // optionally narrowed to Dolby Vision streams (…restart.mute.dvonly). Gating
+  // the hold also gates the seek-edge settle inside HoldVideo.
+  bool          VideoRestartHoldWanted() const;
   bool          OpenAmlVideo(const CDVDStreamInfo &hints);
   void          CloseAmlVideo();
   std::string   GetVfmMap(const std::string &name);
