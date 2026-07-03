@@ -943,7 +943,7 @@
           <level>1</level>
           <default>100</default>
           <constraints>
-            <minimum>50</minimum>
+            <minimum>10</minimum>
             <step>5</step>
             <maximum>200</maximum>
           </constraints>
