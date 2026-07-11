@@ -120,6 +120,7 @@ namespace OVERLAY {
     void Release(int idx);
     bool HasOverlay(int idx);
     bool HasTextOverlay(int idx);
+    bool HasImageOverlay(int idx);
     bool HasImageSubOutsideActiveArea(int idx, int l5Top, int l5Bottom);
     void SetVideoRect(CRect &source, CRect &dest, CRect &view);
     void SetStereoMode(const std::string &stereomode);

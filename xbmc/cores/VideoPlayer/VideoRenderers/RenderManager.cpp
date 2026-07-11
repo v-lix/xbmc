@@ -836,8 +836,10 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
       // When visible: signal for text subs on screen
       signalSubtitles = m_overlays.HasTextOverlay(m_presentsource);
 
-      // Resolve effective L5 bars (source, falling back to detected)
+      // Resolve effective L5 bars (source, falling back to detected, then
+      // auto-letterbox geometry)
       uint16_t sigTop = 0, sigBottom = 0;
+      bool autoLbBars = false;
       if (m_picture.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
       {
         const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
@@ -851,6 +853,19 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
         {
           uint16_t detLeft, detRight;
           aml_dv_detect_active_area_get(sigTop, sigBottom, detLeft, detRight);
+        }
+        if (sigTop == 0 && sigBottom == 0)
+        {
+          // Synthesized offsets for the player-added bars on cropped
+          // encodes. Same pixel pitch as the coded video, so the src->dst
+          // scale below converts them like source/detected values.
+          uint16_t albTop, albBottom, albLeft, albRight;
+          if (aml_dv_auto_letterbox_get(albTop, albBottom, albLeft, albRight))
+          {
+            sigTop = albTop;
+            sigBottom = albBottom;
+            autoLbBars = sigTop > 0 || sigBottom > 0;
+          }
         }
       }
 
@@ -881,8 +896,11 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
         float subBaselineFromTop = resInfo.iSubtitles - marginPixels;
         float subClearanceBottom = dst.y2 - subBaselineFromTop;
         float subClearanceTop = subBaselineFromTop - dst.y1;
-        // Sub clears both bars → no need to signal
-        if (subClearanceBottom > botBarDisp && subClearanceTop > topBarDisp)
+        // Sub clears both bars → no need to signal. Auto-letterbox bars sit
+        // outside the video rect, so clearing the video edge itself is enough.
+        float needBottom = autoLbBars ? 0.0f : botBarDisp;
+        float needTop = autoLbBars ? 0.0f : topBarDisp;
+        if (subClearanceBottom > needBottom && subClearanceTop > needTop)
           signalSubtitles = false;
       }
 
@@ -890,8 +908,13 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
       if (!signalSubtitles && !restrictSubsToActiveArea &&
           (sigTop > 0 || sigBottom > 0))
       {
-        signalSubtitles = m_overlays.HasImageSubOutsideActiveArea(
-            m_presentsource, sigTop, sigBottom);
+        // Auto-letterbox bars lie outside the video rect, so the canvas-AR
+        // geometry test cannot see them — treat any image sub as overlapping.
+        if (autoLbBars)
+          signalSubtitles = m_overlays.HasImageOverlay(m_presentsource);
+        else
+          signalSubtitles = m_overlays.HasImageSubOutsideActiveArea(
+              m_presentsource, sigTop, sigBottom);
       }
     }
     aml_dv_set_subtitles(signalSubtitles);

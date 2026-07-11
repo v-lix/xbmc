@@ -343,6 +343,18 @@ bool CRenderer::HasTextOverlay(int idx)
   return false;
 }
 
+bool CRenderer::HasImageOverlay(int idx)
+{
+  std::unique_lock<CCriticalSection> lock(m_section);
+
+  for (const auto& e : m_buffers[idx])
+  {
+    if (e.overlay_dvd && e.overlay_dvd->IsOverlayType(DVDOVERLAY_TYPE_IMAGE))
+      return true;
+  }
+  return false;
+}
+
 bool CRenderer::HasImageSubOutsideActiveArea(int idx, int l5Top, int l5Bottom)
 {
   std::unique_lock<CCriticalSection> lock(m_section);
