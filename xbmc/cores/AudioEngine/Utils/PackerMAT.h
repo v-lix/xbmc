@@ -120,7 +120,10 @@ public:
     int dat = 0;
     for (int i = index; i < index + bits; i++)
     {
-      dat = dat * 2 + getbit(data[i / 8], i % 8);
+      // Guard against reading past the end of the buffer on malformed input:
+      // out-of-range bits read as 0 instead of dereferencing beyond the array.
+      const uint8_t bit = (i / 8 < size) ? getbit(data[i / 8], i % 8) : 0;
+      dat = dat * 2 + bit;
     }
     index += bits;
     return dat;

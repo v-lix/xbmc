@@ -146,7 +146,7 @@ public:
    */
   void OffsetValues(T value)
   {
-    for (size_t i = 0; i < N; ++i)
+    for (size_t i = 0; i < m_sampleCount; ++i)
       m_samples[i] += value;
   }
 

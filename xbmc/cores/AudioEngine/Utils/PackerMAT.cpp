@@ -163,6 +163,21 @@ bool CPackerMAT::PackTrueHD(const uint8_t* data, int size)
     // insert ~440 extra bytes of padding and shift audio unit boundaries within the
     // MAT frame, which can confuse strict TrueHD decoders.
 
+    // Seek/corruption safety net: negative padding is expected (carry-forward),
+    // but an unbounded large POSITIVE padding - e.g. a wild frameTime jump on a
+    // hard seek or corrupt stream - would spin the while(padding > 0) loop below
+    // emitting a huge number of MAT frames. Bound it like the baseline path.
+    if (m_state.padding > MAT_BUFFER_SIZE * 5)
+    {
+      CLog::Log(LOGDEBUG,
+                "CPackerMAT::PackTrueHD: excessive padding, re-initializing MAT packer state");
+      m_state = {};
+      m_state.init = true;
+      m_buffer.clear();
+      m_bufferCount = 0;
+      return false;
+    }
+
     // LAV: Record the offset of frame time to output time, which is used to verify
     // the size of the padding on discontinuities
     if (m_state.outputTimingValid)
@@ -484,6 +499,11 @@ TrueHDMajorSyncInfo CPackerMAT::ParseTrueHDMajorSyncHeaders(const uint8_t* p, in
     int extensionSize = p[30] >> 4; // calculate headers size
     majorSyncSize += 2 + extensionSize * 2;
   }
+
+  // The computed header size must fit within the provided buffer; otherwise the
+  // bitstream reads below could run past the end on malformed/corrupt input.
+  if (majorSyncSize > buffsize)
+    return {};
 
   CBitStream bs(p + 4, buffsize - 4);
 
