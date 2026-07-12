@@ -205,13 +205,6 @@ bool CApplicationPowerHandling::WakeUpScreenSaver(bool bPowerOffKeyPressed /* = 
 #define SCRIPT_ALARM "sssssscreensaver"
 #define SCRIPT_TIMEOUT 15 // seconds
 
-        const auto appPlayer = CServiceBroker::GetAppComponents().GetComponent<CApplicationPlayer>();
-        if (appPlayer && appPlayer->IsPlayingVideo() && !appPlayer->IsPaused())
-        {
-          CServiceBroker::GetAppMessenger()->SendMsg(TMSG_GUI_ACTION, CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow(), -1,
-                                                     static_cast<void*>(new CAction(ACTION_NAV_BACK)));
-        }
-
         /* FIXME: This is a hack but a proper fix is non-trivial. Basically this code
         * makes sure the addon gets terminated after we've moved out of the screensaver window.
         * If we don't do this, we may simply lockup.
