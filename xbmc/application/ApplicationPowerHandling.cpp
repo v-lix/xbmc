@@ -41,7 +41,10 @@
 void CApplicationPowerHandling::ResetScreenSaver()
 {
   // reset our timers
-  m_shutdownTimer.StartZero();
+  // Don't reset the shutdown timer if a Python screensaver is active - the video
+  // playback from the screensaver should not prevent idle shutdown
+  if (!IsPythonScreenSaverActive())
+    m_shutdownTimer.StartZero();
 
   // screen saver timer is reset only if we're not already in screensaver or
   // DPMS mode
@@ -202,6 +205,13 @@ bool CApplicationPowerHandling::WakeUpScreenSaver(bool bPowerOffKeyPressed /* = 
 #define SCRIPT_ALARM "sssssscreensaver"
 #define SCRIPT_TIMEOUT 15 // seconds
 
+        const auto appPlayer = CServiceBroker::GetAppComponents().GetComponent<CApplicationPlayer>();
+        if (appPlayer && appPlayer->IsPlayingVideo() && !appPlayer->IsPaused())
+        {
+          CServiceBroker::GetAppMessenger()->SendMsg(TMSG_GUI_ACTION, CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow(), -1,
+                                                     static_cast<void*>(new CAction(ACTION_NAV_BACK)));
+        }
+
         /* FIXME: This is a hack but a proper fix is non-trivial. Basically this code
         * makes sure the addon gets terminated after we've moved out of the screensaver window.
         * If we don't do this, we may simply lockup.
@@ -288,10 +298,10 @@ void CApplicationPowerHandling::CheckScreenSaverAndDPMS()
   if (m_bInhibitScreenSaver)
     haveIdleActivity = true;
 
-  // Are we playing a video and it is not paused?
+  // Are we playing a video and it is not paused? (Ignore if screensaver is active, so video screensavers don't kill themselves)
   const auto& components = CServiceBroker::GetAppComponents();
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
-  if (appPlayer && appPlayer->IsPlayingVideo() && !appPlayer->IsPaused())
+  if (appPlayer && appPlayer->IsPlayingVideo() && !appPlayer->IsPaused() && !m_screensaverActive)
     haveIdleActivity = true;
 
   // Are we playing audio and screensaver is disabled globally for audio?
@@ -508,8 +518,13 @@ void CApplicationPowerHandling::CheckShutdown()
   if (!appPlayer)
     return;
 
-  if (m_bInhibitIdleShutdown || appPlayer->IsPlaying() ||
-      appPlayer->IsPausedPlayback() // is something playing?
+  bool bPlayingMediaActivity = appPlayer->IsPlaying() || appPlayer->IsPausedPlayback();
+  if (m_screensaverActive && appPlayer->IsPlayingVideo())
+    bPlayingMediaActivity = false;
+  if (IsPythonScreenSaverActive())
+    bPlayingMediaActivity = false;
+
+  if (m_bInhibitIdleShutdown || bPlayingMediaActivity
       || CMusicLibraryQueue::GetInstance().IsRunning() ||
       CVideoLibraryQueue::GetInstance().IsRunning() ||
       CServiceBroker::GetGUI()->GetWindowManager().IsWindowActive(

@@ -54,7 +54,8 @@ void CGUIVideoControl::Render()
     {
       auto& appComponents = CServiceBroker::GetAppComponents();
       const auto appPower = appComponents.GetComponent<CApplicationPowerHandling>();
-      appPower->ResetScreenSaver();
+      if (!appPower->IsPythonScreenSaverActive())
+        appPower->ResetScreenSaver();
     }
 
     CServiceBroker::GetWinSystem()->GetGfxContext().SetViewWindow(m_posX, m_posY, m_posX + m_width, m_posY + m_height);

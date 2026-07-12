@@ -164,7 +164,7 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
         CLog::Log(LOGDEBUG, "{} - ignoring OnScreensaverDeactivated for power action",
                   __FUNCTION__);
     }
-    if (m_bPowerOnScreensaver && !bIgnoreDeactivate && m_configuration.bActivateSource)
+    if (m_bPowerOnScreensaver && !bIgnoreDeactivate)
     {
       ActivateSource();
     }

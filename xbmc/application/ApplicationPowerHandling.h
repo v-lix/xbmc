@@ -43,6 +43,7 @@ public:
   void SetScreenSaverUnlocked() { m_iScreenSaveLock = 1; }
   void StopScreenSaverTimer();
   std::string ScreensaverIdInUse() const { return m_screensaverIdInUse; }
+  bool IsPythonScreenSaverActive() const { return m_pythonScreenSaver != nullptr; }
 
   bool GetRenderGUI() const { return m_renderGUI; }
   void SetRenderGUI(bool renderGUI);
