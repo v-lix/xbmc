@@ -143,10 +143,21 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
   if (flag == ANNOUNCEMENT::System && sender == CAnnouncementManager::ANNOUNCEMENT_SENDER &&
       message == "OnQuit" && m_bIsReady)
   {
-    std::unique_lock<CCriticalSection> lock(m_critSection);
-    m_iExitCode = static_cast<int>(data["exitcode"].asInteger(EXITCODE_QUIT));
-    CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
-    StopThread(false);
+    {
+      std::unique_lock<CCriticalSection> lock(m_critSection);
+      m_iExitCode = static_cast<int>(data["exitcode"].asInteger(EXITCODE_QUIT));
+      CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
+    }
+
+    if (m_iExitCode == EXITCODE_POWERDOWN)
+    {
+      CLog::Log(LOGDEBUG, "{} - Synchronously joining CEC thread to ensure StandbyDevices is sent before system powerdown", __FUNCTION__);
+      StopThread(true);
+    }
+    else
+    {
+      StopThread(false);
+    }
   }
   else if (flag == ANNOUNCEMENT::GUI && sender == CAnnouncementManager::ANNOUNCEMENT_SENDER &&
            message == "OnScreensaverDeactivated" && m_bIsReady)
