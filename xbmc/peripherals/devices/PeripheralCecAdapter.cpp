@@ -654,7 +654,9 @@ void CPeripheralCecAdapter::CecCommand(void* cbParam, const cec_command* command
     switch (command->opcode)
     {
       case CEC_OPCODE_STANDBY:
-        if (command->initiator == CECDEVICE_TV &&
+        if ((command->initiator == CECDEVICE_TV ||
+             command->destination == CECDEVICE_TV ||
+             command->destination == CECDEVICE_BROADCAST) &&
             (!adapter->m_standbySent.IsValid() ||
              CDateTime::GetCurrentDateTime() - adapter->m_standbySent >
                  CDateTimeSpan(0, 0, 0, SCREENSAVER_TIMEOUT)))
