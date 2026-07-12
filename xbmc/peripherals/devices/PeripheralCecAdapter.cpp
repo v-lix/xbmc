@@ -1151,6 +1151,15 @@ void CPeripheralCecAdapter::OnSettingChanged(const std::string& strChangedSettin
     if (!bEnabled && IsRunning())
     {
       CLog::Log(LOGDEBUG, "{} - closing the CEC connection", __FUNCTION__);
+
+      if (m_bInitialised)
+      {
+        CEC::libcec_configuration config = m_configuration;
+        config.bPowerOffOnStandby = 0;
+        config.powerOffDevices.Clear();
+        m_cecAdapter->SetConfiguration(&config);
+      }
+
       SetConfigurationFromSettings();
       StopThread(true);
     }
