@@ -9,35 +9,47 @@
   </peripheral>
 
   <peripheral bus="cec" name="CEC Adapter" mapTo="cec">
+    <!-- Master Switch -->
     <setting key="enabled" type="bool" value="1" label="305" order="1" />
-    <setting key="activate_source" type="bool" value="1" label="36020" order="2" />
-    <setting key="wake_devices" type="enum" value="36037" label="36007" lvalues="36037|36038|36039|231" order="3" />
-    <setting key="standby_devices" type="enum" value="36037" label="36008" lvalues="36037|36038|36039|231" order="4" />
-    <setting key="send_inactive_source" type="bool" value="1" label="36025" order="5" />
-    <setting key="cec_standby_screensaver" type="bool" value="0" label="36009" order="6" />
-    <setting key="cec_standby_screensaver_paused" type="bool" value="0" order="7" label="36055" />
-    <setting key="screensaver_delay_standby" type="int" min="0" max="60" step="1" value="0" label="36054" order="8" />
-    <setting key="cec_wake_screensaver" type="bool" value="1" label="36010" order="9" />
-    <setting key="standby_pc_on_tv_standby" type="enum" value="13011" label="36029" order="10" lvalues="36028|13005|13011|13010|13009|36044|36045" />
-    <setting key="standby_tv_on_pc_standby" type="bool" value="1" label="36026" order="11" />
-    <setting key="use_tv_menu_language" type="bool" value="0" label="36018" order="12" />
-    <setting key="pause_playback_on_deactivate" type="bool" value="1" label="36033" configurable="0" />
-    <setting key="pause_or_stop_playback_on_deactivate" type="enum" value="231" label="36033" order="13" lvalues="231|36044|36045" />
-    <setting key="physical_address" type="string" label="36021" value="0" order="14" />
-    <setting key="power_avr_on_as" type="bool" label="36046" value="0" order="15" />
 
+    <!-- Global Identity -->
+    <setting key="device_name" type="string" value="CoreELEC" label="36056" order="2" />
+    <setting key="device_type" type="enum" value="36051" label="36013" lvalues="36051|36052|36053" order="3" />
+    <setting key="physical_address" type="string" value="0" label="36021" order="4" />
+    <setting key="use_tv_menu_language" type="bool" value="0" label="36018" order="5" />
+
+    <!-- Boot / Wake-Up -->
+    <setting key="activate_source" type="bool" value="1" label="36020" order="6" />
+    <setting key="activate_on_keypress" type="bool" value="0" label="36060" order="7" />
+    <setting key="wakeup_cec_auto_power" type="bool" value="1" label="36057" order="8" />
+    <setting key="wakeup_cec_streaming" type="bool" value="1" label="36058" order="9" />
+    <setting key="wakeup_cec_active_route" type="bool" value="0" label="36059" order="10" />
+    <setting key="wake_devices" type="enum" value="36037" label="36007" lvalues="36037|36038|36039|231" order="11" />
+    <setting key="power_avr_on_as" type="bool" value="0" label="36046" order="12" />
+
+    <!-- Power-Off Actions -->
+    <setting key="standby_devices" type="enum" value="36037" label="36026" lvalues="36037|36038|36039|231" order="13" />
+    <setting key="standby_tv_on_pc_standby" type="bool" value="1" label="36008" order="14" />
+    <setting key="cec_standby_screensaver" type="bool" value="0" label="36009" order="15" />
+    <setting key="cec_standby_screensaver_paused" type="bool" value="0" label="36055" order="16" />
+    <setting key="screensaver_delay_standby" type="int" min="0" max="60" step="1" value="0" label="36054" order="17" />
+    <setting key="cec_wake_screensaver" type="bool" value="1" label="36010" order="18" />
+
+    <!-- General Power State Changes -->
+    <setting key="send_inactive_source" type="bool" value="1" label="36025" order="19" />
+    <setting key="standby_pc_on_tv_standby" type="enum" value="13011" label="36029" order="20" lvalues="36028|13005|13011|13010|13009|36044|36045" />
+
+    <!-- Miscellaneous -->
+    <setting key="pause_or_stop_playback_on_deactivate" type="enum" value="231" label="36033" order="21" lvalues="231|36044|36045" />
+    <setting key="double_tap_timeout_ms" type="int" min="50" max="1000" step="50" value="300" label="36047" order="22" />
+    <setting key="button_repeat_rate_ms" type="int" min="0" max="250" step="10" value="0" label="36048" order="23" />
+    <setting key="button_release_delay_ms" type="int" min="0" max="500" step="50" value="0" label="36049" order="24" />
+
+    <!-- Non-configurable / hidden settings -->
+    <setting key="pause_playback_on_deactivate" type="bool" value="1" label="36033" configurable="0" />
     <setting key="tv_vendor" type="int" value="0" configurable="0" />
     <setting key="wake_devices_advanced" type="string" value="" configurable="0" />
     <setting key="standby_devices_advanced" type="string" value="" configurable="0" />
-    <setting key="double_tap_timeout_ms" type="int" min="50" max="1000" step="50" value="300" label="36047" order="16" />
-    <setting key="button_repeat_rate_ms" type="int" min="0" max="250" step="10" value="0" label="36048" order="17" />
-    <setting key="button_release_delay_ms" type="int" min="0" max="500" step="50" value="0" label="36049" order="18" />
-    <setting key="device_type" type="enum" value="36051" label="36013" lvalues="36051|36052|36053" order="19" />
-
-    <setting key="device_name" type="string" value="CoreELEC" order="20" label="36056" />
-    <setting key="wakeup_cec_auto_power" type="bool" value="1" order="21" label="36057" />
-    <setting key="wakeup_cec_streaming" type="bool" value="1" order="22" label="36058" />
-    <setting key="wakeup_cec_active_route" type="bool" value="0" order="23" label="36059" />
   </peripheral>
 
   <peripheral vendor_product="2548:1001,2548:1002" bus="usb" name="Pulse-Eight CEC Adapter" mapTo="cec">
