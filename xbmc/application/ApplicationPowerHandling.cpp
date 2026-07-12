@@ -183,6 +183,7 @@ bool CApplicationPowerHandling::WakeUpScreenSaver(bool bPowerOffKeyPressed /* = 
 
     // disable screensaver
     m_screensaverActive = false;
+    m_bScreenSaverWakingUp = true;
     m_iScreenSaveLock = 0;
     ResetScreenSaverTimer();
 
@@ -318,6 +319,14 @@ void CApplicationPowerHandling::CheckScreenSaverAndDPMS()
   else if (m_screensaverInhibitor)
   {
     m_screensaverInhibitor.Release();
+  }
+
+  if (m_bScreenSaverWakingUp)
+  {
+    if (CServiceBroker::GetGUI()->GetWindowManager().IsWindowActive(WINDOW_SCREENSAVER))
+      maybeScreensaver = false; // still closing, prevent it from being marked as spontaneously active again
+    else
+      m_bScreenSaverWakingUp = false; // it finally closed!
   }
 
   // Has the screen saver window become active?

@@ -91,6 +91,7 @@ protected:
   ADDON::AddonPtr
       m_pythonScreenSaver; // @warning: Fallback for Python interface, for binaries not needed!
   bool m_screensaverActive = false;
+  bool m_bScreenSaverWakingUp = false;
   // -1 = failed, 0 = locked, 1 = unlocked, 2 = check in progress
   int m_iScreenSaveLock = 0;
   std::string m_screensaverIdInUse;
