@@ -275,36 +275,44 @@ void CRenderer::Render(COverlay* o)
   }
 
   // DV L5 active area: clamp image-based subtitles to the active content area.
-  // Skip ALIGN_SCREEN_AR — those subs were authored for a different framing
-  // (e.g., 16:9 PGS on 2.4:1 video) and are positioned relative to the screen.
+  // The offsets are bar heights measured from the view edges — player-added
+  // bars on cropped encodes and/or in-frame L5 bars scaled to the display.
+  // Screen-anchored subs (ALIGN_SCREEN_AR: canvas AR != video AR, e.g. 16:9
+  // PGS on a cropped 2.4:1 encode) are authored into those bars, so they need
+  // moving just like video-anchored ones — L5 masking would swallow them.
   // For POSITION_RELATIVE subs, state.y is the center; for others it's the top edge.
-  if (o->m_isBitmapOverlay && o->m_align != COverlay::ALIGN_SCREEN_AR &&
-      (m_activeAreaTopOffset > 0 || m_activeAreaBottomOffset > 0))
+  if (o->m_isBitmapOverlay && (m_activeAreaTopOffset > 0 || m_activeAreaBottomOffset > 0))
   {
-    float activeTop = m_rd.y1 + static_cast<float>(m_activeAreaTopOffset);
-    float activeBottom = m_rd.y1 + m_rd.Height() - static_cast<float>(m_activeAreaBottomOffset);
+    float activeTop = m_rv.y1 + static_cast<float>(m_activeAreaTopOffset);
+    float activeBottom = m_rv.y2 - static_cast<float>(m_activeAreaBottomOffset);
     float activeHeight = activeBottom - activeTop;
-    float rdHeight = m_rd.Height();
+    // Reference rect the sub was positioned against: the view for
+    // screen-anchored subs, the video rect for video-anchored ones.
+    const CRect& ref = (o->m_align == COverlay::ALIGN_SCREEN_AR) ? m_rv : m_rd;
+    float refHeight = ref.Height();
 
     bool centerBased = (o->m_pos == COverlay::POSITION_RELATIVE);
     float halfH = centerBased ? state.height * 0.5f : 0.0f;
     float subTop = state.y - halfH;
     float subBottom = state.y + (centerBased ? halfH : state.height);
 
-    // Infer the authoring margin from the sub's distance to the video display
+    // Infer the authoring margin from the sub's distance to the reference
     // edge and scale it proportionally to the active area height. This preserves
     // the original padding intent when clamping subs into the active area.
-    if (subBottom > activeBottom && rdHeight > 0.0f)
+    if (refHeight > 0.0f && activeHeight > 0.0f)
     {
-      float bottomGap = (m_rd.y1 + rdHeight) - subBottom;
-      float padding = (bottomGap / rdHeight) * activeHeight;
-      state.y = activeBottom - padding - (centerBased ? halfH : state.height);
-    }
-    if (subTop < activeTop && rdHeight > 0.0f)
-    {
-      float topGap = subTop - m_rd.y1;
-      float padding = (topGap / rdHeight) * activeHeight;
-      state.y = activeTop + padding + halfH;
+      if (subBottom > activeBottom)
+      {
+        float bottomGap = std::max(0.0f, ref.y2 - subBottom);
+        float padding = (bottomGap / refHeight) * activeHeight;
+        state.y = activeBottom - padding - (centerBased ? halfH : state.height);
+      }
+      if (subTop < activeTop)
+      {
+        float topGap = std::max(0.0f, subTop - ref.y1);
+        float padding = (topGap / refHeight) * activeHeight;
+        state.y = activeTop + padding + halfH;
+      }
     }
   }
 

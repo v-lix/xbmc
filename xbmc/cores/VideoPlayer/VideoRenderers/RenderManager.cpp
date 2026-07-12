@@ -714,7 +714,7 @@ RESOLUTION CRenderManager::GetResolution()
   return res;
 }
 
-void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, bool useActiveArea)
+void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, CRect& view, bool useActiveArea)
 {
   // DV L5 active area: use per-frame L5 offsets to position subtitles inside
   // the active content area. Tracks IMAX/aspect ratio changes in real time.
@@ -735,16 +735,14 @@ void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, bool useActiv
     return;
   }
 
-  // Display letterbox: for pre-cropped frames (e.g. 3840x1608 on 2160p),
-  // the frame has no borders but the scaler adds black bars. Always known
-  // immediately from frame vs display dimensions — used as minimum baseline.
-  float guiHeight = CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight();
-  int displayLB = (dst.Height() > 0 && dst.Height() < guiHeight)
-      ? static_cast<int>((guiHeight - dst.Height()) / 2.0f)
-      : 0;
+  if (src.Height() <= 0 || dst.Height() <= 0 || view.Height() <= 0)
+  {
+    m_overlays.SetActiveAreaOffsets(0, 0, false);
+    return;
+  }
 
-  // L5 or detection offsets (in display coordinates) — can increase the
-  // baseline but never shrink it below the display letterbox.
+  // In-frame bars (L5 or detection offsets, in coded-frame pixels) scaled to
+  // display coordinates.
   int l5Top = 0, l5Bottom = 0;
 
   const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
@@ -768,8 +766,22 @@ void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, bool useActiv
     }
   }
 
-  int finalTop = std::max(l5Top, displayLB);
-  int finalBottom = std::max(l5Bottom, displayLB);
+  // Active area in screen coordinates: the video rect shrunk by the scaled
+  // in-frame bars, clamped to the visible view. Player-added bars on cropped
+  // encodes (frame smaller than the view, e.g. 3840x1600 on 2160p) lie
+  // outside dst and are excluded automatically — no L5 metadata needed.
+  float activeTop = std::max(view.y1, dst.y1 + l5Top);
+  float activeBottom = std::min(view.y2, dst.y2 - l5Bottom);
+  if (activeBottom <= activeTop)
+  {
+    m_overlays.SetActiveAreaOffsets(0, 0, false);
+    return;
+  }
+
+  // The overlay renderer consumes the active area as bar heights measured
+  // from the view edges (the libass canvas spans the view).
+  int finalTop = std::max(0, static_cast<int>(activeTop - view.y1));
+  int finalBottom = std::max(0, static_cast<int>(view.y2 - activeBottom));
 
   if (finalTop == 0 && finalBottom == 0)
   {
@@ -919,7 +931,7 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
     }
     aml_dv_set_subtitles(signalSubtitles);
 
-    CalcOverlayActiveArea(src, dst, restrictSubsToActiveArea);
+    CalcOverlayActiveArea(src, dst, view, restrictSubsToActiveArea);
     m_overlays.SetVideoRect(src, dst, view);
     m_overlays.Render(m_presentsource);
 

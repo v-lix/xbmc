@@ -124,6 +124,10 @@ namespace OVERLAY {
     bool HasImageSubOutsideActiveArea(int idx, int l5Top, int l5Bottom);
     void SetVideoRect(CRect &source, CRect &dest, CRect &view);
     void SetStereoMode(const std::string &stereomode);
+    /*!
+     * \brief Set the DV L5 active area as bar heights in pixels measured
+     * from the view (screen) edges. 0/0 disables subtitle confinement.
+     */
     void SetActiveAreaOffsets(int topPixels, int bottomPixels, bool applyUserPos);
 
     /*!
