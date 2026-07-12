@@ -8,8 +8,10 @@
 
 #include "DebugRenderer.h"
 
+#include "ServiceBroker.h"
 #include "cores/VideoPlayer/DVDCodecs/Overlay/DVDOverlayLibass.h"
 #include "cores/VideoPlayer/Interface/TimingConstants.h"
+#include "settings/SettingsComponent.h"
 #include "settings/SubtitlesSettings.h"
 #include "utils/log.h"
 #include "windowing/GraphicContext.h"
@@ -147,4 +149,21 @@ void CDebugRenderer::CRenderer::CreateSubtitlesStyle()
   m_debugOverlayStyle->fontName = KODI::SUBTITLES::FONT_DEFAULT_FAMILYNAME;
   m_debugOverlayStyle->fontSize = 20.0;
   m_debugOverlayStyle->marginVertical = 12;
+}
+
+void CDebugRenderer::CRenderer::ResetSubtitlePosition()
+{
+  // The base implementation pushes the computed default position through
+  // CApplicationPlayer, which rewrites the per-video setting and the main
+  // subtitle renderer's position — clobbering a manually moved subtitle
+  // position as soon as the debug OSD is rendered (m_subtitlePosResInfo
+  // starts unset, so the first render always lands here). This instance
+  // only needs its own tracking state synced: m_subtitleAlign is always
+  // the member default (LoadSettings is never called) and the player
+  // callback never routed back here, so m_subtitlePosition stays 0.
+  m_saveSubtitlePosition = false;
+  m_subtitleVerticalMargin = static_cast<int>(
+      static_cast<float>(m_rv.Height()) / 100 *
+      CServiceBroker::GetSettingsComponent()->GetSubtitlesSettings()->GetVerticalMarginPerc());
+  m_subtitlePosResInfo = static_cast<int>(m_rv.Height());
 }

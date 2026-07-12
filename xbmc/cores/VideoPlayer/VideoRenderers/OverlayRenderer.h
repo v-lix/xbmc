@@ -142,7 +142,7 @@ namespace OVERLAY {
     /*!
      * \brief Reset the subtitle position to default value
      */
-    void ResetSubtitlePosition();
+    virtual void ResetSubtitlePosition();
 
     /*!
      * \brief Called when the screen resolution is changed

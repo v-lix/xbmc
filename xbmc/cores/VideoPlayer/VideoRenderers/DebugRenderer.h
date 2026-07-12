@@ -41,6 +41,9 @@ protected:
     // Implementation of Observer
     void Notify(const Observable& obs, const ObservableMessage msg) override{};
 
+    // Local-only: never push a reset position to the player (see .cpp)
+    void ResetSubtitlePosition() override;
+
     std::shared_ptr<struct KODI::SUBTITLES::STYLE::style> m_debugOverlayStyle;
   };
 
