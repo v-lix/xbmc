@@ -205,6 +205,7 @@ private:
   bool m_bOnPlayReceived;
   bool m_bPlaybackPaused;
   std::string m_strComPort;
+  std::chrono::time_point<std::chrono::steady_clock> m_lastSourceDeactivatedTime;
   bool m_bPowerOnScreensaver;
   bool m_bPowerOffScreensaverPaused;
   bool m_bUseTVMenuLanguage;

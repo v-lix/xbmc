@@ -241,7 +241,7 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
     bool bActivateSource(false);
     {
       std::unique_lock<CCriticalSection> lock(m_critSection);
-      bActivateSource = (m_configuration.bActivateSource && !m_bOnPlayReceived &&
+      bActivateSource = (GetSettingBool("activate_source") && !m_bOnPlayReceived &&
                          !m_cecAdapter->IsLibCECActiveSource() &&
                          (!m_preventActivateSourceOnPlay.IsValid() ||
                           CDateTime::GetCurrentDateTime() - m_preventActivateSourceOnPlay >
@@ -1222,6 +1222,17 @@ void CPeripheralCecAdapter::CecSourceActivated(void* cbParam,
   if (!adapter)
     return;
 
+  bool isActive = adapter->m_cecAdapter->IsLibCECActiveSource();
+  FILE* fp = fopen("/run/kodi_cec_startup_done", "w");
+  if (fp)
+  {
+    fputs(isActive ? "1\n" : "0\n", fp);
+    fclose(fp);
+  }
+
+  if (activated == 0)
+    adapter->m_lastSourceDeactivatedTime = std::chrono::steady_clock::now();
+
   // wake up the screensaver, so the user doesn't switch to a black screen
   if (activated == 1)
   {
@@ -1327,7 +1338,6 @@ void CPeripheralCecAdapter::SetConfigurationFromLibCEC(const CEC::libcec_configu
 
   // set the boolean settings
   m_configuration.bActivateSource = config.bActivateSource;
-  bChanged |= SetSetting("activate_source", m_configuration.bActivateSource == 1);
 
   m_configuration.iDoubleTapTimeoutMs = config.iDoubleTapTimeoutMs;
   bChanged |= SetSetting("double_tap_timeout_ms", (int)m_configuration.iDoubleTapTimeoutMs);
@@ -1418,7 +1428,7 @@ void CPeripheralCecAdapter::SetConfigurationFromSettings(void)
 
   // read the boolean settings
   m_bUseTVMenuLanguage = GetSettingBool("use_tv_menu_language");
-  m_configuration.bActivateSource = GetSettingBool("activate_source") ? 1 : 0;
+  m_configuration.bActivateSource = 0; // Handled manually by Kodi
   m_bPowerOffScreensaver = GetSettingBool("cec_standby_screensaver");
   m_bPowerOffScreensaverPaused = GetSettingBool("cec_standby_screensaver_paused") ? 1 : 0;
   m_bPowerOnScreensaver = GetSettingBool("cec_wake_screensaver");
@@ -1566,14 +1576,16 @@ bool CPeripheralCecAdapterUpdateThread::UpdateConfiguration(libcec_configuration
 
 bool CPeripheralCecAdapterUpdateThread::WaitReady(void)
 {
+  bool bActivateSource = m_adapter->GetSettingBool("activate_source");
+
   // don't wait if we're not powering up anything
-  if (m_configuration.wakeDevices.IsEmpty() && m_configuration.bActivateSource == 0)
+  if (m_configuration.wakeDevices.IsEmpty() && !bActivateSource)
     return true;
 
   // wait for the TV if we're configured to become the active source.
   // wait for the first device in the wake list otherwise.
   cec_logical_address waitFor =
-      (m_configuration.bActivateSource == 1) ? CECDEVICE_TV : m_configuration.wakeDevices.primary;
+      (bActivateSource) ? CECDEVICE_TV : m_configuration.wakeDevices.primary;
 
   cec_power_status powerStatus(CEC_POWER_STATUS_UNKNOWN);
   bool bContinue(true);
@@ -1636,16 +1648,41 @@ std::string CPeripheralCecAdapterUpdateThread::UpdateAudioSystemStatus(void)
 
 bool CPeripheralCecAdapterUpdateThread::SetInitialConfiguration(void)
 {
-  // the option to make XBMC the active source is set
-  if (m_configuration.bActivateSource == 1)
+  bool bStealFocus = true;
+  bool bIsColdBoot = false;
+  FILE* fp = fopen("/run/kodi_cec_startup_done", "r");
+  if (fp)
+  {
+    char buf[2] = {0};
+    if (fread(buf, 1, 1, fp) == 1)
+    {
+      if (buf[0] == '0')
+        bStealFocus = false;
+    }
+    fclose(fp);
+  }
+  else
+  {
+    bIsColdBoot = true;
+  }
+
+  bool bIsActiveSource = false;
+
+  // On cold boot, respect the GUI setting.
+  // On soft restart, respect our previous state (bStealFocus) regardless of the setting.
+  // This prevents libcec's internal blast and gives us control over active source behavior
+  if ((bIsColdBoot && m_adapter->GetSettingBool("activate_source")) || (!bIsColdBoot && bStealFocus))
+  {
     m_adapter->m_cecAdapter->SetActiveSource();
+    bIsActiveSource = true;
+  }
 
   // devices to wake are set
   cec_logical_addresses tvOnly;
   tvOnly.Clear();
   tvOnly.Set(CECDEVICE_TV);
   if (!m_configuration.wakeDevices.IsEmpty() &&
-      (m_configuration.wakeDevices != tvOnly || m_configuration.bActivateSource == 0))
+      (m_configuration.wakeDevices != tvOnly || !bIsActiveSource))
     m_adapter->m_cecAdapter->PowerOnDevices(CECDEVICE_BROADCAST);
 
   // wait until devices are powered up
