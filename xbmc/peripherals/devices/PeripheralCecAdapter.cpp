@@ -28,6 +28,7 @@
 #include "utils/log.h"
 #include "xbmc/interfaces/AnnouncementManager.h"
 #include "xbmc/interfaces/legacy/configini.h"
+#include "application/ApplicationActionListeners.h"
 
 #include <mutex>
 
@@ -60,6 +61,7 @@ using namespace XBMCAddon;
 #define LOCALISED_ID_RECORDING_DEVICE 36051
 #define LOCALISED_ID_PLAYBACK_DEVICE 36052
 #define LOCALISED_ID_TUNER_DEVICE 36053
+#define LOCALISED_ID_AUDIO_SYSTEM 36054
 
 #define LOCALISED_ID_NONE 231
 
@@ -74,6 +76,11 @@ CPeripheralCecAdapter::CPeripheralCecAdapter(CPeripherals& manager,
   ResetMembers();
   m_features.push_back(FEATURE_CEC);
   m_strComPort = scanResult.m_strLocation;
+
+  auto& components = CServiceBroker::GetAppComponents();
+  auto appListener = components.GetComponent<CApplicationActionListeners>();
+  if (appListener)
+    appListener->RegisterActionListener(this);
 }
 
 void CPeripheralCecAdapter::Deinitialize(void)
@@ -81,6 +88,10 @@ void CPeripheralCecAdapter::Deinitialize(void)
   {
     std::unique_lock<CCriticalSection> lock(m_critSection);
     CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
+    auto& components = CServiceBroker::GetAppComponents();
+    auto appListener = components.GetComponent<CApplicationActionListeners>();
+    if (appListener)
+      appListener->UnregisterActionListener(this);
     m_bStop = true;
   }
 
@@ -237,6 +248,13 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
   else if (flag == ANNOUNCEMENT::Player && sender == CAnnouncementManager::ANNOUNCEMENT_SENDER &&
            (message == "OnPlay" || message == "OnResume"))
   {
+    const auto& components = CServiceBroker::GetAppComponents();
+    const auto appPower = components.GetComponent<CApplicationPowerHandling>();
+    if (appPower->IsInScreenSaver())
+    {
+      return;
+    }
+
     // activate the source when playback started, and the option is enabled
     bool bActivateSource(false);
     {
@@ -832,6 +850,7 @@ void CPeripheralCecAdapter::PushCecKeypress(const CecButtonPress& key)
     }
   }
 
+  m_lastCecKeypressTime = std::chrono::steady_clock::now();
   m_buttonQueue.push_back(key);
 }
 
@@ -1772,10 +1791,7 @@ void CPeripheralCecAdapter::OnDeviceRemoved(void)
   m_bDeviceRemoved = true;
 }
 
-namespace PERIPHERALS
-{
-
-class CPeripheralCecAdapterReopenJob : public CJob
+class PERIPHERALS::CPeripheralCecAdapterReopenJob : public CJob
 {
 public:
   CPeripheralCecAdapterReopenJob(CPeripheralCecAdapter* adapter) : m_adapter(adapter) {}
@@ -1786,8 +1802,6 @@ public:
 private:
   CPeripheralCecAdapter* m_adapter;
 };
-
-}; // namespace PERIPHERALS
 
 bool CPeripheralCecAdapter::ReopenConnection(bool bAsync /* = false */)
 {
@@ -1816,6 +1830,13 @@ bool CPeripheralCecAdapter::ReopenConnection(bool bAsync /* = false */)
 
 void CPeripheralCecAdapter::ActivateSource(void)
 {
+  auto now = std::chrono::steady_clock::now();
+  if (std::chrono::duration_cast<std::chrono::seconds>(now - m_lastActivateSourceTime).count() < 5)
+  {
+    return; // Throttle to prevent spamming CEC bus when IsLibCECActiveSource takes time to update
+  }
+  m_lastActivateSourceTime = now;
+
   std::unique_lock<CCriticalSection> lock(m_critSection);
   m_bActiveSourcePending = true;
 }
@@ -1927,3 +1948,30 @@ bool CPeripheralCecAdapter::ToggleDeviceState(CecStateChange mode /*= STATE_SWIT
 
   return false;
 }
+
+void CPeripheralCecAdapter::OnActionPre(const CAction& action)
+{
+  if (GetSettingBool("activate_on_keypress") && m_cecAdapter && !m_cecAdapter->IsLibCECActiveSource())
+  {
+    // Ignore pure analog noise (like mouse movements) so we only trigger on distinct button presses
+    if (action.GetID() != ACTION_MOUSE_MOVE && action.GetID() != ACTION_NONE && action.GetID() != ACTION_ANALOG_MOVE)
+    {
+       const auto& components = CServiceBroker::GetAppComponents();
+       const auto appPower = components.GetComponent<CApplicationPowerHandling>();
+       if (appPower->IsInScreenSaver())
+       {
+         CLog::Log(LOGDEBUG, "{} - ignoring OnActionPre because screensaver is active", __FUNCTION__);
+         return;
+       }
+
+       auto now = std::chrono::steady_clock::now();
+       if (std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastCecKeypressTime).count() > 1000 &&
+           std::chrono::duration_cast<std::chrono::seconds>(now - m_lastSourceDeactivatedTime).count() > 5)
+       {
+         ActivateSource(); // ActivateSource internally checks if it's already active before firing!
+       }
+    }
+  }
+}
+
+

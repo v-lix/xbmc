@@ -32,6 +32,13 @@ public:
    * \return True if the action was handled, false otherwise
    */
   virtual bool OnAction(const CAction& action) = 0;
+
+  /*!
+   * \brief Observe a GUI action before it is consumed
+   *
+   * \param action The GUI action
+   */
+  virtual void OnActionPre(const CAction& action) {}
 };
 } // namespace ACTION
 } // namespace KODI
