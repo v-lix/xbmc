@@ -40,13 +40,13 @@ static void set_visible(const std::string& id, bool visible) {
 }
 
 // Dolby VSVDB Color space data
-// Dolby VSVDB Color space data - Add index 10 for Epson
-static double colour_space_data[4][6] = {
+// cs == 10 (EPSON LS12000) does not index this array: it uses the XML override
+// or hardcoded fallback values in CalculateVSVDBPayload_2()
+static double colour_space_data[3][6] = {
     // Rx--[5/8]-------  Ry--[1/4]------  Gx--[1]-  Gy--[1/2]-----  Bx--[1/8]-------  By--[1/32]--------
     {(0.6800 - 0.625), (0.3200 - 0.25), (0.2650), (0.6900 - 0.5), (0.1500 - 0.125), (0.0600 - 0.03125)}, //  0: DCI-P3
     {(0.7080 - 0.625), (0.2920 - 0.25), (0.1700), (0.7970 - 0.5), (0.1310 - 0.125), (0.0460 - 0.03125)}, //  1: BT.2020
-    {(0.6400 - 0.625), (0.3300 - 0.25), (0.3000), (0.6000 - 0.5), (0.1500 - 0.125), (0.0600 - 0.03125)}, //  2: BT.709
-    {(0.6670 - 0.625), (0.3310 - 0.25), (0.3140), (0.6720 - 0.5), (0.1480 - 0.125), (0.0420 - 0.03125)}  // 10: EPSON LS12000
+    {(0.6400 - 0.625), (0.3300 - 0.25), (0.3000), (0.6000 - 0.5), (0.1500 - 0.125), (0.0600 - 0.03125)}  //  2: BT.709
 };
 
 static inline int find_closest_lut_index(int value, const int *lut, int lut_size)
@@ -393,7 +393,7 @@ void CalculateVSVDBPayload_2()
         CLog::Log(LOGINFO, "CDolbyVisionAML - Found XML Payload: {}", customVsvdbCoords);
 
         // Parse 12 colon-separated hexadecimal bytes (verbatim Vertex2 format)
-        if (sscanf(customVsvdbCoords.c_str(), "%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x", 
+        if (sscanf(customVsvdbCoords.c_str(), "%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x",
                    &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8], &v[9], &v[10], &v[11]) == 12)
         {
           // Input validation: ensure parsed values fit within a single byte
@@ -428,7 +428,7 @@ void CalculateVSVDBPayload_2()
           CLog::Log(LOGERROR, "CDolbyVisionAML - Failed to parse XML Payload format! Expected 12 hex bytes separated by colons.");
         }
       }
-      else 
+      else
       {
         CLog::Log(LOGDEBUG, "CDolbyVisionAML - XML Payload is empty, using hardcoded Epson values");
       }

@@ -439,7 +439,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int GetLimitCDPrevVal() const;
     int m_limitCDPrevVal{0};
 
-    std::string m_dvCustomVsvdb; // Stores raw hex string from advancedsettings.xml ex : "EB0146D0..."
+    std::string m_dvCustomVsvdb; // Raw colon-separated VSVDB hex string from advancedsettings.xml, e.g. "EB:01:46:D0:..."
 
   private:
     void Initialize();
