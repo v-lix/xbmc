@@ -259,7 +259,7 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
     bool bActivateSource(false);
     {
       std::unique_lock<CCriticalSection> lock(m_critSection);
-      bActivateSource = (GetSettingBool("activate_source") && !m_bOnPlayReceived &&
+      bActivateSource = (GetSettingBool("activate_on_activity") && !m_bOnPlayReceived &&
                          !m_cecAdapter->IsLibCECActiveSource() &&
                          (!m_preventActivateSourceOnPlay.IsValid() ||
                           CDateTime::GetCurrentDateTime() - m_preventActivateSourceOnPlay >
@@ -1951,7 +1951,7 @@ bool CPeripheralCecAdapter::ToggleDeviceState(CecStateChange mode /*= STATE_SWIT
 
 void CPeripheralCecAdapter::OnActionPre(const CAction& action)
 {
-  if (GetSettingBool("activate_on_keypress") && m_cecAdapter && !m_cecAdapter->IsLibCECActiveSource())
+  if (GetSettingBool("activate_on_activity") && m_cecAdapter && !m_cecAdapter->IsLibCECActiveSource())
   {
     // Ignore pure analog noise (like mouse movements) so we only trigger on distinct button presses
     if (action.GetID() != ACTION_MOUSE_MOVE && action.GetID() != ACTION_NONE && action.GetID() != ACTION_ANALOG_MOVE)

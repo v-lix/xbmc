@@ -20,7 +20,7 @@
 
     <!-- Boot / Wake-Up -->
     <setting key="activate_source" type="bool" value="1" label="36020" order="6" />
-    <setting key="activate_on_keypress" type="bool" value="0" label="36060" order="7" />
+    <setting key="activate_on_activity" type="bool" value="1" label="36060" order="7" />
     <setting key="wakeup_cec_auto_power" type="bool" value="1" label="36057" order="8" />
     <setting key="wakeup_cec_streaming" type="bool" value="1" label="36058" order="9" />
     <setting key="wakeup_cec_active_route" type="bool" value="0" label="36059" order="10" />

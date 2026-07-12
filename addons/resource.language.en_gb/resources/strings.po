@@ -27017,5 +27017,5 @@ msgstr ""
 
 #: system/peripherals.xml
 msgctxt "#36060"
-msgid "Switch source to this device on remote keypress"
+msgid "Switch source to this device on activity"
 msgstr ""
