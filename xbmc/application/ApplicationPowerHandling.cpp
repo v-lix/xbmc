@@ -405,6 +405,8 @@ void CApplicationPowerHandling::ActivateScreenSaver(bool forceType /*= false */)
       bUseDim = true;
     else if (CServiceBroker::GetPVRManager().Get<PVR::GUI::Channels>().IsRunningChannelScan())
       bUseDim = true;
+    else if (CServiceBroker::GetGUI()->GetWindowManager().HasModalDialog(true))
+      bUseDim = true;
 
     if (bUseDim)
       m_screensaverIdInUse = "screensaver.xbmc.builtin.dim";
