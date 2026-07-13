@@ -146,6 +146,9 @@ private:
   void SetConfigurationFromLibCEC(const CEC::libcec_configuration& config);
   void SetVersionInfo(const CEC::libcec_configuration& configuration);
 
+  bool LoadCecFuncConfig(void);
+  void SetWakeupBitsFromSettings(void);
+
   static void ReadLogicalAddresses(const std::string& strString,
                                    CEC::cec_logical_addresses& addresses);
   static void ReadLogicalAddresses(int iLocalisedId, CEC::cec_logical_addresses& addresses);
@@ -211,7 +214,8 @@ private:
   bool m_bSendInactiveSource;
   bool m_bPowerOffScreensaver;
   bool m_bShutdownOnStandby;
-  int m_iCec_func_config;
+  int m_iCec_func_config = 0;
+  bool m_bFuncConfigLoaded = false;
 };
 
 class CPeripheralCecAdapterUpdateThread : public CThread

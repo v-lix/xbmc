@@ -41,6 +41,11 @@ using namespace XBMCAddon;
 
 #define CEC_LIB_SUPPORTED_VERSION LIBCEC_VERSION_TO_UINT(4, 0, 0)
 
+// CE default cec_func_config (0x7f) without the GUI-controlled wake bits
+// (AUTO_POWER_ON, STREAMPATH_POWER_ON, ACTIVE_SOURCE) — those come from the
+// wakeup_cec_* settings instead
+#define CEC_FUNC_CONFIG_BASE 0x27
+
 /* time in seconds to ignore standby commands from devices after the screensaver has been activated
  */
 #define SCREENSAVER_TIMEOUT 20
@@ -1152,12 +1157,12 @@ void CPeripheralCecAdapter::OnSettingChanged(const std::string& strChangedSettin
   }
   else if (StringUtils::StartsWithNoCase(strChangedSetting, "wakeup_"))
   {
-    m_iCec_func_config &= ~(1 << AUTO_POWER_ON_MASK);
-    m_iCec_func_config |= ((int)GetSettingBool("wakeup_cec_auto_power") << AUTO_POWER_ON_MASK);
-    m_iCec_func_config &= ~(1 << STREAMPATH_POWER_ON_MASK);
-    m_iCec_func_config |= ((int)GetSettingBool("wakeup_cec_streaming") << STREAMPATH_POWER_ON_MASK);
-    m_iCec_func_config &= ~(1 << ACTIVE_SOURCE_MASK);
-    m_iCec_func_config |= ((int)GetSettingBool("wakeup_cec_active_route") << ACTIVE_SOURCE_MASK);
+    // seed the mask from config.ini before flipping bits in it: with CEC
+    // disabled SetConfigurationFromSettings() never ran, so it is unset here
+    if (!m_bFuncConfigLoaded)
+      LoadCecFuncConfig();
+
+    SetWakeupBitsFromSettings();
 
     XBMCAddon::xbmcvfs::configini* config_ini = new XBMCAddon::xbmcvfs::configini();
     config_ini->set("cec_func_config", StringUtils::Format("{:x}", m_iCec_func_config));
@@ -1329,6 +1334,41 @@ void CPeripheralCecAdapter::SetConfigurationFromLibCEC(const CEC::libcec_configu
     CLog::Log(LOGDEBUG, "SetConfigurationFromLibCEC - settings updated by libCEC");
 }
 
+void CPeripheralCecAdapter::SetWakeupBitsFromSettings(void)
+{
+  m_iCec_func_config &= ~(1 << AUTO_POWER_ON_MASK);
+  m_iCec_func_config |= ((int)GetSettingBool("wakeup_cec_auto_power") << AUTO_POWER_ON_MASK);
+  m_iCec_func_config &= ~(1 << STREAMPATH_POWER_ON_MASK);
+  m_iCec_func_config |= ((int)GetSettingBool("wakeup_cec_streaming") << STREAMPATH_POWER_ON_MASK);
+  m_iCec_func_config &= ~(1 << ACTIVE_SOURCE_MASK);
+  m_iCec_func_config |= ((int)GetSettingBool("wakeup_cec_active_route") << ACTIVE_SOURCE_MASK);
+}
+
+bool CPeripheralCecAdapter::LoadCecFuncConfig(void)
+{
+  XBMCAddon::xbmcvfs::configini* config_ini = new XBMCAddon::xbmcvfs::configini();
+  std::string cec_func_config = config_ini->get("cec_func_config");
+  delete (config_ini);
+
+  bool bHasEntry = !cec_func_config.empty();
+  if (bHasEntry)
+  {
+    m_iCec_func_config = std::stoul(cec_func_config, nullptr, 16);
+  }
+  else
+  {
+    // config.ini ships with cec_func_config commented out. Don't assume the
+    // old 0x7f default here: that would arm wake-by-active-source (bit 6),
+    // waking the box whenever another device on the CEC bus announces itself.
+    // The wakeup_cec_* settings are the source of truth until an entry exists.
+    m_iCec_func_config = CEC_FUNC_CONFIG_BASE;
+    SetWakeupBitsFromSettings();
+  }
+
+  m_bFuncConfigLoaded = true;
+  return bHasEntry;
+}
+
 void CPeripheralCecAdapter::SetConfigurationFromSettings(void)
 {
   // client version matches the version of libCEC that we originally used the API from
@@ -1420,9 +1460,9 @@ void CPeripheralCecAdapter::SetConfigurationFromSettings(void)
     SetSetting("pause_playback_on_deactivate", false);
   }
 
+  bool bHasFuncConfig = LoadCecFuncConfig();
+
   XBMCAddon::xbmcvfs::configini* config_ini = new XBMCAddon::xbmcvfs::configini();
-  std::string cec_func_config = config_ini->get("cec_func_config", "7f");
-  m_iCec_func_config = std::stoul(cec_func_config, nullptr, 16);
 
   if (GetSettingBool("enabled") != ((m_iCec_func_config >> CEC_FUNC_MASK) & 0x1))
   {
@@ -1434,9 +1474,15 @@ void CPeripheralCecAdapter::SetConfigurationFromSettings(void)
 
   delete(config_ini);
 
-  SetSetting("wakeup_cec_auto_power", (bool)((m_iCec_func_config >> AUTO_POWER_ON_MASK) & 0x1));
-  SetSetting("wakeup_cec_streaming", (bool)((m_iCec_func_config >> STREAMPATH_POWER_ON_MASK) & 0x1));
-  SetSetting("wakeup_cec_active_route", (bool)((m_iCec_func_config >> ACTIVE_SOURCE_MASK) & 0x1));
+  // only sync the GUI toggles from an entry that actually exists in
+  // config.ini; otherwise keep the setting defaults / what the user persisted
+  if (bHasFuncConfig)
+  {
+    SetSetting("wakeup_cec_auto_power", (bool)((m_iCec_func_config >> AUTO_POWER_ON_MASK) & 0x1));
+    SetSetting("wakeup_cec_streaming",
+               (bool)((m_iCec_func_config >> STREAMPATH_POWER_ON_MASK) & 0x1));
+    SetSetting("wakeup_cec_active_route", (bool)((m_iCec_func_config >> ACTIVE_SOURCE_MASK) & 0x1));
+  }
 }
 
 void CPeripheralCecAdapter::ReadLogicalAddresses(const std::string& strString,
