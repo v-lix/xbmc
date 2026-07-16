@@ -37,6 +37,14 @@
 #include "utils/Variant.h"
 #include "utils/log.h"
 #include "video/VideoDatabase.h"
+#include "addons/AddonManager.h"
+#include "addons/Addon.h"
+#include "addons/addoninfo/AddonType.h"
+#include "interfaces/generic/ScriptInvocationManager.h"
+#include "utils/JobManager.h"
+
+#include <chrono>
+#include <thread>
 
 using namespace PLAYLIST;
 using namespace KODI::MESSAGING;
@@ -923,6 +931,73 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
 
   case TMSG_MEDIA_PLAY:
   {
+    auto appPower = CServiceBroker::GetAppComponents().GetComponent<CApplicationPowerHandling>();
+    auto appPlayer = CServiceBroker::GetAppComponents().GetComponent<CApplicationPlayer>();
+    
+    std::string screensaverId = "";
+    std::string libPath = "";
+    
+    if (appPower->IsInScreenSaver() && appPlayer->IsPlayingVideo())
+    {
+      screensaverId = appPower->ScreensaverIdInUse();
+      if (!screensaverId.empty())
+      {
+        ADDON::AddonPtr addon;
+        if (CServiceBroker::GetAddonMgr().GetAddon(screensaverId, addon, ADDON::AddonType::SCREENSAVER, ADDON::OnlyEnabled::CHOICE_YES))
+        {
+          libPath = addon->LibPath();
+        }
+      }
+    }
+
+    // Only intercept if we actually found a python script path.
+    // If you pause a movie, Kodi forces the "Dim" screensaver. We don't want to kill the paused movie!
+    if (!libPath.empty())
+    {
+      // Only allow one deferred playback at a time. Check this before any side effects
+      // to avoid leaking the payload or re-closing the player on duplicate messages.
+      if (m_bIsDeferredPlayPending.exchange(true))
+      {
+        CLog::Log(LOGINFO, "CPlayListPlayer::OnApplicationMessage - Deferred playback already pending, ignoring duplicate play message.");
+        return;
+      }
+
+      CLog::Log(LOGINFO, "CPlayListPlayer::OnApplicationMessage - Video screensaver is active. Deferring playback until python script cleanly exits.");
+      wakeScreensaver();
+      
+      // Explicitly stop the player natively so the hardware decoder teardown begins immediately,
+      // rather than waiting for the Python script's xbmc.Player().stop() to hit the queue.
+      appPlayer->ClosePlayer();
+
+      // We capture the original payload to safely delay it, and remove it from the current message
+      // so the current pass doesn't delete it before the delay thread can use it.
+      void* payload = pMsg->lpVoid;
+      pMsg->lpVoid = nullptr;
+
+      CServiceBroker::GetJobManager()->AddJob(new CLambdaJob([this, msgId = pMsg->dwMessage, p1 = pMsg->param1, p2 = pMsg->param2, payload = payload, str = pMsg->strParam, params = pMsg->params, libPath = libPath]() {
+        if (!libPath.empty())
+        {
+          int timeout = 0;
+          // Poll for up to 5 seconds (100 * 50ms = 5000ms) to see if the screensaver script has completely stopped running.
+          while (CScriptInvocationManager::GetInstance().IsRunning(libPath) && timeout < 100)
+          {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            timeout++;
+          }
+        }
+        else
+        {
+          // Fallback if we couldn't resolve the python script path for some reason
+          std::this_thread::sleep_for(std::chrono::milliseconds(2500));
+        }
+
+        m_bIsDeferredPlayPending = false;
+        CServiceBroker::GetAppMessenger()->PostMsg(msgId, p1, p2, payload, str, params);
+      }), nullptr, CJob::PRIORITY_NORMAL);
+
+      return;
+    }
+
     wakeScreensaver();
 
     // first check if we were called from the PlayFile() function

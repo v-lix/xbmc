@@ -12,6 +12,7 @@
 #include "messaging/IMessageTarget.h"
 #include "playlists/PlayListTypes.h"
 
+#include <atomic>
 #include <chrono>
 #include <map>
 #include <memory>
@@ -189,6 +190,7 @@ protected:
 
   bool m_bPlayedFirstFile;
   bool m_bPlaybackStarted;
+  std::atomic<bool> m_bIsDeferredPlayPending{false};
   int m_iFailedSongs;
   std::chrono::time_point<std::chrono::steady_clock> m_failedSongsStart;
   int m_iCurrentSong;
