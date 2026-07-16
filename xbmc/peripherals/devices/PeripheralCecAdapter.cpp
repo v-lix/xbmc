@@ -61,7 +61,6 @@ using namespace XBMCAddon;
 #define LOCALISED_ID_RECORDING_DEVICE 36051
 #define LOCALISED_ID_PLAYBACK_DEVICE 36052
 #define LOCALISED_ID_TUNER_DEVICE 36053
-#define LOCALISED_ID_AUDIO_SYSTEM 36054
 
 #define LOCALISED_ID_NONE 231
 
@@ -87,13 +86,14 @@ void CPeripheralCecAdapter::Deinitialize(void)
 {
   {
     std::unique_lock<CCriticalSection> lock(m_critSection);
-    CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
-    auto& components = CServiceBroker::GetAppComponents();
-    auto appListener = components.GetComponent<CApplicationActionListeners>();
-    if (appListener)
-      appListener->UnregisterActionListener(this);
     m_bStop = true;
   }
+
+  CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
+  auto& components = CServiceBroker::GetAppComponents();
+  auto appListener = components.GetComponent<CApplicationActionListeners>();
+  if (appListener)
+    appListener->UnregisterActionListener(this);
 
   StopThread(true);
   delete m_queryThread;
@@ -186,7 +186,7 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
         CLog::Log(LOGDEBUG, "{} - ignoring OnScreensaverDeactivated for power action",
                   __FUNCTION__);
     }
-    if (m_bPowerOnScreensaver && !bIgnoreDeactivate && m_configuration.bActivateSource)
+    if (m_bPowerOnScreensaver && !bIgnoreDeactivate)
     {
       ActivateSource();
     }
@@ -1830,13 +1830,6 @@ bool CPeripheralCecAdapter::ReopenConnection(bool bAsync /* = false */)
 
 void CPeripheralCecAdapter::ActivateSource(void)
 {
-  auto now = std::chrono::steady_clock::now();
-  if (std::chrono::duration_cast<std::chrono::seconds>(now - m_lastActivateSourceTime).count() < 5)
-  {
-    return; // Throttle to prevent spamming CEC bus when IsLibCECActiveSource takes time to update
-  }
-  m_lastActivateSourceTime = now;
-
   std::unique_lock<CCriticalSection> lock(m_critSection);
   m_bActiveSourcePending = true;
 }
@@ -1968,10 +1961,12 @@ void CPeripheralCecAdapter::OnActionPre(const CAction& action)
        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastCecKeypressTime).count() > 1000 &&
            std::chrono::duration_cast<std::chrono::seconds>(now - m_lastSourceDeactivatedTime).count() > 5)
        {
-         ActivateSource(); // ActivateSource internally checks if it's already active before firing!
+         if (std::chrono::duration_cast<std::chrono::seconds>(now - m_lastActivateSourceTime).count() >= 5)
+         {
+           m_lastActivateSourceTime = now;
+           ActivateSource();
+         }
        }
     }
   }
 }
-
-
