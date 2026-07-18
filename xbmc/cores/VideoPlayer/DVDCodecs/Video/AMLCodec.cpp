@@ -14,6 +14,8 @@
 #include "cores/VideoPlayer/Process/ProcessInfo.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderManager.h"
+#include "application/ApplicationComponents.h"
+#include "application/ApplicationPowerHandling.h"
 #include "settings/AdvancedSettings.h"
 #include "windowing/GraphicContext.h"
 #include "settings/DisplaySettings.h"
@@ -2107,7 +2109,9 @@ bool CAMLCodec::OpenDecoder()
       CSettings::SETTING_COREELEC_AMLOGIC_DV_SKIP_WINDOWED);
   bool isFullscreen = m_processInfo.IsFullscreen() ||
                       CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo();
-  m_dvOpened = (isFullscreen || !skipWindowed);
+  bool isScreensaver = CServiceBroker::GetAppComponents()
+      .GetComponent<CApplicationPowerHandling>()->IsInScreenSaver();
+  m_dvOpened = (isFullscreen || !skipWindowed || isScreensaver);
 
   // Stash coded geometry for the auto-letterbox L5 path before any DV-on apply.
   // Non-DV streams clear the native flag so a prior DV stream's geometry can't
