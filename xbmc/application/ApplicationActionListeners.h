@@ -53,6 +53,12 @@ protected:
    */
   bool NotifyActionListeners(const CAction& action) const;
 
+  /*!
+   \brief Delegates the action to all registered action handlers before window manager processes it.
+   \param action The action
+   */
+  void NotifyActionListenersPre(const CAction& action) const;
+
   std::vector<KODI::ACTION::IActionListener*> m_actionListeners;
 
   CCriticalSection& m_critSection;

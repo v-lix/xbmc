@@ -46,3 +46,12 @@ bool CApplicationActionListeners::NotifyActionListeners(const CAction& action) c
 
   return false;
 }
+
+void CApplicationActionListeners::NotifyActionListenersPre(const CAction& action) const
+{
+  std::unique_lock<CCriticalSection> lock(m_critSection);
+  for (const auto& listener : m_actionListeners)
+  {
+    listener->OnActionPre(action);
+  }
+}

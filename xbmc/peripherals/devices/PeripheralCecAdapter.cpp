@@ -28,6 +28,7 @@
 #include "utils/log.h"
 #include "xbmc/interfaces/AnnouncementManager.h"
 #include "xbmc/interfaces/legacy/configini.h"
+#include "application/ApplicationActionListeners.h"
 
 #include <mutex>
 
@@ -79,15 +80,25 @@ CPeripheralCecAdapter::CPeripheralCecAdapter(CPeripherals& manager,
   ResetMembers();
   m_features.push_back(FEATURE_CEC);
   m_strComPort = scanResult.m_strLocation;
+
+  auto& components = CServiceBroker::GetAppComponents();
+  auto appListener = components.GetComponent<CApplicationActionListeners>();
+  if (appListener)
+    appListener->RegisterActionListener(this);
 }
 
 void CPeripheralCecAdapter::Deinitialize(void)
 {
   {
     std::unique_lock<CCriticalSection> lock(m_critSection);
-    CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
     m_bStop = true;
   }
+
+  CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
+  auto& components = CServiceBroker::GetAppComponents();
+  auto appListener = components.GetComponent<CApplicationActionListeners>();
+  if (appListener)
+    appListener->UnregisterActionListener(this);
 
   StopThread(true);
   delete m_queryThread;
@@ -148,10 +159,21 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
   if (flag == ANNOUNCEMENT::System && sender == CAnnouncementManager::ANNOUNCEMENT_SENDER &&
       message == "OnQuit" && m_bIsReady)
   {
-    std::unique_lock<CCriticalSection> lock(m_critSection);
-    m_iExitCode = static_cast<int>(data["exitcode"].asInteger(EXITCODE_QUIT));
-    CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
-    StopThread(false);
+    {
+      std::unique_lock<CCriticalSection> lock(m_critSection);
+      m_iExitCode = static_cast<int>(data["exitcode"].asInteger(EXITCODE_QUIT));
+      CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
+    }
+
+    if (m_iExitCode == EXITCODE_POWERDOWN)
+    {
+      CLog::Log(LOGDEBUG, "{} - Synchronously joining CEC thread to ensure StandbyDevices is sent before system powerdown", __FUNCTION__);
+      StopThread(true);
+    }
+    else
+    {
+      StopThread(false);
+    }
   }
   else if (flag == ANNOUNCEMENT::GUI && sender == CAnnouncementManager::ANNOUNCEMENT_SENDER &&
            message == "OnScreensaverDeactivated" && m_bIsReady)
@@ -169,7 +191,7 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
         CLog::Log(LOGDEBUG, "{} - ignoring OnScreensaverDeactivated for power action",
                   __FUNCTION__);
     }
-    if (m_bPowerOnScreensaver && !bIgnoreDeactivate && m_configuration.bActivateSource)
+    if (m_bPowerOnScreensaver && !bIgnoreDeactivate)
     {
       ActivateSource();
     }
@@ -231,11 +253,18 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
   else if (flag == ANNOUNCEMENT::Player && sender == CAnnouncementManager::ANNOUNCEMENT_SENDER &&
            (message == "OnPlay" || message == "OnResume"))
   {
+    const auto& components = CServiceBroker::GetAppComponents();
+    const auto appPower = components.GetComponent<CApplicationPowerHandling>();
+    if (appPower->IsInScreenSaver())
+    {
+      return;
+    }
+
     // activate the source when playback started, and the option is enabled
     bool bActivateSource(false);
     {
       std::unique_lock<CCriticalSection> lock(m_critSection);
-      bActivateSource = (m_configuration.bActivateSource && !m_bOnPlayReceived &&
+      bActivateSource = (GetSettingBool("activate_on_activity") && !m_bOnPlayReceived &&
                          !m_cecAdapter->IsLibCECActiveSource() &&
                          (!m_preventActivateSourceOnPlay.IsValid() ||
                           CDateTime::GetCurrentDateTime() - m_preventActivateSourceOnPlay >
@@ -648,7 +677,9 @@ void CPeripheralCecAdapter::CecCommand(void* cbParam, const cec_command* command
     switch (command->opcode)
     {
       case CEC_OPCODE_STANDBY:
-        if (command->initiator == CECDEVICE_TV &&
+        if ((command->initiator == CECDEVICE_TV ||
+             command->destination == CECDEVICE_TV ||
+             command->destination == CECDEVICE_BROADCAST) &&
             (!adapter->m_standbySent.IsValid() ||
              CDateTime::GetCurrentDateTime() - adapter->m_standbySent >
                  CDateTimeSpan(0, 0, 0, SCREENSAVER_TIMEOUT)))
@@ -824,6 +855,7 @@ void CPeripheralCecAdapter::PushCecKeypress(const CecButtonPress& key)
     }
   }
 
+  m_lastCecKeypressTime = std::chrono::steady_clock::now();
   m_buttonQueue.push_back(key);
 }
 
@@ -1145,6 +1177,15 @@ void CPeripheralCecAdapter::OnSettingChanged(const std::string& strChangedSettin
     if (!bEnabled && IsRunning())
     {
       CLog::Log(LOGDEBUG, "{} - closing the CEC connection", __FUNCTION__);
+
+      if (m_bInitialised)
+      {
+        CEC::libcec_configuration config = m_configuration;
+        config.bPowerOffOnStandby = 0;
+        config.powerOffDevices.Clear();
+        m_cecAdapter->SetConfiguration(&config);
+      }
+
       SetConfigurationFromSettings();
       StopThread(true);
     }
@@ -1204,6 +1245,17 @@ void CPeripheralCecAdapter::CecSourceActivated(void* cbParam,
   CPeripheralCecAdapter* adapter = static_cast<CPeripheralCecAdapter*>(cbParam);
   if (!adapter)
     return;
+
+  bool isActive = adapter->m_cecAdapter->IsLibCECActiveSource();
+  FILE* fp = fopen("/run/kodi_cec_startup_done", "w");
+  if (fp)
+  {
+    fputs(isActive ? "1\n" : "0\n", fp);
+    fclose(fp);
+  }
+
+  if (activated == 0)
+    adapter->m_lastSourceDeactivatedTime = std::chrono::steady_clock::now();
 
   // wake up the screensaver, so the user doesn't switch to a black screen
   if (activated == 1)
@@ -1310,7 +1362,6 @@ void CPeripheralCecAdapter::SetConfigurationFromLibCEC(const CEC::libcec_configu
 
   // set the boolean settings
   m_configuration.bActivateSource = config.bActivateSource;
-  bChanged |= SetSetting("activate_source", m_configuration.bActivateSource == 1);
 
   m_configuration.iDoubleTapTimeoutMs = config.iDoubleTapTimeoutMs;
   bChanged |= SetSetting("double_tap_timeout_ms", (int)m_configuration.iDoubleTapTimeoutMs);
@@ -1436,7 +1487,7 @@ void CPeripheralCecAdapter::SetConfigurationFromSettings(void)
 
   // read the boolean settings
   m_bUseTVMenuLanguage = GetSettingBool("use_tv_menu_language");
-  m_configuration.bActivateSource = GetSettingBool("activate_source") ? 1 : 0;
+  m_configuration.bActivateSource = 0; // Handled manually by Kodi
   m_bPowerOffScreensaver = GetSettingBool("cec_standby_screensaver");
   m_bPowerOffScreensaverPaused = GetSettingBool("cec_standby_screensaver_paused") ? 1 : 0;
   m_bPowerOnScreensaver = GetSettingBool("cec_wake_screensaver");
@@ -1590,14 +1641,16 @@ bool CPeripheralCecAdapterUpdateThread::UpdateConfiguration(libcec_configuration
 
 bool CPeripheralCecAdapterUpdateThread::WaitReady(void)
 {
+  bool bActivateSource = m_adapter->GetSettingBool("activate_source");
+
   // don't wait if we're not powering up anything
-  if (m_configuration.wakeDevices.IsEmpty() && m_configuration.bActivateSource == 0)
+  if (m_configuration.wakeDevices.IsEmpty() && !bActivateSource)
     return true;
 
   // wait for the TV if we're configured to become the active source.
   // wait for the first device in the wake list otherwise.
   cec_logical_address waitFor =
-      (m_configuration.bActivateSource == 1) ? CECDEVICE_TV : m_configuration.wakeDevices.primary;
+      (bActivateSource) ? CECDEVICE_TV : m_configuration.wakeDevices.primary;
 
   cec_power_status powerStatus(CEC_POWER_STATUS_UNKNOWN);
   bool bContinue(true);
@@ -1660,16 +1713,41 @@ std::string CPeripheralCecAdapterUpdateThread::UpdateAudioSystemStatus(void)
 
 bool CPeripheralCecAdapterUpdateThread::SetInitialConfiguration(void)
 {
-  // the option to make XBMC the active source is set
-  if (m_configuration.bActivateSource == 1)
+  bool bStealFocus = true;
+  bool bIsColdBoot = false;
+  FILE* fp = fopen("/run/kodi_cec_startup_done", "r");
+  if (fp)
+  {
+    char buf[2] = {0};
+    if (fread(buf, 1, 1, fp) == 1)
+    {
+      if (buf[0] == '0')
+        bStealFocus = false;
+    }
+    fclose(fp);
+  }
+  else
+  {
+    bIsColdBoot = true;
+  }
+
+  bool bIsActiveSource = false;
+
+  // On cold boot, respect the GUI setting.
+  // On soft restart, respect our previous state (bStealFocus) regardless of the setting.
+  // This prevents libcec's internal blast and gives us control over active source behavior
+  if ((bIsColdBoot && m_adapter->GetSettingBool("activate_source")) || (!bIsColdBoot && bStealFocus))
+  {
     m_adapter->m_cecAdapter->SetActiveSource();
+    bIsActiveSource = true;
+  }
 
   // devices to wake are set
   cec_logical_addresses tvOnly;
   tvOnly.Clear();
   tvOnly.Set(CECDEVICE_TV);
   if (!m_configuration.wakeDevices.IsEmpty() &&
-      (m_configuration.wakeDevices != tvOnly || m_configuration.bActivateSource == 0))
+      (m_configuration.wakeDevices != tvOnly || !bIsActiveSource))
     m_adapter->m_cecAdapter->PowerOnDevices(CECDEVICE_BROADCAST);
 
   // wait until devices are powered up
@@ -1759,10 +1837,7 @@ void CPeripheralCecAdapter::OnDeviceRemoved(void)
   m_bDeviceRemoved = true;
 }
 
-namespace PERIPHERALS
-{
-
-class CPeripheralCecAdapterReopenJob : public CJob
+class PERIPHERALS::CPeripheralCecAdapterReopenJob : public CJob
 {
 public:
   CPeripheralCecAdapterReopenJob(CPeripheralCecAdapter* adapter) : m_adapter(adapter) {}
@@ -1773,8 +1848,6 @@ public:
 private:
   CPeripheralCecAdapter* m_adapter;
 };
-
-}; // namespace PERIPHERALS
 
 bool CPeripheralCecAdapter::ReopenConnection(bool bAsync /* = false */)
 {
@@ -1913,4 +1986,33 @@ bool CPeripheralCecAdapter::ToggleDeviceState(CecStateChange mode /*= STATE_SWIT
   }
 
   return false;
+}
+
+void CPeripheralCecAdapter::OnActionPre(const CAction& action)
+{
+  if (GetSettingBool("activate_on_activity") && m_cecAdapter && !m_cecAdapter->IsLibCECActiveSource())
+  {
+    // Ignore pure analog noise (like mouse movements) so we only trigger on distinct button presses
+    if (action.GetID() != ACTION_MOUSE_MOVE && action.GetID() != ACTION_NONE && action.GetID() != ACTION_ANALOG_MOVE)
+    {
+       const auto& components = CServiceBroker::GetAppComponents();
+       const auto appPower = components.GetComponent<CApplicationPowerHandling>();
+       if (appPower->IsInScreenSaver())
+       {
+         CLog::Log(LOGDEBUG, "{} - ignoring OnActionPre because screensaver is active", __FUNCTION__);
+         return;
+       }
+
+       auto now = std::chrono::steady_clock::now();
+       if (std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastCecKeypressTime).count() > 1000 &&
+           std::chrono::duration_cast<std::chrono::seconds>(now - m_lastSourceDeactivatedTime).count() > 5)
+       {
+         if (std::chrono::duration_cast<std::chrono::seconds>(now - m_lastActivateSourceTime).count() >= 5)
+         {
+           m_lastActivateSourceTime = now;
+           ActivateSource();
+         }
+       }
+    }
+  }
 }

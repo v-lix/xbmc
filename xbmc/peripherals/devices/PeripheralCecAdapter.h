@@ -45,6 +45,7 @@ public:
 #include "interfaces/AnnouncementManager.h"
 #include "threads/CriticalSection.h"
 #include "threads/Thread.h"
+#include "input/actions/interfaces/IActionListener.h"
 
 #include <chrono>
 #include <queue>
@@ -93,6 +94,7 @@ typedef enum
 
 class CPeripheralCecAdapter : public CPeripheralHID,
                               public ANNOUNCEMENT::IAnnouncer,
+                              public KODI::ACTION::IActionListener,
                               private CThread
 {
   friend class CPeripheralCecAdapterUpdateThread;
@@ -109,6 +111,9 @@ public:
                 const std::string& sender,
                 const std::string& message,
                 const CVariant& data) override;
+
+  bool OnAction(const CAction& action) override { return false; }
+  void OnActionPre(const CAction& action) override;
 
   // audio control
   bool HasAudioControl(void);
@@ -208,6 +213,9 @@ private:
   bool m_bOnPlayReceived;
   bool m_bPlaybackPaused;
   std::string m_strComPort;
+  std::chrono::time_point<std::chrono::steady_clock> m_lastSourceDeactivatedTime;
+  std::chrono::time_point<std::chrono::steady_clock> m_lastCecKeypressTime;
+  std::chrono::time_point<std::chrono::steady_clock> m_lastActivateSourceTime;
   bool m_bPowerOnScreensaver;
   bool m_bPowerOffScreensaverPaused;
   bool m_bUseTVMenuLanguage;

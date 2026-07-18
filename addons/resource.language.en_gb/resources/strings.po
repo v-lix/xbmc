@@ -27014,3 +27014,8 @@ msgstr ""
 msgctxt "#69999"
 msgid "Enable this to disable noise reduction. Requires reboot. FOR BETTER VIDEO PROCESSING LEAVE THIS SETTING ENABLED (i.e., DISABLE NOISE REDUCTION)."
 msgstr ""
+
+#: system/peripherals.xml
+msgctxt "#36060"
+msgid "Switch source to this device on activity"
+msgstr ""

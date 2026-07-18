@@ -933,6 +933,11 @@ void CApplication::Render()
 
 bool CApplication::OnAction(const CAction &action)
 {
+  if (GetComponent<CApplicationActionListeners>())
+  {
+    GetComponent<CApplicationActionListeners>()->NotifyActionListenersPre(action);
+  }
+
   // special case for switching between GUI & fullscreen mode.
   if (action.GetID() == ACTION_SHOW_GUI)
   { // Switch to fullscreen mode if we can
