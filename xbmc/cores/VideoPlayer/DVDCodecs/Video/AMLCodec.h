@@ -166,6 +166,14 @@ private:
   std::chrono::time_point<std::chrono::system_clock> m_tp_last_frame;
   std::chrono::time_point<std::chrono::system_clock> m_tp_drain_start;
 
+  // Hard (non-EAGAIN) codec-write failure escalation, see AddData: the packet
+  // is retried by the player, the decoder reset periodically, and only after a
+  // bounded window is the packet given up so a permanently dead codec cannot
+  // stall playback forever.
+  bool             m_wrFailActive = false;
+  std::chrono::time_point<std::chrono::steady_clock> m_tpWrFailStart;
+  std::chrono::time_point<std::chrono::steady_clock> m_tpWrFailLastReset;
+
   bool            m_buffer_level_ready;
   float           m_minimum_buffer_level;
   bool            m_dvOpened = false;

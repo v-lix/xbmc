@@ -635,7 +635,8 @@ static int write_header(am_private_t *para, am_packet_t *pkt)
             write_bytes = para->m_dll->codec_write(pkt->codec, pkt->hdr->data + len, pkt->hdr->size - len);
             if (write_bytes < 0 || write_bytes > (pkt->hdr->size - len)) {
                 if (-errno != AVERROR(EAGAIN)) {
-                    CLog::Log(LOGDEBUG, "ERROR:write header failed!");
+                    CLog::Log(LOGDEBUG, "ERROR:write header failed! write_bytes({:d}), errno({:d}:{})",
+                      write_bytes, errno, strerror(errno));
                     return PLAYER_WR_FAILED;
                 } else {
                     continue;
@@ -2577,6 +2578,7 @@ bool CAMLCodec::AddData(uint8_t *pData, size_t iSize, double dts, double pts)
   // will get set to zero once everything is consumed.
   // PLAYER_SUCCESS means all is ok, not all bytes were written.
   int loop = 0;
+  bool write_failed = false;
   while (am_private->am_pkt.isvalid && loop < 100)
   {
     if (m_abort)
@@ -2587,7 +2589,10 @@ bool CAMLCodec::AddData(uint8_t *pData, size_t iSize, double dts, double pts)
 
     // abort on any errors.
     if (write_av_packet(am_private, &am_private->am_pkt) != PLAYER_SUCCESS)
+    {
+      write_failed = true;
       break;
+    }
 
     if (am_private->am_pkt.isvalid)
       CLog::Log(LOGDEBUG, "CAMLCodec::{} Decode: write_av_packet looping", __FUNCTION__);
@@ -2599,6 +2604,45 @@ bool CAMLCodec::AddData(uint8_t *pData, size_t iSize, double dts, double pts)
     Reset();
     return false;
   }
+
+  if (write_failed)
+  {
+    // Hard (non-EAGAIN) write/checkin failure: the codec device is rejecting
+    // data outright, typically after a codec_reset raced a display mode switch
+    // and left the vdec dead. Returning true here would report the packet as
+    // consumed and silently discard it (~one per 2ms) -- across the 5s
+    // GetPicture watchdog window that is ~100s of stream, onto which the
+    // player then resyncs: the "playback jumps minutes ahead" bug. Return
+    // false instead so VideoPlayerVideo requeues the packet, and escalate:
+    // reset the decoder every 250ms of continued failure; only once the same
+    // packet has failed for 2s is it given up, so a permanently dead codec
+    // degrades to the old drop behavior instead of freezing playback forever.
+    const auto now = std::chrono::steady_clock::now();
+    if (!m_wrFailActive)
+    {
+      m_wrFailActive = true;
+      m_tpWrFailStart = now;
+      m_tpWrFailLastReset = now;
+    }
+    else if (now - m_tpWrFailStart > std::chrono::milliseconds(2000))
+    {
+      CLog::Log(LOGERROR, "CAMLCodec::{}: persistent codec write failure, dropping packet pts:{:.3f}",
+        __FUNCTION__, pts / DVD_TIME_BASE);
+      m_wrFailActive = false;
+      return true;
+    }
+    else if (now - m_tpWrFailLastReset > std::chrono::milliseconds(250))
+    {
+      CLog::Log(LOGWARNING, "CAMLCodec::{}: codec write failing for {:d}ms, resetting decoder",
+        __FUNCTION__, static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+          now - m_tpWrFailStart).count()));
+      Reset();
+      m_tpWrFailLastReset = std::chrono::steady_clock::now();
+    }
+    usleep(RW_WAIT_TIME);
+    return false;
+  }
+  m_wrFailActive = false;
   if (iSize > 50000)
     usleep(2000); // wait 2ms to process larger packets
 

@@ -644,8 +644,9 @@ void CDVDVideoCodecAmlogic::Close(void)
 
 bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
 {
-  // Handle Input, add demuxer packet to input queue, we must accept it or
-  // it will be discarded as VideoPlayerVideo has no concept of "try again".
+  // Handle Input, add demuxer packet to input queue. Returning false requeues
+  // the packet in VideoPlayerVideo (SendMessageBack) for a later retry;
+  // returning true reports it consumed and it will not be seen again.
 
   ApplyDynamicDoViSettings();
 
