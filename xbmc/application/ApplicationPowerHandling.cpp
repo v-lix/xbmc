@@ -41,7 +41,10 @@
 void CApplicationPowerHandling::ResetScreenSaver()
 {
   // reset our timers
-  m_shutdownTimer.StartZero();
+  // Don't reset the shutdown timer if a Python screensaver is active - the video
+  // playback from the screensaver should not prevent idle shutdown
+  if (!IsPythonScreenSaverActive())
+    m_shutdownTimer.StartZero();
 
   // screen saver timer is reset only if we're not already in screensaver or
   // DPMS mode
@@ -180,6 +183,7 @@ bool CApplicationPowerHandling::WakeUpScreenSaver(bool bPowerOffKeyPressed /* = 
 
     // disable screensaver
     m_screensaverActive = false;
+    m_bScreenSaverWakingUp = true;
     m_iScreenSaveLock = 0;
     ResetScreenSaverTimer();
 
@@ -288,10 +292,10 @@ void CApplicationPowerHandling::CheckScreenSaverAndDPMS()
   if (m_bInhibitScreenSaver)
     haveIdleActivity = true;
 
-  // Are we playing a video and it is not paused?
+  // Are we playing a video and it is not paused? (Ignore if screensaver is active, so video screensavers don't kill themselves)
   const auto& components = CServiceBroker::GetAppComponents();
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
-  if (appPlayer && appPlayer->IsPlayingVideo() && !appPlayer->IsPaused())
+  if (appPlayer && appPlayer->IsPlayingVideo() && !appPlayer->IsPaused() && !m_screensaverActive)
     haveIdleActivity = true;
 
   // Are we playing audio and screensaver is disabled globally for audio?
@@ -315,6 +319,14 @@ void CApplicationPowerHandling::CheckScreenSaverAndDPMS()
   else if (m_screensaverInhibitor)
   {
     m_screensaverInhibitor.Release();
+  }
+
+  if (m_bScreenSaverWakingUp)
+  {
+    if (CServiceBroker::GetGUI()->GetWindowManager().IsWindowActive(WINDOW_SCREENSAVER))
+      maybeScreensaver = false; // still closing, prevent it from being marked as spontaneously active again
+    else
+      m_bScreenSaverWakingUp = false; // it finally closed!
   }
 
   // Has the screen saver window become active?
@@ -392,6 +404,8 @@ void CApplicationPowerHandling::ActivateScreenSaver(bool forceType /*= false */)
         settings->GetBool(CSettings::SETTING_SCREENSAVER_USEDIMONPAUSE))
       bUseDim = true;
     else if (CServiceBroker::GetPVRManager().Get<PVR::GUI::Channels>().IsRunningChannelScan())
+      bUseDim = true;
+    else if (CServiceBroker::GetGUI()->GetWindowManager().HasModalDialog(true))
       bUseDim = true;
 
     if (bUseDim)
@@ -508,8 +522,13 @@ void CApplicationPowerHandling::CheckShutdown()
   if (!appPlayer)
     return;
 
-  if (m_bInhibitIdleShutdown || appPlayer->IsPlaying() ||
-      appPlayer->IsPausedPlayback() // is something playing?
+  bool bPlayingMediaActivity = appPlayer->IsPlaying() || appPlayer->IsPausedPlayback();
+  if (m_screensaverActive && appPlayer->IsPlayingVideo())
+    bPlayingMediaActivity = false;
+  if (IsPythonScreenSaverActive())
+    bPlayingMediaActivity = false;
+
+  if (m_bInhibitIdleShutdown || bPlayingMediaActivity
       || CMusicLibraryQueue::GetInstance().IsRunning() ||
       CVideoLibraryQueue::GetInstance().IsRunning() ||
       CServiceBroker::GetGUI()->GetWindowManager().IsWindowActive(

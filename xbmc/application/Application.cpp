@@ -877,7 +877,8 @@ void CApplication::Render()
   if (!extPlayerActive && CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo() &&
       !appPlayer->IsPausedPlayback())
   {
-    appPower->ResetScreenSaver();
+    if (!appPower->IsPythonScreenSaverActive())
+      appPower->ResetScreenSaver();
   }
 
   if (!CServiceBroker::GetRenderSystem()->BeginRender())

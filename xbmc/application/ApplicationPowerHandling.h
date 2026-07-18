@@ -43,6 +43,7 @@ public:
   void SetScreenSaverUnlocked() { m_iScreenSaveLock = 1; }
   void StopScreenSaverTimer();
   std::string ScreensaverIdInUse() const { return m_screensaverIdInUse; }
+  bool IsPythonScreenSaverActive() const { return m_pythonScreenSaver != nullptr; }
 
   bool GetRenderGUI() const { return m_renderGUI; }
   void SetRenderGUI(bool renderGUI);
@@ -90,6 +91,7 @@ protected:
   ADDON::AddonPtr
       m_pythonScreenSaver; // @warning: Fallback for Python interface, for binaries not needed!
   bool m_screensaverActive = false;
+  bool m_bScreenSaverWakingUp = false;
   // -1 = failed, 0 = locked, 1 = unlocked, 2 = check in progress
   int m_iScreenSaveLock = 0;
   std::string m_screensaverIdInUse;
