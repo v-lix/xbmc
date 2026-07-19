@@ -16998,6 +16998,14 @@ msgctxt "#38087"
 msgid "Give the audio path the same high memory-bus priority that the video and display path already has, so heavy 4K/Dolby Vision decoding cannot briefly starve the audio buffer and cause rare split-second dropouts. Audio and video then share the top priority equally (video is not deprioritised), and audio adds only a tiny fraction of memory traffic. On by default; takes effect immediately."
 msgstr "Gibt dem Audiopfad dieselbe hohe Speicherbus-Priorität, die der Video- und Anzeigepfad bereits hat, damit das aufwendige Dekodieren von 4K-/Dolby-Vision-Video den Audiopuffer nicht kurzzeitig aushungern und seltene, sekundenbruchteilkurze Aussetzer verursachen kann. Audio und Video teilen sich dann gleichberechtigt die höchste Priorität (Video wird nicht benachteiligt), und Audio verursacht nur einen winzigen Bruchteil des Speicherverkehrs. Standardmäßig aktiviert; wird sofort wirksam."
 
+msgctxt "#38088"
+msgid "Correct 50/60Hz audio sync"
+msgstr "Audiosynchronität bei 50/60 Hz korrigieren"
+
+msgctxt "#38089"
+msgid "Removes the built-in audio delay compensation at 50Hz and 60Hz refresh rates for 1080p and below content. Kodi's default audio latency of 165ms is calibrated for 30Hz and below output; at 50/60Hz the display pipeline runs with lower-latency. On some setups that value is too high and causes audio sync delays. When enabled, the compensation at 49-61Hz is set to 0ms. 4K/2160p is unchanged."
+msgstr "Entfernt die eingebaute Audioverzögerungskompensation bei den Bildwiederholraten 50 Hz und 60 Hz für Inhalte mit 1080p und darunter. Kodis Standard-Audiolatenz von 165 ms ist auf Ausgabe mit 30 Hz und darunter abgestimmt; bei 50/60 Hz arbeitet die Anzeige-Pipeline mit geringerer Latenz. Bei manchen Konfigurationen ist dieser Wert zu hoch und verursacht Audio-Synchronisationsverzögerungen. Wenn aktiviert, wird die Kompensation bei 49–61 Hz auf 0 ms gesetzt. 4K/2160p bleibt unverändert."
+
 msgctxt "#38023"
 msgid "Set my rating"
 msgstr "Bewerten"
