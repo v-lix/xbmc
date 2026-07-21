@@ -1816,9 +1816,18 @@ void aml_dv_set_xbmc_osd()
     osd_active = s_pm4kHome->GetProperty("script.plex.osd_active").asString() == "1";
   }
   else
+  {
+    // Codec logos (and any skin overlay drawn over DV video) are not dialogs
+    // or the video menu, so the skin flags them via a window property; treat
+    // that as OSD-on-screen too, keeping L5 zeroed while they are visible.
+    CGUIWindow* home = wm.GetWindow(WINDOW_HOME);
+    const bool codecLogosOnScreen =
+        home && home->GetProperty("skin.codeclogosonscreen").asString() == "1";
     osd_active = wm.HasVisibleDialog() ||
                  wm.IsWindowVisible(WINDOW_VIDEO_MENU) ||
-                 CServiceBroker::GetDataCacheCore().GetAVChangeExtended();
+                 CServiceBroker::GetDataCacheCore().GetAVChangeExtended() ||
+                 codecLogosOnScreen;
+  }
 
   int val = osd_active ? 1 : 0;
   if (val != s_lastOsd)
