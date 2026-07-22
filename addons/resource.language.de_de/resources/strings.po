@@ -18944,6 +18944,14 @@ msgctxt "#60635"
 msgid "Brightens DV and HDR10 content converted to SDR via VS10, which otherwise looks dim next to the GUI and native SDR files. Off keeps the stock tone mapping. Auto assumes the source peaks at its actual content peak brightness (MaxCLL) instead of its mastering display peak - the strongest boost that cannot clip; does nothing when that metadata is missing. Manual sets a ceiling on the assumed source peak: titles below the ceiling get the Auto boost, brighter titles are treated as peaking at the ceiling and their content above it clips; the ceiling is also used for titles without metadata. HLG sources are not affected."
 msgstr "Hellt DV- und HDR10-Inhalte auf, die über VS10 nach SDR konvertiert werden und sonst neben der GUI und nativen SDR-Dateien dunkel wirken. Aus behält das Standard-Tone-Mapping bei. Automatisch nimmt als Quell-Spitze die tatsächliche Spitzenhelligkeit des Inhalts (MaxCLL) statt der Mastering-Display-Spitze an - die stärkste Anhebung, die nicht beschneiden kann; ohne diese Metadaten passiert nichts. Manuell setzt eine Obergrenze für die angenommene Quell-Spitze: Titel darunter erhalten die automatische Anhebung, hellere Titel werden behandelt, als läge ihre Spitze an der Obergrenze, und Inhalte darüber werden beschnitten; die Obergrenze gilt auch für Titel ohne Metadaten. HLG-Quellen sind nicht betroffen."
 
+msgctxt "#60636"
+msgid "Use per-frame metadata for SDR conversion"
+msgstr "Frame-genaue Metadaten für SDR-Konvertierung verwenden"
+
+msgctxt "#60637"
+msgid "Lets the Dolby engine use the source's dynamic metadata (per-scene brightness anchors and the colorist's SDR trims) when converting DV to SDR via VS10, so dark and bright scenes each get their own tone curve instead of one static curve for the whole title. Disable to restore the previous static tone mapping if brightness looks wrong. Only affects DV sources."
+msgstr "Lässt die Dolby-Engine die dynamischen Metadaten der Quelle (szenenweise Helligkeitsanker und die SDR-Trims des Koloristen) bei der DV-nach-SDR-Konvertierung über VS10 verwenden, sodass dunkle und helle Szenen jeweils eine eigene Tone-Mapping-Kurve erhalten statt einer statischen Kurve für den ganzen Titel. Deaktivieren, um das bisherige statische Tone Mapping wiederherzustellen, falls die Helligkeit falsch wirkt. Betrifft nur DV-Quellen."
+
 msgctxt "#60069"
 msgid "HDR10 OSD peak brightness (nits)"
 msgstr "HDR10-OSD-Spitzenhelligkeit (Nits)"

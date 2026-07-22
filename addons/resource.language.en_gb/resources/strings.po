@@ -25645,6 +25645,18 @@ msgctxt "#60635"
 msgid "Brightens DV and HDR10 content converted to SDR via VS10, which otherwise looks dim next to the GUI and native SDR files. Off keeps the stock tone mapping. Auto assumes the source peaks at its actual content peak brightness (MaxCLL) instead of its mastering display peak - the strongest boost that cannot clip; does nothing when that metadata is missing. Manual sets a ceiling on the assumed source peak: titles below the ceiling get the Auto boost, brighter titles are treated as peaking at the ceiling and their content above it clips; the ceiling is also used for titles without metadata. HLG sources are not affected."
 msgstr ""
 
+#. "Dolby Vision VS10 SDR Per-Frame Metadata"
+#: system/settings/settings.xml
+msgctxt "#60636"
+msgid "Use per-frame metadata for SDR conversion"
+msgstr ""
+
+#. "Dolby Vision VS10 SDR Per-Frame Metadata"
+#: system/settings/settings.xml
+msgctxt "#60637"
+msgid "Lets the Dolby engine use the source's dynamic metadata (per-scene brightness anchors and the colorist's SDR trims) when converting DV to SDR via VS10, so dark and bright scenes each get their own tone curve instead of one static curve for the whole title. Disable to restore the previous static tone mapping if brightness looks wrong. Only affects DV sources."
+msgstr ""
+
 #. "Dolby Vision VS10 HDR10 OSD Peak Brightness"
 #: system/settings/settings.xml
 msgctxt "#60069"

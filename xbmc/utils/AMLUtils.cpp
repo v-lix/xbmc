@@ -1031,6 +1031,7 @@ unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
   // unconditionally prevents a stale value when the SDR branch below is
   // skipped (e.g. VP enabled while playing HDR10->SDR).
   aml_dv_set_sdr_source_max_nits(aml_dv_sdr_boost_param());
+  aml_dv_set_sdr_keep_ext(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_PER_FRAME_METADATA));
 
   if (dv_vp != 0)
   {
@@ -1605,6 +1606,15 @@ int aml_dv_sdr_boost_param()
   if (mode == 2)
     return settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_SRC_MAX_NITS);
   return mode;
+}
+
+void aml_dv_set_sdr_keep_ext(bool keep)
+{
+  // VS10 DV->SDR: keep the source's L1/L2 extension metadata so the DV
+  // library does per-shot dynamic display management with the colorist's
+  // SDR trims, instead of the static tone curve the avdvplus R8 strip
+  // leaves behind.
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_sdr_keep_ext", keep ? 1 : 0);
 }
 
 void aml_dv_set_sdr_source_max_nits(int value)

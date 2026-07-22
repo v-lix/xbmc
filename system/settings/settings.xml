@@ -4477,6 +4477,16 @@
           </constraints>
           <control type="slider" format="integer" />
         </setting>
+        <setting id="coreelec.amlogic.dolbyvision.vs10.sdr.per.frame.metadata" type="boolean" label="60636" help="60637" parent="coreelec.amlogic.dolbyvision.type">
+          <requirement>HAVE_AMCODEC</requirement>
+          <visible>false</visible>
+          <level>2</level>
+          <default>true</default>
+          <dependencies>
+            <dependency type="visible" setting="coreelec.amlogic.dolbyvision.mode" operator="!is">2</dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
         <!-- DV Level 5 active area handling group -->
         <setting id="coreelec.amlogic.dolbyvision.level5" type="boolean" label="60154" help="60155" parent="coreelec.amlogic.dolbyvision.type">
           <requirement>HAVE_AMCODEC</requirement>
