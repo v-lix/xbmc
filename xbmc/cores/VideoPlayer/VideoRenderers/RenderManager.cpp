@@ -136,6 +136,14 @@ bool CRenderManager::Configure(const VideoPicture& picture, float fps, unsigned 
                   m_fps, fps);
         m_fps = fps;
         m_bTriggerUpdateResolution = true;
+        // Clear the vsync phase state the way the full reconfigure below does:
+        // the clock sync accumulator averages fmod(..., frametime) samples, so
+        // once fps changes the pending samples were measured against the old
+        // frametime and m_syncOffset describes the old cadence. Keeping them
+        // biases renderPts for the ~31 frames it takes to refill the average,
+        // and feeds one polluted value to SetVsyncAdjust().
+        m_clockSync.Reset();
+        m_dvdClock.SetVsyncAdjust(0);
         return true;
       }
       CLog::Log(LOGDEBUG,
