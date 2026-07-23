@@ -1964,7 +1964,12 @@ void CPeripheralCecAdapter::ProcessStandbyDevices(void)
       m_standbySent = CDateTime::GetCurrentDateTime();
       m_cecAdapter->StandbyDevices(CECDEVICE_BROADCAST);
     }
-    else if (m_bSendInactiveSource == 1)
+    // Also mark ourselves inactive when standby commands were sent: the standby
+    // broadcast never clears libcec's active-source flag, and a stale "we are
+    // active source" swallows the next deliberate wake in ProcessActivateSource()
+    // and flips CECToggleState the wrong way. Same sequential pattern as
+    // UnregisterDevice().
+    if (m_bSendInactiveSource == 1)
     {
       CLog::Log(LOGDEBUG, "{} - sending inactive source commands", __FUNCTION__);
       m_cecAdapter->SetInactiveView();
