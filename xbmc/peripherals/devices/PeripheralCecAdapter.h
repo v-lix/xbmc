@@ -216,6 +216,7 @@ private:
   std::chrono::time_point<std::chrono::steady_clock> m_lastSourceDeactivatedTime;
   std::chrono::time_point<std::chrono::steady_clock> m_lastCecKeypressTime;
   std::chrono::time_point<std::chrono::steady_clock> m_lastActivateSourceTime;
+  std::chrono::time_point<std::chrono::steady_clock> m_lastCheckTime;
   bool m_bPowerOnScreensaver;
   bool m_bPowerOffScreensaverPaused;
   bool m_bUseTVMenuLanguage;
