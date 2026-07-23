@@ -1827,16 +1827,21 @@ void aml_dv_set_xbmc_osd()
   }
   else
   {
-    // Codec logos (and any skin overlay drawn over DV video) are not dialogs
-    // or the video menu, so the skin flags them via a window property; treat
-    // that as OSD-on-screen too, keeping L5 zeroed while they are visible.
+    // Codec logos are not dialogs or the video menu, so a skin flags them via
+    // skin.codeclogosonscreen while they are on screen. A skin that does so also
+    // sets skin.codeclogososd once (at Home load) to opt out of the blunt
+    // AVChangeExtended fallback, which otherwise zeroes L5 for the whole av.change
+    // window on every DV start regardless of logos. Skins that don't set it keep
+    // the old behavior — backward compatible.
     CGUIWindow* home = wm.GetWindow(WINDOW_HOME);
     const bool codecLogosOnScreen =
         home && home->GetProperty("skin.codeclogosonscreen").asString() == "1";
+    const bool skinHandlesOsd =
+        home && home->GetProperty("skin.codeclogososd").asString() == "1";
     osd_active = wm.HasVisibleDialog() ||
                  wm.IsWindowVisible(WINDOW_VIDEO_MENU) ||
-                 CServiceBroker::GetDataCacheCore().GetAVChangeExtended() ||
-                 codecLogosOnScreen;
+                 codecLogosOnScreen ||
+                 (!skinHandlesOsd && CServiceBroker::GetDataCacheCore().GetAVChangeExtended());
   }
 
   int val = osd_active ? 1 : 0;
