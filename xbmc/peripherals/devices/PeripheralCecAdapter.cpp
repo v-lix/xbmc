@@ -270,7 +270,7 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
                               CDateTimeSpan(0, 0, 0, CEC_SUPPRESS_ACTIVATE_SOURCE_AFTER_ON_STOP)));
       m_bOnPlayReceived = true;
     }
-    if (bActivateSource && m_cecAdapter && !m_cecAdapter->IsLibCECActiveSource())
+    if (bActivateSource && m_cecAdapter)
       ActivateSource();
   }
 }
@@ -2034,8 +2034,8 @@ void CPeripheralCecAdapter::OnActionPre(const CAction& action)
            m_lastActivateSourceTime = now;
            
            // ActivateSource() safely sets a boolean under a mutex. The background CEC thread 
-           // will process it and call libcec's SetActiveSource(), which internally bails out 
-           // if it's already the active source. This completely decouples the input thread from libcec!
+           // will process it and call libcec's SetActiveSource().
+           // This completely decouples the input thread from libcec!
            ActivateSource();
          }
        }
