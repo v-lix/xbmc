@@ -453,6 +453,38 @@ int aml_get_cpufamily_id()
   return aml_cpufamily_id;
 }
 
+bool aml_display_is_widescreen()
+{
+  bool is_widescreen = true;
+  CSysfsPath edid{"/sys/class/amhdmitx/amhdmitx0/edid"};
+
+  if (edid.Exists())
+  {
+    // Match on the "size(mm):" suffix only: our 4.9 kernel misspells the label
+    // as "Physcial size(mm):" (hdmi_tx_edid.c, hdmitx_edid_dump), so searching
+    // for the correct spelling never hits and the helper silently reports every
+    // display as widescreen. The suffix matches either spelling, so this keeps
+    // working if the kernel is ever corrected.
+    auto valstr = edid.Get<std::string>();
+    size_t pos = valstr ? valstr->find("size(mm):") : std::string::npos;
+    if (pos != std::string::npos)
+    {
+      int width_mm = 0, height_mm = 0;
+      if (sscanf(valstr->c_str() + pos, "size(mm): %d x %d", &width_mm, &height_mm) == 2 &&
+          width_mm > 0 && height_mm > 0)
+      {
+          float ratio = static_cast<float>(width_mm) / height_mm;
+          // 16:9 range (with some tolerance)
+          is_widescreen = (ratio > 1.65f) ? 1 : 0;
+          CLog::Log(LOGDEBUG, "AMLUtils: display {} wide screen ({}x{}mm)",
+            is_widescreen ? "is" : "is not", width_mm, height_mm);
+      }
+    }
+  }
+
+  return is_widescreen;
+}
+
 bool aml_display_support_hdr_pq()
 {
   bool support = false;
@@ -3212,7 +3244,29 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
 
   res->bFullScreen   = true;
   res->iSubtitles    = (int)(0.965 * res->iHeight);
-  res->fPixelRatio   = 1.0f;
+  // SD CEA modes carry non-square pixels. CEA-861 declares the full 720-wide
+  // raster as exactly 4:3 or 16:9, so the ratio is the signalled display
+  // aspect over the raster aspect:
+  //   720x480  4:3 -> 8:9     720x480 16:9 -> 32:27
+  //   720x576  4:3 -> 16:15   720x576 16:9 -> 64:45
+  // Leaving these at 1.0 makes the renderer letterbox 16:9 content into ~400
+  // lines, which the display then stretches back out. HD/UHD modes and the
+  // VESA/DMT modes (640x480, 800x600, 1024x768, 1280x1024) are square-pixel
+  // by definition and stay at 1.0.
+  res->fPixelRatio = 1.0f;
+  if (res->iScreenWidth == 720 && (res->iScreenHeight == 480 || res->iScreenHeight == 576))
+  {
+    // CVBS is analogue 4:3 and drives a composite TV, not the HDMI sink, so
+    // its ratio must never be taken from the sink's EDID. A "_4x3" mode name
+    // selects the 4:3 VIC explicitly. Everything else takes the 16:9 VIC the
+    // driver maps plain SD mode names to (hdmi_tx_edid.c dispmode_vic_tab),
+    // unless the sink reports itself as a non-widescreen display.
+    const bool is4x3 = fromMode.find("cvbs") != std::string::npos ||
+                       fromMode.find("_4x3") != std::string::npos ||
+                       !aml_display_is_widescreen();
+    res->fPixelRatio = (is4x3 ? (4.0f / 3.0f) : (16.0f / 9.0f)) *
+                       res->iScreenHeight / res->iScreenWidth;
+  }
   res->strId         = fromMode;
   res->strMode       = StringUtils::Format("{:d}x{:d} @ {:.2f}{} - Full Screen", res->iScreenWidth, res->iScreenHeight, res->fRefreshRate,
     res->dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "");
