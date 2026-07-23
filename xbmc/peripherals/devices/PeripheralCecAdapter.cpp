@@ -265,13 +265,12 @@ void CPeripheralCecAdapter::Announce(ANNOUNCEMENT::AnnouncementFlag flag,
     {
       std::unique_lock<CCriticalSection> lock(m_critSection);
       bActivateSource = (GetSettingBool("activate_on_activity") && !m_bOnPlayReceived &&
-                         !m_cecAdapter->IsLibCECActiveSource() &&
                          (!m_preventActivateSourceOnPlay.IsValid() ||
                           CDateTime::GetCurrentDateTime() - m_preventActivateSourceOnPlay >
                               CDateTimeSpan(0, 0, 0, CEC_SUPPRESS_ACTIVATE_SOURCE_AFTER_ON_STOP)));
       m_bOnPlayReceived = true;
     }
-    if (bActivateSource)
+    if (bActivateSource && m_cecAdapter && !m_cecAdapter->IsLibCECActiveSource())
       ActivateSource();
   }
 }
@@ -1890,7 +1889,7 @@ void CPeripheralCecAdapter::ProcessActivateSource(void)
     m_bActiveSourcePending = false;
   }
 
-  if (bActivate)
+  if (bActivate && m_cecAdapter && !m_cecAdapter->IsLibCECActiveSource())
     m_cecAdapter->SetActiveSource();
 }
 
@@ -1990,29 +1989,43 @@ bool CPeripheralCecAdapter::ToggleDeviceState(CecStateChange mode /*= STATE_SWIT
 
 void CPeripheralCecAdapter::OnActionPre(const CAction& action)
 {
-  if (GetSettingBool("activate_on_activity") && m_cecAdapter && !m_cecAdapter->IsLibCECActiveSource())
-  {
-    // Ignore pure analog noise (like mouse movements) so we only trigger on distinct button presses
-    if (action.GetID() != ACTION_MOUSE_MOVE && action.GetID() != ACTION_NONE && action.GetID() != ACTION_ANALOG_MOVE)
-    {
-       const auto& components = CServiceBroker::GetAppComponents();
-       const auto appPower = components.GetComponent<CApplicationPowerHandling>();
-       if (appPower->IsInScreenSaver())
-       {
-         CLog::Log(LOGDEBUG, "{} - ignoring OnActionPre because screensaver is active", __FUNCTION__);
-         return;
-       }
+  auto actionId = action.GetID();
+  // Ignore pure analog noise and continuous scroll/drag events so we only trigger on distinct presses
+  if (actionId == ACTION_MOUSE_MOVE || actionId == ACTION_NONE || actionId == ACTION_ANALOG_MOVE ||
+      actionId == ACTION_MOUSE_DRAG || actionId == ACTION_MOUSE_WHEEL_UP || actionId == ACTION_MOUSE_WHEEL_DOWN)
+    return;
 
-       auto now = std::chrono::steady_clock::now();
-       if (std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastCecKeypressTime).count() > 1000 &&
-           std::chrono::duration_cast<std::chrono::seconds>(now - m_lastSourceDeactivatedTime).count() > 5)
-       {
+  if (GetSettingBool("activate_on_activity") && m_cecAdapter)
+  {
+    auto now = std::chrono::steady_clock::now();
+
+    // Throttle this entire check to at most once per second to prevent input processing lag
+    // caused by taking locks in IsLibCECActiveSource during rapid input streams.
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastCheckTime).count() < 1000)
+      return;
+
+    m_lastCheckTime = now;
+
+    const auto& components = CServiceBroker::GetAppComponents();
+    const auto appPower = components.GetComponent<CApplicationPowerHandling>();
+    if (appPower->IsInScreenSaver())
+    {
+      CLog::Log(LOGDEBUG, "{} - ignoring OnActionPre because screensaver is active", __FUNCTION__);
+      return;
+    }
+
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastCecKeypressTime).count() > 1000 &&
+        std::chrono::duration_cast<std::chrono::seconds>(now - m_lastSourceDeactivatedTime).count() > 5)
+    {
          if (std::chrono::duration_cast<std::chrono::seconds>(now - m_lastActivateSourceTime).count() >= 5)
          {
            m_lastActivateSourceTime = now;
+           
+           // ActivateSource() safely sets a boolean under a mutex. The background CEC thread 
+           // will process it and call libcec's SetActiveSource(), which internally bails out 
+           // if it's already the active source. This completely decouples the input thread from libcec!
            ActivateSource();
          }
        }
     }
-  }
 }
