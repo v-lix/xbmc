@@ -631,6 +631,10 @@ void CPeripheralCecAdapter::SetMenuLanguage(const char* strLanguage)
 
 void CPeripheralCecAdapter::OnTvStandby(void)
 {
+  // announce regardless of the configured action - addons have no other way to
+  // observe the TV going away (e.g. to cancel a queued auto-play)
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Other, "OnTVStandby");
+
   int iActionOnTvStandby = GetSettingInt("standby_pc_on_tv_standby");
   switch (iActionOnTvStandby)
   {
@@ -1255,6 +1259,9 @@ void CPeripheralCecAdapter::CecSourceActivated(void* cbParam,
 
   if (activated == 0)
     adapter->m_lastSourceDeactivatedTime = std::chrono::steady_clock::now();
+
+  CServiceBroker::GetAnnouncementManager()->Announce(
+      ANNOUNCEMENT::Other, activated == 1 ? "OnCECSourceActivated" : "OnCECSourceDeactivated");
 
   // wake up the screensaver, so the user doesn't switch to a black screen
   if (activated == 1)
