@@ -3419,7 +3419,7 @@
         </setting>
         <setting id="coreelec.audio.correct_5060hz_sync" type="boolean" label="38088" help="38089">
           <level>2</level>
-          <default>false</default>
+          <default>true</default>
           <control type="toggle" />
         </setting>
         <setting id="audiooutput.processquality" type="integer" label="13505" help="36169">
