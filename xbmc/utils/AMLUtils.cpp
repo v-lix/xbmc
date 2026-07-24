@@ -1064,6 +1064,7 @@ unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
   // skipped (e.g. VP enabled while playing HDR10->SDR).
   aml_dv_set_sdr_source_max_nits(aml_dv_sdr_boost_param());
   aml_dv_set_sdr_keep_ext(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_PER_FRAME_METADATA));
+  aml_dv_set_target_min_lum(settings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_TARGET_MIN_LUM));
 
   if (dv_vp != 0)
   {
@@ -1659,6 +1660,16 @@ void aml_dv_set_sdr_source_max_nits(int value)
   // SDR output - the *->SDR column of dolby_vision_target_lum_max is
   // ignored by the DV library (proven on-device, 10 vs 4000 identical).
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_sdr_src_max_nits", value);
+}
+
+void aml_dv_set_target_min_lum(int value)
+{
+  // Target display min luminance for the VS10 tone curve, 0.0001 nit
+  // units. Amlogic's stock 50 (0.005 nits) floors PQ output black at
+  // 10-bit code ~77 — visible black crush below code ~80 (github #83).
+  // Default 1 (0.0001 nits) keeps the floor at PQ code ~65, one step
+  // above reference black.
+  CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_target_min", value);
 }
 
 bool aml_is_dv_enable()

@@ -689,6 +689,7 @@ static void set_dv_settings_visible(bool show)
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_BOOST, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_SRC_MAX_NITS, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_PER_FRAME_METADATA, show);
+  set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_TARGET_MIN_LUM, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS, show);
   set_visible(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10PLUS, show);
@@ -921,6 +922,7 @@ bool CDolbyVisionAML::Setup()
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_BOOST);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_SRC_MAX_NITS);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_PER_FRAME_METADATA);
+  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_TARGET_MIN_LUM);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_VIDEO_PROCESSOR);
   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO);
@@ -1099,6 +1101,13 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
     unsigned int dv_out_mode(aml_dv_dolby_vision_mode());
     if (aml_is_dv_enable() && (dv_out_mode == DOLBY_VISION_OUTPUT_MODE_SDR10 || dv_out_mode == DOLBY_VISION_OUTPUT_MODE_SDR8))
       aml_dv_set_sdr_keep_ext(settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_SDR_PER_FRAME_METADATA));
+  }
+  else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_TARGET_MIN_LUM)
+  {
+    // Affects the tone curve of every VS10 output mode - apply live
+    // whenever the DV core is engaged.
+    if (aml_is_dv_enable())
+      aml_dv_set_target_min_lum(std::dynamic_pointer_cast<const CSettingInt>(setting)->GetValue());
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_TYPE_VP_AUTO)
   {

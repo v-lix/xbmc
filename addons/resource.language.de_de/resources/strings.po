@@ -18960,6 +18960,30 @@ msgctxt "#60637"
 msgid "Lets the Dolby engine use the source's dynamic metadata (per-scene brightness anchors and the colorist's SDR trims) when converting DV to SDR via VS10, so dark and bright scenes each get their own tone curve instead of one static curve for the whole title. Disable to restore the previous static tone mapping if brightness looks wrong. Only affects DV sources."
 msgstr "Lässt die Dolby-Engine die dynamischen Metadaten der Quelle (szenenweise Helligkeitsanker und die SDR-Trims des Koloristen) bei der DV-nach-SDR-Konvertierung über VS10 verwenden, sodass dunkle und helle Szenen jeweils eine eigene Tone-Mapping-Kurve erhalten statt einer statischen Kurve für den ganzen Titel. Deaktivieren, um das bisherige statische Tone Mapping wiederherzustellen, falls die Helligkeit falsch wirkt. Betrifft nur DV-Quellen."
 
+msgctxt "#60638"
+msgid "VS10 output black level"
+msgstr "VS10-Ausgabe-Schwarzwert"
+
+msgctxt "#60639"
+msgid "Minimum display luminance assumed by the VS10 tone curve for all conversions. Reference black keeps shadow detail intact down to one step above video black. Higher values raise the output black floor and crush the darkest steps - the stock Amlogic value of 0.005 nits crushes everything below 10-bit code ~80 on HDR output. Only change this if your display cannot resolve near-black."
+msgstr "Minimale Display-Luminanz, die die VS10-Tone-Mapping-Kurve für alle Konvertierungen annimmt. Referenzschwarz erhält Schattendetails bis eine Stufe über Videoschwarz. Höhere Werte heben den Schwarzwert der Ausgabe an und verschlucken die dunkelsten Stufen - der Amlogic-Standardwert von 0,005 Nits verschluckt bei HDR-Ausgabe alles unterhalb von 10-Bit-Code ~80. Nur ändern, wenn das Display Near-Black nicht auflösen kann."
+
+msgctxt "#60640"
+msgid "Reference black (0.0001 nits)"
+msgstr "Referenzschwarz (0,0001 Nits)"
+
+msgctxt "#60641"
+msgid "0.001 nits"
+msgstr "0,001 Nits"
+
+msgctxt "#60642"
+msgid "0.005 nits (Amlogic stock)"
+msgstr "0,005 Nits (Amlogic-Standard)"
+
+msgctxt "#60643"
+msgid "0.01 nits"
+msgstr "0,01 Nits"
+
 msgctxt "#60069"
 msgid "HDR10 OSD peak brightness (nits)"
 msgstr "HDR10-OSD-Spitzenhelligkeit (Nits)"
