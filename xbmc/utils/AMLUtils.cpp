@@ -1296,7 +1296,7 @@ void aml_dv_dump_state(const char* tag)
     "gmax={} blend={} xosd={} subs={} attr=[{}] hdmi_cfg=[{}] | "
     "tx: hpd={} rxsense={} rhpd={} used={} disp_mode={} sink_type={} | "
     "geom: fb_win=[{}] fb_fs=[{}] fb_fs_en={} vid_axis=[{}] vid_dis={} | "
-    "l5: meta5={} l5_osdst={} l5_subt={} detect={} ovr_t={} ovr_b={} ovr_l={} ovr_r={} ovr_force={} | "
+    "l5: meta5={} l5_osdst={} l5_subt={} detect={} ovr_t={} ovr_b={} ovr_l={} ovr_r={} ovr_force={} ovr_add={} | "
     "c: lastOsd={} lastSubs={} dvMode={} f422={} vs10conv={} dvActive={}",
     tag,
     rd("/sys/module/amdolby_vision/parameters/dolby_vision_mode"),
@@ -1348,6 +1348,7 @@ void aml_dv_dump_state(const char* tag)
     rd("/sys/module/amdolby_vision/parameters/xbmc_override_l5_left"),
     rd("/sys/module/amdolby_vision/parameters/xbmc_override_l5_right"),
     rd("/sys/module/amdolby_vision/parameters/xbmc_force_l5_override"),
+    rd("/sys/module/amdolby_vision/parameters/xbmc_l5_override_additive"),
     s_lastOsd, s_lastSubtitles, s_dvModeCached,
     aml_linux_force_422 ? 1 : 0, vs10_conversion ? 1 : 0,
     s_dvPlaybackActive ? 1 : 0);
@@ -2029,13 +2030,18 @@ void aml_dv_apply_l5_override_sysfs()
   // xbmc_override_l5_* is the override namespace (kernel commit 61aaaed51c52),
   // separate from xbmc_detected_l5_* which is owned by the detect thread.
   // No collision with aml_dv_detect_active_area_stop() zeroing detect paths.
+  // Auto-letterbox values are ADDITIVE: the kernel adds them to each frame's
+  // source L5 so variable in-picture bars compose with the player-added
+  // padding (e.g. 3840x2024 with per-scene RPU L5 0/208 -> emits 68/276).
+  // A manual override stays absolute — the user dictates the final value.
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_top",    top);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_bottom", bottom);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_left",   left);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_right",  right);
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_l5_override_additive", autoLb);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_force_l5_override",  active);
 
-  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_override_sysfs - active={} auto={} t={} b={} l={} r={}",
+  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_override_sysfs - active={} auto/additive={} t={} b={} l={} r={}",
             active, autoLb, top, bottom, left, right);
 }
 

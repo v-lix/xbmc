@@ -882,11 +882,18 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
       signalSubtitles = m_overlays.HasTextOverlay(m_presentsource);
 
       // Resolve effective L5 bars (source, falling back to detected, then
-      // auto-letterbox geometry)
+      // auto-letterbox geometry). autoLbActive tracks the player-added
+      // padding on cropped encodes independently of the source values —
+      // both can be present at once (variable in-picture L5 on a cropped
+      // frame), and the kernel emits their sum to the sink.
       uint16_t sigTop = 0, sigBottom = 0;
       bool autoLbBars = false;
+      bool autoLbActive = false;
       if (m_picture.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION)
       {
+        uint16_t albTop = 0, albBottom = 0, albLeft = 0, albRight = 0;
+        autoLbActive = aml_dv_auto_letterbox_get(albTop, albBottom, albLeft, albRight) &&
+                       (albTop > 0 || albBottom > 0);
         const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
         if (doviMeta.has_level5_metadata)
         {
@@ -899,18 +906,14 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
           uint16_t detLeft, detRight;
           aml_dv_detect_active_area_get(sigTop, sigBottom, detLeft, detRight);
         }
-        if (sigTop == 0 && sigBottom == 0)
+        if (sigTop == 0 && sigBottom == 0 && autoLbActive)
         {
           // Synthesized offsets for the player-added bars on cropped
           // encodes. Same pixel pitch as the coded video, so the src->dst
           // scale below converts them like source/detected values.
-          uint16_t albTop, albBottom, albLeft, albRight;
-          if (aml_dv_auto_letterbox_get(albTop, albBottom, albLeft, albRight))
-          {
-            sigTop = albTop;
-            sigBottom = albBottom;
-            autoLbBars = sigTop > 0 || sigBottom > 0;
-          }
+          sigTop = albTop;
+          sigBottom = albBottom;
+          autoLbBars = true;
         }
       }
 
@@ -953,9 +956,12 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
       if (!signalSubtitles && !restrictSubsToActiveArea &&
           (sigTop > 0 || sigBottom > 0))
       {
-        // Auto-letterbox bars lie outside the video rect, so the canvas-AR
-        // geometry test cannot see them — treat any image sub as overlapping.
-        if (autoLbBars)
+        // Auto-letterbox padding lies outside the video rect, so the
+        // canvas-AR geometry test cannot see it — treat any image sub as
+        // overlapping. Applies whenever the padding exists, including when
+        // in-picture source bars are present at the same time (the sink
+        // masks their sum, so a sub in the padding is still swallowed).
+        if (autoLbActive)
           signalSubtitles = m_overlays.HasImageOverlay(m_presentsource);
         else
           signalSubtitles = m_overlays.HasImageSubOutsideActiveArea(

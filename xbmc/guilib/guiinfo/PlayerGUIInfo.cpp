@@ -711,6 +711,7 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
     case PLAYER_PROCESS_VIDEO_DOVI_L5_TOP_OFFSET:
     case PLAYER_PROCESS_VIDEO_DOVI_L5_BOTTOM_OFFSET:
     case PLAYER_PROCESS_VIDEO_DOVI_L5_DETECTED:
+    case PLAYER_PROCESS_VIDEO_DOVI_L5_AUTO:
     case PLAYER_PROCESS_VIDEO_DOVI_ACTIVE_AREA_CLASS:
     {
       /* Prefer source L5 when it has non-zero offsets. Only fall back to
@@ -726,16 +727,21 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
         aml_dv_detect_active_area_get(dTop, dBottom, dLeft, dRight);
       /* Auto-letterbox synthesises L5 from the coded aspect for cropped
        * (non-16:9) content — neither source nor the pixel detector provides
-       * it (the detector skips non-16:9 and never goes stable). Surface those
-       * synthesised offsets so the L5 section is visible in player info. */
+       * it (the detector skips non-16:9 and never goes stable). The kernel
+       * ADDS those offsets to each frame's source L5 (additive override),
+       * so mirror that here: displayed = source + auto-letterbox. */
       uint16_t aTop = 0, aBottom = 0, aLeft = 0, aRight = 0;
-      bool autoLb = !sourceHasL5 && !detected &&
-                    aml_dv_auto_letterbox_get(aTop, aBottom, aLeft, aRight);
+      bool autoLb = aml_dv_auto_letterbox_get(aTop, aBottom, aLeft, aRight);
       /* hasL5: true when there are non-zero source offsets, detection completed
        * (even 0/0/0/0 — valid for 16:9), or auto-letterbox is reacting. */
       bool hasL5 = sourceHasL5 || detected || autoLb;
 
-      /* Value precedence: detected → auto-letterbox → source. */
+      /* Value precedence mirrors kernel emission:
+       * detected → auto-letterbox (composed with source) → source. */
+      auto satAdd = [](uint16_t a, uint16_t b) {
+        uint32_t sum = static_cast<uint32_t>(a) + b;
+        return static_cast<uint16_t>(sum > 0xFFFF ? 0xFFFF : sum);
+      };
       uint16_t fTop, fBottom, fLeft, fRight;
       if (detected)
       {
@@ -743,7 +749,10 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
       }
       else if (autoLb)
       {
-        fTop = aTop; fBottom = aBottom; fLeft = aLeft; fRight = aRight;
+        fTop = satAdd(aTop, meta.level5_active_area_top_offset);
+        fBottom = satAdd(aBottom, meta.level5_active_area_bottom_offset);
+        fLeft = satAdd(aLeft, meta.level5_active_area_left_offset);
+        fRight = satAdd(aRight, meta.level5_active_area_right_offset);
       }
       else
       {
@@ -767,6 +776,8 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
           value = std::to_string(fBottom); break;
         case PLAYER_PROCESS_VIDEO_DOVI_L5_DETECTED:
           value = std::to_string(detected); break;
+        case PLAYER_PROCESS_VIDEO_DOVI_L5_AUTO:
+          value = std::to_string(autoLb); break;
         case PLAYER_PROCESS_VIDEO_DOVI_ACTIVE_AREA_CLASS:
         {
           /* Resolution-independent aspect class from the effective top bar:
