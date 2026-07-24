@@ -22797,6 +22797,18 @@ msgctxt "#38087"
 msgid "Give the audio path the same high memory-bus priority that the video and display path already has, so heavy 4K/Dolby Vision decoding cannot briefly starve the audio buffer and cause rare split-second dropouts. Audio and video then share the top priority equally (video is not deprioritised), and audio adds only a tiny fraction of memory traffic. On by default; takes effect immediately."
 msgstr ""
 
+#. Label for the setting with id #38088 (correct 50/60Hz audio sync)
+#: system/settings/settings.xml
+msgctxt "#38088"
+msgid "Correct 50/60Hz audio sync"
+msgstr ""
+
+#. Description for the setting with label #38088 "Correct 50/60Hz audio sync"
+#: system/settings/settings.xml
+msgctxt "#38089"
+msgid "Removes the built-in audio delay compensation at 50Hz and 60Hz refresh rates for 1080p and below content. Kodi's default audio latency of 165ms is calibrated for 30Hz and below output; at 50/60Hz the display pipeline runs with lower-latency. On some setups that value is too high and causes audio sync delays. When enabled, the compensation at 49-61Hz is set to 0ms. 4K/2160p is unchanged."
+msgstr ""
+
 #. Used for the rating selection
 #: xbmc/music/MusicUtils.cpp
 #: xbmc/video/dialogs/GUIDialogVideoInfo.cpp

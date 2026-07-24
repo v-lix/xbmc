@@ -172,6 +172,10 @@ void CAdvancedSettings::Initialize()
 
   m_hasVideoDefaultLatency = false;
   m_videoDefaultLatency = 0.0;
+  // Load() runs on every profile switch; without these the latency tables
+  // accumulate a fresh copy of the defaults and user entries per load.
+  m_videoRefreshLatency.clear();
+  m_audioPassthroughLatency.clear();
 
   m_videoDecoderTimeout = 5;
   m_videoDecoderDrainTimeout = 5;
@@ -536,19 +540,32 @@ void CAdvancedSettings::DefaultVideoLatency() {
 
   if (!m_hasVideoDefaultLatency) m_videoDefaultLatency = 165;
 
+  // Built-in per-resolution latency defaults. The generic 49-61Hz reduction is
+  // not stored here: it is applied in GetLatencyTweak() and gated on the
+  // "Correct 50/60Hz audio sync" GUI setting
+  // (coreelec.audio.correct_5060hz_sync), so it can be toggled at runtime
+  // rather than being a blanket default.
+  std::vector<RefreshVideoLatency> defaults;
+
   RefreshVideoLatency videolatency = {};
   videolatency.resolution = 2160;
   videolatency.refreshmin = 25;
   videolatency.refreshmax = 25;
   videolatency.delay = 70;
-  m_videoRefreshLatency.push_back(videolatency);
+  defaults.push_back(videolatency);
 
   videolatency = {};
   videolatency.resolution = 2160;
   videolatency.refreshmin = 50;
   videolatency.refreshmax = 60;
   videolatency.delay = 90;
-  m_videoRefreshLatency.push_back(videolatency);
+  defaults.push_back(videolatency);
+
+  // Prepend rather than append: user <refresh> entries from advancedsettings.xml
+  // are already in the vector, and GetLatencyTweak() takes the LAST match, so
+  // defaults must sit in front of them to remain user-overridable.
+  m_videoRefreshLatency.insert(m_videoRefreshLatency.begin(), defaults.begin(),
+                               defaults.end());
 }
 
 void CAdvancedSettings::ParseSettingsFile(const std::string &file)
@@ -1599,6 +1616,23 @@ float CAdvancedSettings::GetLatencyTweak(float refreshrate,
                                          unsigned int resolution)
 {
   float delay = m_videoDefaultLatency;
+
+  // "Correct 50/60Hz audio sync" (coreelec.audio.correct_5060hz_sync): the
+  // 165ms default is a film-rate (23.976/24Hz) calibration and overcompensates
+  // at 50/60Hz, pushing audio ahead of video. When enabled use 0ms at 49-61Hz
+  // as the baseline. Only when the user has not pinned a global
+  // <latency><delay> (that value is respected as-is), and set before the loop
+  // so per-resolution and user <refresh> entries below still override it.
+  if (!m_hasVideoDefaultLatency && refreshrate >= 49 && refreshrate <= 61)
+  {
+    const std::shared_ptr<CSettingsComponent> settingsComponent =
+        CServiceBroker::GetSettingsComponent();
+    const std::shared_ptr<CSettings> settings =
+        settingsComponent ? settingsComponent->GetSettings() : nullptr;
+    if (settings && settings->GetBool(CSettings::SETTING_COREELEC_AUDIO_CORRECT_5060HZ_SYNC))
+      delay = 0;
+  }
+
   for (int i = 0; i < (int) m_videoRefreshLatency.size(); i++)
   {
     RefreshVideoLatency& videolatency = m_videoRefreshLatency[i];
