@@ -1052,6 +1052,7 @@ bool CBitstreamConverter::Convert(uint8_t *pData_bl, int iSize_bl, uint8_t *pDat
 
     Hdr10PlusMetadata hdr10plus_meta;
     bool convert_hdr10plus_meta = false;
+    bool au_has_rpu = false;
 
     // process bl frame data
     start = buf;
@@ -1105,7 +1106,10 @@ bool CBitstreamConverter::Convert(uint8_t *pData_bl, int iSize_bl, uint8_t *pDat
   
         case HEVC_NAL_UNSPEC62: // DoVi RPU
           if (!m_removeDovi && !convert_hdr10plus_meta)
+          {
             ProcessDoViRpuWrap(buf, size, &m_convertBuffer, offset, pts);
+            au_has_rpu = true;
+          }
           break;
 
         default: // Package other data into HEVC_NAL_UNSPEC63 DoVi EL
@@ -1124,7 +1128,16 @@ bool CBitstreamConverter::Convert(uint8_t *pData_bl, int iSize_bl, uint8_t *pDat
 
     // If converting hdr10plus - add the DoVi RPU as the last NALU in the access unit.
     if (convert_hdr10plus_meta)
+    {
       AddDoViRpuNaluWrap(hdr10plus_meta, &m_convertBuffer, offset, pts);
+      m_lastHdr10PlusMeta = hdr10plus_meta;
+      m_lastHdr10PlusMetaValid = true;
+    }
+    // HDR10+ SEIs can stop mid-stream (AMZN encodes drop them for end credits)
+    // while the stream is already flagged DV: TV-led DV needs an RPU on every
+    // frame or the TV drops out of DV, so hold the last converted metadata.
+    else if (m_lastHdr10PlusMetaValid && !au_has_rpu)
+      AddDoViRpuNaluWrap(m_lastHdr10PlusMeta, &m_convertBuffer, offset, pts);
 
     // append end of sequence if exist
     if (buf_eos)
@@ -1740,6 +1753,7 @@ bool CBitstreamConverter::BitstreamConvert(uint8_t* pData, int iSize, uint8_t **
 
   Hdr10PlusMetadata hdr10plus_meta;
   bool convert_hdr10plus_meta = false;
+  bool au_has_rpu = false;
 
   std::vector<uint8_t> finalPrefixSeiNalu;
 
@@ -1811,7 +1825,10 @@ bool CBitstreamConverter::BitstreamConvert(uint8_t* pData, int iSize, uint8_t **
 
         case HEVC_NAL_UNSPEC62: // DoVi RPU
           if (!m_removeDovi && !convert_hdr10plus_meta)
+          {
             ProcessDoViRpu(buf, nal_size, poutbuf, poutbuf_size, pts);
+            au_has_rpu = true;
+          }
           break;
 
         case HEVC_NAL_UNSPEC63: // DoVi EL
@@ -1831,7 +1848,16 @@ bool CBitstreamConverter::BitstreamConvert(uint8_t* pData, int iSize, uint8_t **
 
   // If converting hdr10plus - add the DoVi RPU as the last NALU in the access unit.
   if (convert_hdr10plus_meta)
+  {
     AddDoViRpuNalu(hdr10plus_meta, poutbuf, poutbuf_size, pts);
+    m_lastHdr10PlusMeta = hdr10plus_meta;
+    m_lastHdr10PlusMetaValid = true;
+  }
+  // HDR10+ SEIs can stop mid-stream (AMZN encodes drop them for end credits)
+  // while the stream is already flagged DV: TV-led DV needs an RPU on every
+  // frame or the TV drops out of DV, so hold the last converted metadata.
+  else if (m_lastHdr10PlusMetaValid && !au_has_rpu)
+    AddDoViRpuNalu(m_lastHdr10PlusMeta, poutbuf, poutbuf_size, pts);
 
   m_first_frame = false;
 

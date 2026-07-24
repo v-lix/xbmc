@@ -261,6 +261,8 @@ protected:
   bool              m_convert_Hdr10Plus;
   bool              m_prefer_Hdr10Plus_conversion;
   bool              m_dual_priority_Hdr10Plus;
+  Hdr10PlusMetadata m_lastHdr10PlusMeta{};
+  bool              m_lastHdr10PlusMetaValid{false};
   enum PeakBrightnessSource m_convert_Hdr10Plus_peak_brightness_source;
   bool              m_first_frame;
   enum DOVICMv40Mode m_append_cmv40;
