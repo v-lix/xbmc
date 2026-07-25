@@ -1261,7 +1261,14 @@ void CPeripheralCecAdapter::CecSourceActivated(void* cbParam,
   bool bWasInScreensaver = appPowerForScreenSaver->IsInScreenSaver();
 
   if (activated == 0)
+  {
     adapter->m_lastSourceDeactivatedTime = std::chrono::steady_clock::now();
+    if (adapter->GetSettingInt("pause_or_stop_playback_on_deactivate") != LOCALISED_ID_NONE)
+    {
+      std::unique_lock<CCriticalSection> lock(adapter->m_critSection);
+      adapter->m_bOnPlayReceived = false;
+    }
+  }
 
   CServiceBroker::GetAnnouncementManager()->Announce(
       ANNOUNCEMENT::Other, activated == 1 ? "OnCECSourceActivated" : "OnCECSourceDeactivated");
