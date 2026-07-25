@@ -1256,6 +1256,9 @@ void CPeripheralCecAdapter::CecSourceActivated(void* cbParam,
     fputs(isActive ? "1\n" : "0\n", fp);
     fclose(fp);
   }
+  auto& appComponentsForScreenSaver = CServiceBroker::GetAppComponents();
+  const auto appPowerForScreenSaver = appComponentsForScreenSaver.GetComponent<CApplicationPowerHandling>();
+  bool bWasInScreensaver = appPowerForScreenSaver->IsInScreenSaver();
 
   if (activated == 0)
     adapter->m_lastSourceDeactivatedTime = std::chrono::steady_clock::now();
@@ -1284,8 +1287,10 @@ void CPeripheralCecAdapter::CecSourceActivated(void* cbParam,
     const auto& components = CServiceBroker::GetAppComponents();
     const auto appPlayer = components.GetComponent<CApplicationPlayer>();
 
-    bool bPlayingAndDeactivated = activated == 0 && ((pSlideShow && pSlideShow->IsPlaying()) ||
-                                                     !appPlayer->IsPausedPlayback());
+    bool bPlayingAndDeactivated = activated == 0 && !bWasInScreensaver &&
+                                  ((pSlideShow && pSlideShow->IsPlaying()) ||
+                                   !appPlayer->IsPausedPlayback());
+
     bool bPausedAndActivated =
         activated == 1 && adapter->m_bPlaybackPaused &&
         ((pSlideShow && pSlideShow->IsPaused()) || (appPlayer && appPlayer->IsPausedPlayback()));
