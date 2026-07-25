@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <mutex>
+#include <thread>
 
 #include "AMLUtils.h"
 
@@ -851,6 +852,8 @@ unsigned int aml_dv_on(unsigned int mode, bool force_hdmi)
   CDVCoreGuard dvlock(__FUNCTION__);
   aml_dv_apply_l5_sysfs();
   aml_dv_apply_l5_override_sysfs();
+  /* No-op unless the auto-letterbox path is actually driving the override. */
+  aml_dv_auto_letterbox_watch_start();
 
   unsigned int xbmc_dv_vsvdb_source_lum_limit_num = 0;
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_dv_vsvdb_source_lum_limit_num", xbmc_dv_vsvdb_source_lum_limit_num);
@@ -1414,6 +1417,7 @@ void aml_dv_off(bool skip_hdmi_update)
 {
   CDVCoreGuard dvlock(__FUNCTION__);
   aml_dv_detect_active_area_stop();
+  aml_dv_auto_letterbox_watch_stop();
 
   // change mode and disable.
   CSysfsPath dolby_vision_mode{"/sys/module/amdolby_vision/parameters/dolby_vision_mode"};
@@ -1958,12 +1962,18 @@ bool aml_dv_l5_override_active()
 static std::atomic<int> s_autoLbWidth{0};
 static std::atomic<int> s_autoLbHeight{0};
 static std::atomic<bool> s_autoLbNativeDV{false};
+/* Cleared by the plausibility watch below when the stream's source L5 turns out
+ * to already account for the crop — adding our gap on top would double the bars,
+ * so the override goes back to replacing rather than composing. */
+static std::atomic<bool> s_autoLbAdditive{true};
 
 void aml_dv_set_active_area_geometry(int width, int height, bool nativeDV)
 {
   s_autoLbWidth.store(width);
   s_autoLbHeight.store(height);
   s_autoLbNativeDV.store(nativeDV);
+  /* New stream — the previous one's verdict must not carry over. */
+  s_autoLbAdditive.store(true);
 }
 
 /* Compute the synthesised L5 offsets for the current stream. Returns false (and
@@ -2013,6 +2023,204 @@ bool aml_dv_auto_letterbox_get(uint16_t& top, uint16_t& bottom,
   return _auto_letterbox_geometry(top, bottom, left, right);
 }
 
+/* ---- Auto-letterbox plausibility watch ------------------------------------
+ * Additive composition assumes the two L5 channels describe *different* bars:
+ * ours the player-added padding, the RPU's the per-scene bars baked into the
+ * picture. Some cropped encodes break that assumption — their source L5 was
+ * authored against the uncropped frame, so it already is the crop. Adding our
+ * gap on top doubles it and eats real picture (3840x1600 carrying source
+ * 280/280 composes to 560, leaving a 3.69:1 active area — wider than anything
+ * ever shot). Watch the per-frame source L5 for a while and drop back to a
+ * plain replacing override when the two channels are clearly describing the
+ * same bars: the geometry gap is derived from the actual coded frame, so it
+ * stays trustworthy even though the file's own L5 no longer is.
+ *
+ * Two tests, because neither is complete on its own:
+ *   - implausible aspect: read as coded-frame offsets (what the spec says they
+ *     are), the source L5 implies an active area outside the aspect band the
+ *     pixel detector already trusts (s_commonAR tops out at 2.76:1). Skipped
+ *     when the coded frame is itself outside that band, where the test would
+ *     fire on every frame's real bars;
+ *   - equality: the source offsets match the gap we synthesised. Needed for
+ *     small gaps, where doubling stays plausible (3840x2024, gap 68, source 68
+ *     -> 2.03:1, a perfectly real aspect).
+ * A sample matching neither test resets the run, so the equality trip needs the
+ * condition to hold across scene changes — variable-L5 content whose in-picture
+ * bars merely coincide with the gap for one scene therefore never trips. An
+ * impossible aspect acts on ~1 s, since nothing but a corrupt RPU can produce
+ * one and waiting only prolongs the over-crop. The error is also
+ * biased on purpose: dropping composition wrongly leaves in-picture bars
+ * lift-grey (cosmetic), while composing wrongly crops picture. */
+static constexpr uint32_t AUTO_LB_AR_MAX = 2900; /* x1000, matches the detector band */
+static constexpr uint32_t AUTO_LB_AR_MIN = 1200;
+static constexpr int AUTO_LB_POLL_MS = 500;
+static constexpr int AUTO_LB_MAX_POLLS = 120; /* give up after ~60 s */
+static constexpr int AUTO_LB_TRIP_SAMPLES = 6; /* ~3 s of agreement before acting */
+static constexpr int AUTO_LB_IMPOSSIBLE_SAMPLES = 2; /* ~1 s when the value can't be real */
+
+static std::atomic<bool> s_autoLbWatchCancel{false};
+static std::thread s_autoLbWatchThread;
+static std::mutex s_autoLbWatchMutex;
+
+/* One sample of the current frame's source L5. Fills src[] (T,B,L,R) and reason,
+ * and returns how strongly this sample says the offsets cannot be describing
+ * bars inside the coded picture:
+ *   AUTO_LB_SAMPLE_OK       - plausible, composition stands;
+ *   AUTO_LB_SAMPLE_SUSPECT  - the offsets match our gap. Real content can do
+ *                             this by coincidence, so it needs corroboration;
+ *   AUTO_LB_SAMPLE_IMPOSSIBLE - the offsets describe an aspect no frame has.
+ *                             Only a corrupt RPU produces this transiently. */
+enum
+{
+  AUTO_LB_SAMPLE_OK = 0,
+  AUTO_LB_SAMPLE_SUSPECT = 1,
+  AUTO_LB_SAMPLE_IMPOSSIBLE = 2,
+};
+
+static int _auto_letterbox_duplicate_sample(uint16_t gapTop, uint16_t gapBottom,
+                                            uint16_t gapLeft, uint16_t gapRight,
+                                            int w, int h, uint16_t src[4],
+                                            const char*& reason)
+{
+  auto meta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
+  src[0] = meta.level5_active_area_top_offset;
+  src[1] = meta.level5_active_area_bottom_offset;
+  src[2] = meta.level5_active_area_left_offset;
+  src[3] = meta.level5_active_area_right_offset;
+
+  if (!meta.has_level5_metadata)
+    return AUTO_LB_SAMPLE_OK;
+  if (!(src[0] || src[1] || src[2] || src[3]))
+    return AUTO_LB_SAMPLE_OK; /* no source bars — nothing can be doubled */
+
+  /* Aspect implied by reading the offsets against the coded picture. The
+   * padding cancels out, so this is the same number the sink would see:
+   * out_h - 2*gap - top - bottom == h - top - bottom. */
+  const int activeW = w - static_cast<int>(src[2]) - static_cast<int>(src[3]);
+  const int activeH = h - static_cast<int>(src[0]) - static_cast<int>(src[1]);
+  if (activeW <= 0 || activeH <= 0)
+  {
+    reason = "source L5 leaves no active area in the coded picture";
+    return AUTO_LB_SAMPLE_IMPOSSIBLE;
+  }
+
+  const uint32_t impliedAR = (static_cast<uint32_t>(activeW) * 1000) / activeH;
+  const uint32_t codedAR = (static_cast<uint32_t>(w) * 1000) / h;
+  /* Bars only ever push the implied aspect away from the coded one, so this
+   * test discriminates nothing once the coded frame is itself outside the band
+   * — an extreme encode's real bars would read as "impossible" on every frame.
+   * Those files are left to the equality test below. */
+  if (codedAR <= AUTO_LB_AR_MAX && impliedAR > AUTO_LB_AR_MAX)
+  {
+    reason = "source L5 implies an impossibly wide active area";
+    return AUTO_LB_SAMPLE_IMPOSSIBLE;
+  }
+  if (codedAR >= AUTO_LB_AR_MIN && impliedAR < AUTO_LB_AR_MIN)
+  {
+    reason = "source L5 implies an impossibly narrow active area";
+    return AUTO_LB_SAMPLE_IMPOSSIBLE;
+  }
+
+  /* Within 2% of the gap (min 4px) counts as "the same bars". */
+  auto sameAs = [](uint16_t a, uint16_t b) {
+    const int tol = std::max(4, static_cast<int>(b) * 2 / 100);
+    return std::abs(static_cast<int>(a) - static_cast<int>(b)) <= tol;
+  };
+  if ((gapTop || gapBottom) && sameAs(src[0], gapTop) && sameAs(src[1], gapBottom))
+  {
+    reason = "source L5 equals the synthesised top/bottom gap";
+    return AUTO_LB_SAMPLE_SUSPECT;
+  }
+  if ((gapLeft || gapRight) && sameAs(src[2], gapLeft) && sameAs(src[3], gapRight))
+  {
+    reason = "source L5 equals the synthesised left/right gap";
+    return AUTO_LB_SAMPLE_SUSPECT;
+  }
+  return AUTO_LB_SAMPLE_OK;
+}
+
+static void _auto_letterbox_watch_run(int w, int h)
+{
+  uint16_t gapTop = 0, gapBottom = 0, gapLeft = 0, gapRight = 0;
+  if (!_auto_letterbox_geometry(gapTop, gapBottom, gapLeft, gapRight))
+    return;
+
+  int agree = 0;
+  for (int poll = 0; poll < AUTO_LB_MAX_POLLS; ++poll)
+  {
+    for (int slice = 0; slice < AUTO_LB_POLL_MS / 100; ++slice)
+    {
+      if (s_autoLbWatchCancel.load())
+        return;
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    if (s_autoLbWatchCancel.load())
+      return;
+    /* Settings / override can change mid-playback — stop once we're not the
+     * ones driving the override any more. */
+    if (!aml_dv_auto_letterbox_active())
+      return;
+
+    uint16_t src[4] = {0, 0, 0, 0};
+    const char* reason = nullptr;
+    const int verdict = _auto_letterbox_duplicate_sample(gapTop, gapBottom,
+                                                         gapLeft, gapRight,
+                                                         w, h, src, reason);
+    if (verdict == AUTO_LB_SAMPLE_OK)
+    {
+      agree = 0;
+      continue;
+    }
+    /* An impossible aspect needs only enough samples to rule out a corrupt
+     * RPU; a merely suspicious one has to survive scene changes. */
+    const int needed = (verdict == AUTO_LB_SAMPLE_IMPOSSIBLE) ? AUTO_LB_IMPOSSIBLE_SAMPLES
+                                                              : AUTO_LB_TRIP_SAMPLES;
+    if (++agree < needed)
+      continue;
+
+    CLog::Log(LOGINFO, "AMLUtils::auto-letterbox - {} ({}x{}, source T={} B={} L={} R={} vs "
+              "gap T={} B={} L={} R={}) — dropping additive composition, the geometry "
+              "gap now replaces source L5",
+              reason, w, h, src[0], src[1], src[2], src[3],
+              gapTop, gapBottom, gapLeft, gapRight);
+    s_autoLbAdditive.store(false);
+    aml_dv_apply_l5_override_sysfs();
+    return;
+  }
+}
+
+/* Caller must hold s_autoLbWatchMutex. */
+static void _auto_letterbox_watch_stop_locked()
+{
+  s_autoLbWatchCancel.store(true);
+  if (s_autoLbWatchThread.joinable())
+    s_autoLbWatchThread.join();
+  s_autoLbWatchCancel.store(false);
+}
+
+void aml_dv_auto_letterbox_watch_start()
+{
+  std::unique_lock<std::mutex> lock(s_autoLbWatchMutex);
+  _auto_letterbox_watch_stop_locked();
+  if (!aml_dv_auto_letterbox_active())
+    return;
+
+  const int w = s_autoLbWidth.load();
+  const int h = s_autoLbHeight.load();
+  s_autoLbWatchThread = std::thread([w, h]() { _auto_letterbox_watch_run(w, h); });
+}
+
+void aml_dv_auto_letterbox_watch_stop()
+{
+  std::unique_lock<std::mutex> lock(s_autoLbWatchMutex);
+  _auto_letterbox_watch_stop_locked();
+}
+
+bool aml_dv_auto_letterbox_additive()
+{
+  return s_autoLbAdditive.load();
+}
+
 void aml_dv_apply_l5_override_sysfs()
 {
   uint16_t top = 0, bottom = 0, left = 0, right = 0;
@@ -2033,16 +2241,19 @@ void aml_dv_apply_l5_override_sysfs()
   // Auto-letterbox values are ADDITIVE: the kernel adds them to each frame's
   // source L5 so variable in-picture bars compose with the player-added
   // padding (e.g. 3840x2024 with per-scene RPU L5 0/208 -> emits 68/276).
+  // Unless the plausibility watch found the source L5 already carrying the
+  // crop, in which case composition would double the bars and we replace.
   // A manual override stays absolute — the user dictates the final value.
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_top",    top);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_bottom", bottom);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_left",   left);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_override_l5_right",  right);
-  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_l5_override_additive", autoLb);
+  const bool additive = autoLb && s_autoLbAdditive.load();
+  CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_l5_override_additive", additive);
   CSysfsPath("/sys/module/amdolby_vision/parameters/xbmc_force_l5_override",  active);
 
-  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_override_sysfs - active={} auto/additive={} t={} b={} l={} r={}",
-            active, autoLb, top, bottom, left, right);
+  CLog::Log(LOGDEBUG, "AMLUtils::aml_dv_apply_l5_override_sysfs - active={} auto={} additive={} t={} b={} l={} r={}",
+            active, autoLb, additive, top, bottom, left, right);
 }
 
 /* Cached detected values — written by background detection thread,

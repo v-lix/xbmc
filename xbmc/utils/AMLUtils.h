@@ -232,6 +232,22 @@ bool aml_dv_auto_letterbox_active();
 // aml_dv_auto_letterbox_active()). For surfacing the values in player info.
 bool aml_dv_auto_letterbox_get(uint16_t& top, uint16_t& bottom,
                                uint16_t& left, uint16_t& right);
+
+// Plausibility watch for the auto-letterbox path. Some cropped encodes carry a
+// source L5 that was authored against the uncropped frame, so it already is the
+// crop; composing it additively with our synthesised gap would double the bars
+// and crop real picture. Samples the per-frame source L5 for up to a minute and
+// drops back to a replacing override when both channels are describing the same
+// bars. Started from aml_dv_on(), stopped from aml_dv_off(); the verdict is
+// cleared per stream by aml_dv_set_active_area_geometry().
+void aml_dv_auto_letterbox_watch_start();
+void aml_dv_auto_letterbox_watch_stop();
+
+// False once the watch above has ruled out additive composition for the current
+// stream, i.e. the auto-letterbox offsets replace source L5 instead of adding to
+// it. Mirrors the kernel's xbmc_l5_override_additive flag; player info uses it
+// to display what the sink actually receives.
+bool aml_dv_auto_letterbox_additive();
 enum DV_MODE aml_dv_mode();
 enum DV_TYPE aml_dv_type();
 unsigned int aml_vs10_by_setting(const std::string setting);

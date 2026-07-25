@@ -778,8 +778,18 @@ void CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst, CRect& view, 
   // display coordinates.
   int l5Top = 0, l5Bottom = 0;
 
+  // Cropped encodes whose source L5 was authored against the uncropped frame
+  // describe the crop, not bars inside the picture — the auto-letterbox
+  // plausibility watch has dropped additive composition for exactly that case.
+  // Honouring those offsets here would shrink the overlay area by bars that
+  // aren't on screen, so ignore them and let the player-added padding (already
+  // outside dst) do the work.
+  const bool phantomSourceBars =
+      m_picture.hdrType == StreamHdrType::HDR_TYPE_DOLBYVISION &&
+      aml_dv_auto_letterbox_active() && !aml_dv_auto_letterbox_additive();
+
   const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
-  if (doviMeta.has_level5_metadata &&
+  if (!phantomSourceBars && doviMeta.has_level5_metadata &&
       (doviMeta.level5_active_area_top_offset > 0 ||
        doviMeta.level5_active_area_bottom_offset > 0))
   {
@@ -894,8 +904,12 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
         uint16_t albTop = 0, albBottom = 0, albLeft = 0, albRight = 0;
         autoLbActive = aml_dv_auto_letterbox_get(albTop, albBottom, albLeft, albRight) &&
                        (albTop > 0 || albBottom > 0);
+        // Source offsets that merely restate the crop describe no bars on
+        // screen (see phantomSourceBars in CalcOverlayActiveArea) — and the
+        // kernel isn't emitting them either, so they must not drive signaling.
+        const bool phantomSourceBars = autoLbActive && !aml_dv_auto_letterbox_additive();
         const auto doviMeta = CServiceBroker::GetDataCacheCore().GetVideoDoViFrameMetadata();
-        if (doviMeta.has_level5_metadata)
+        if (!phantomSourceBars && doviMeta.has_level5_metadata)
         {
           sigTop = doviMeta.level5_active_area_top_offset;
           sigBottom = doviMeta.level5_active_area_bottom_offset;

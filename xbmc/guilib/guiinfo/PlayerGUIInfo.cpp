@@ -729,7 +729,9 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
        * (non-16:9) content — neither source nor the pixel detector provides
        * it (the detector skips non-16:9 and never goes stable). The kernel
        * ADDS those offsets to each frame's source L5 (additive override),
-       * so mirror that here: displayed = source + auto-letterbox. */
+       * so mirror that here: displayed = source + auto-letterbox — unless the
+       * plausibility watch found the source L5 already carrying the crop, in
+       * which case the kernel replaces and so do we. */
       uint16_t aTop = 0, aBottom = 0, aLeft = 0, aRight = 0;
       bool autoLb = aml_dv_auto_letterbox_get(aTop, aBottom, aLeft, aRight);
       /* hasL5: true when there are non-zero source offsets, detection completed
@@ -746,6 +748,10 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
       if (detected)
       {
         fTop = dTop; fBottom = dBottom; fLeft = dLeft; fRight = dRight;
+      }
+      else if (autoLb && !aml_dv_auto_letterbox_additive())
+      {
+        fTop = aTop; fBottom = aBottom; fLeft = aLeft; fRight = aRight;
       }
       else if (autoLb)
       {
