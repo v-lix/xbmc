@@ -25326,7 +25326,7 @@ msgstr ""
 #. Setting help for TrueHD Atmos dialogue normalisation defeat
 #: system/settings/settings.xml
 msgctxt "#55002"
-msgid "Force the dialogue normalisation value to (0 dB) in TrueHD Atmos bitstreams. This disables receiver-side dialogue normalisation for the Atmos presentation, preventing unwanted volume reduction during passthrough playback."
+msgid "Force the dialogue normalisation value to (0 dB) in TrueHD Atmos bitstreams. This disables receiver-side dialogue normalisation for the Atmos presentation, preventing unwanted volume reduction during passthrough playback. The attenuation this removes is headroom that the mix may rely on, so on titles mastered close to full scale the loudest moments can overload the receiver and make it mute for about a second. Turn this off if that happens."
 msgstr ""
 
 #. Setting label for AC3/EAC3 dialogue normalisation defeat

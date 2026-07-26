@@ -37,6 +37,13 @@
 #define MAX_EAC3_BLOCKS 6
 #define UNKNOWN_DTS_EXTENSION 255
 
+// TrueHD dialogue_norm value that states -31 dBFS, the level decoders normalise
+// to, and therefore defeats dialog normalization (same convention as AC-3)
+#define THD_DIALNORM_DEFEAT 31
+// Cap on the mid-stream major sync field change log, so a stream that toggles on
+// every sync frame (~10/s) cannot flood the log
+#define THD_MAX_FIELD_CHANGE_LOGS 32
+
 static const uint16_t AC3Bitrates[] = {32,  40,  48,  56,  64,  80,  96,  112, 128, 160,
                                        192, 224, 256, 320, 384, 448, 512, 576, 640};
 static const uint16_t AC3FSCod[] = {48000, 44100, 32000, 0};
@@ -112,6 +119,10 @@ void CAEStreamParser::Reset()
   m_needBytes = 0;
 
   m_hasSync = false;
+
+  // re-log the TrueHD major sync fields after a flush/seek
+  m_thdFieldsValid = false;
+  m_thdFieldChanges = 0;
 }
 
 int CAEStreamParser::AddData(uint8_t* data,
@@ -1320,10 +1331,11 @@ unsigned int CAEStreamParser::SyncTrueHD(uint8_t* data, unsigned int size)
         continue;
 
       unsigned int major_sync_size = 28;
-      if (data[29] & 1)
+      const bool extChannelMeaningPresent = (data[29] & 1) != 0;
+      const int extension_count = extChannelMeaningPresent ? (data[30] >> 4) : 0;
+      if (extChannelMeaningPresent)
       {
         // extension(s) present, look up count
-        int extension_count = data[30] >> 4;
         major_sync_size += 2 + extension_count * 2;
       }
 
@@ -1336,32 +1348,94 @@ unsigned int CAEStreamParser::SyncTrueHD(uint8_t* data, unsigned int size)
       if (((data[4 + major_sync_size - 1] << 8) | data[4 + major_sync_size - 2]) != crc)
         continue;
 
-      // Detect Atmos and parse extra_channel_meaning fields (before any patching)
-      // Reference: MediaInfoLib File_Ac3.cpp HD()
-      // Bit layout inside extra_channel_meaning:
+      // Detect Atmos and parse the dialnorm-carrying fields (before any patching).
+      //
+      // channel_meaning() occupies data[22]..data[29] (64 bits). Layout taken from
+      // FFmpeg's MLP encoder, libavcodec/mlpenc.c write_major_sync_info():
+      //   (6) reserved              | (1) 2ch_control_enabled | (1) 6ch_control_enabled
+      //   (1) 8ch_control_enabled   | (1) reserved            | (7) drc_start_up_gain
+      //   (6) 2ch_dialogue_norm     | (6) 2ch_mix_level
+      //   (5) 6ch_dialogue_norm     | (6) 6ch_mix_level       | (5) 6ch_source_format
+      //   (5) 8ch_dialogue_norm     | (6) 8ch_mix_level       | (6) 8ch_source_format
+      //   (1) reserved              | (1) extra_channel_meaning_present
+      // The trailing flag lands on data[29] bit 0, which is what upstream (and
+      // FFmpeg's mlp_get_major_sync_size) already keys the extension size off.
+      //
+      // extra_channel_meaning() then starts byte-aligned at data[30]:
       //   extra_channel_meaning_length: 4 bits = data[30] bits[7:4]
       //   16ch_dialogue_norm:           5 bits = data[30] bits[3:0] + data[31] bit 7
       //   16ch_mix_level:               6 bits = data[31] bits[6:1]
       //   16ch_channel_count:           5 bits = data[31] bit 0   + data[32] bits[7:4]
       bool hasAtmos = (data[21] & 0x80) != 0;
-      bool hasExtChannelMeaning = hasAtmos && (data[29] & 1);
+      // The 16ch block needs 20 bits, so it cannot fit in the 12 bits an
+      // extra_channel_meaning of length 0 leaves - that is a different extension.
+      bool hasExtChannelMeaning = hasAtmos && extChannelMeaningPresent && extension_count >= 1;
       int origDialNorm = 0;
       int atmosChannels = 0;
 
+      TrueHDMajorSyncFields fields{};
+      fields.ratebits = static_cast<uint8_t>(rate);
+      fields.numSubstreams = static_cast<uint8_t>((data[20] & 0xF0) >> 4);
+      fields.substreamInfo = data[21];
+      fields.control2ch = (data[22] & 0x02) ? 1 : 0;
+      fields.control6ch = (data[22] & 0x01) ? 1 : 0;
+      fields.control8ch = (data[23] & 0x80) ? 1 : 0;
+      fields.dialNorm2ch = (data[24] >> 1) & 0x3F;
+      fields.dialNorm6ch = static_cast<uint8_t>(((data[25] & 0x07) << 2) | (data[26] >> 6));
+      fields.dialNorm8ch = static_cast<uint8_t>(((data[27] & 0x07) << 2) | (data[28] >> 6));
+      fields.extPresent = extChannelMeaningPresent ? 1 : 0;
+      fields.extLength = static_cast<uint8_t>(extension_count);
+
       if (hasExtChannelMeaning)
       {
-        // 5-bit raw value 0-31 maps to -31 to 0 dB (dB = raw - 31)
-        int dialNormRaw = ((data[30] & 0x0F) << 1) | (data[31] >> 7);
-        origDialNorm = dialNormRaw - 31;
+        fields.dialNorm16ch = static_cast<uint8_t>(((data[30] & 0x0F) << 1) | (data[31] >> 7));
+        fields.mixLevel16ch = (data[31] >> 1) & 0x3F;
+        fields.channelCount16ch =
+            static_cast<uint8_t>(((data[31] & 0x01) << 4) | (data[32] >> 4));
 
-        int channelCountRaw = ((data[31] & 0x01) << 4) | (data[32] >> 4);
-        atmosChannels = channelCountRaw + 1;
+        origDialNorm = fields.dialNorm16ch - 31;
+        atmosChannels = fields.channelCount16ch + 1;
       }
 
-      // Defeat 16ch dialog normalization to 0 dB on every major sync frame.
-      // This disables receiver-side dialog normalization for the Atmos presentation.
+      // Log the field set once per stream and again whenever anything changes
+      // mid-stream. Both are invisible otherwise: everything below only runs on
+      // the first major sync after a (re)sync.
+      if (!m_thdFieldsValid || memcmp(&fields, &m_thdFields, sizeof(fields)) != 0)
+      {
+        if (m_thdFieldChanges < THD_MAX_FIELD_CHANGE_LOGS)
+        {
+          CLog::Log(LOGINFO,
+                    "CAEStreamParser::SyncTrueHD - major sync fields [{}]: rate {}, substreams {}, "
+                    "substream_info 0x{:02x}, control 2/6/8ch {}/{}/{}, dialnorm raw 2/6/8/16ch "
+                    "{}/{}/{}/{}, ext present {} len {}, 16ch mix level {}, 16ch channel count {}",
+                    m_thdFieldsValid ? "changed" : "initial", fields.ratebits, fields.numSubstreams,
+                    fields.substreamInfo, fields.control2ch, fields.control6ch, fields.control8ch,
+                    fields.dialNorm2ch, fields.dialNorm6ch, fields.dialNorm8ch, fields.dialNorm16ch,
+                    fields.extPresent, fields.extLength, fields.mixLevel16ch,
+                    fields.channelCount16ch);
+
+          if (++m_thdFieldChanges == THD_MAX_FIELD_CHANGE_LOGS)
+            CLog::Log(LOGINFO, "CAEStreamParser::SyncTrueHD - further major sync field changes "
+                               "will not be logged");
+        }
+        m_thdFields = fields;
+        m_thdFieldsValid = true;
+      }
+
+      // Defeat 16ch dialog normalization on every major sync frame, so the receiver
+      // applies no dialnorm attenuation to the Atmos presentation.
+      //
+      // THD_DIALNORM_DEFEAT (31) states -31 dBFS, which is the reference level the
+      // decoder normalises to, so the resulting gain is 0 dB. A frame that already
+      // says 31 is left alone instead of being rewritten to identical bytes.
+      //
+      // The 2ch/6ch/8ch dialogue_norm values in channel_meaning are deliberately
+      // left untouched. Every stream seen so far clears their *_control_enabled
+      // flags, so the decoder ignores those fields; the log above reports them, so
+      // a stream that does set them will be visible.
       bool dialNormDefeated = false;
-      if (m_defeatTrueHDDialNorm && hasExtChannelMeaning)
+      if (m_defeatTrueHDDialNorm && hasExtChannelMeaning &&
+          fields.dialNorm16ch != THD_DIALNORM_DEFEAT)
       {
         data[30] |= 0x0F; // set dialnorm bits [4:1] = 1111
         data[31] |= 0x80; // set dialnorm bit  [0]   = 1

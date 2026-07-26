@@ -104,6 +104,29 @@ private:
   int m_substreams = 0;       /* used for TrueHD  */
   AVCRC m_crcTrueHD[1024];  /* TrueHD crc table */
 
+  /* TrueHD major sync fields we care about, snapshotted before any patching so
+     mid-stream changes (which are invisible today) can be logged */
+  struct TrueHDMajorSyncFields
+  {
+    uint8_t ratebits;
+    uint8_t numSubstreams;
+    uint8_t substreamInfo;
+    uint8_t control2ch;
+    uint8_t control6ch;
+    uint8_t control8ch;
+    uint8_t dialNorm2ch;
+    uint8_t dialNorm6ch;
+    uint8_t dialNorm8ch;
+    uint8_t extPresent;
+    uint8_t extLength;
+    uint8_t dialNorm16ch;
+    uint8_t mixLevel16ch;
+    uint8_t channelCount16ch;
+  };
+  TrueHDMajorSyncFields m_thdFields{};
+  bool m_thdFieldsValid = false;
+  unsigned int m_thdFieldChanges = 0;
+
   void GetPacket(uint8_t **buffer, unsigned int *bufferSize);
   void DefeatAC3DialNorm(uint8_t* data, unsigned int size);
   void DefeatDTSDialNorm(uint8_t* data, unsigned int size);
