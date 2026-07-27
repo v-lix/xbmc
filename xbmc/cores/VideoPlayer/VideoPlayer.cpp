@@ -3501,6 +3501,18 @@ void CVideoPlayer::HandleMessages()
         }
         else
         {
+#if defined(HAVE_LIBBLURAY)
+          if (m_pInputStream && m_pInputStream->IsStreamType(DVDSTREAM_TYPE_BLURAY) && m_pDemuxer)
+          {
+            CDemuxStream* demuxStream = m_pDemuxer->GetStream(st.demuxerId, st.id);
+            if (demuxStream)
+            {
+              std::static_pointer_cast<CDVDInputStreamBluray>(m_pInputStream)
+                  ->SetActiveAudioStream(demuxStream->dvdNavId);
+            }
+          }
+#endif
+
           CloseStream(m_CurrentAudio, false);
           OpenStream(m_CurrentAudio, st.demuxerId, st.id, st.source);
           AdaptForcedSubtitles();
@@ -3570,6 +3582,18 @@ void CVideoPlayer::HandleMessages()
         }
         else
         {
+#if defined(HAVE_LIBBLURAY)
+          if (m_pInputStream && m_pInputStream->IsStreamType(DVDSTREAM_TYPE_BLURAY) && m_pDemuxer)
+          {
+            CDemuxStream* demuxStream = m_pDemuxer->GetStream(st.demuxerId, st.id);
+            if (demuxStream)
+            {
+              std::static_pointer_cast<CDVDInputStreamBluray>(m_pInputStream)
+                  ->SetActiveSubtitleStream(demuxStream->dvdNavId);
+            }
+          }
+#endif
+
           CloseStream(m_CurrentSubtitle, false);
           OpenStream(m_CurrentSubtitle, st.demuxerId, st.id, st.source);
           if (st.source == STREAM_SOURCE_DEMUX)
