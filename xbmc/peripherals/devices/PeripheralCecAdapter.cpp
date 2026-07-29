@@ -50,6 +50,8 @@ using namespace XBMCAddon;
 /* time in seconds to ignore standby commands from devices after the screensaver has been activated
  */
 #define SCREENSAVER_TIMEOUT 20
+#define STANDBY_WAKE_COOLDOWN 5
+#define ACTIVATE_SOURCE_COOLDOWN 5
 #define VOLUME_CHANGE_TIMEOUT 250
 #define VOLUME_REFRESH_TIMEOUT 100
 
@@ -133,6 +135,7 @@ void CPeripheralCecAdapter::ResetMembers(void)
   m_bDeviceRemoved = false;
   m_bActiveSourcePending = false;
   m_bStandbyPending = false;
+  m_bInactiveViewPending = false;
   m_bActiveSourceBeforeStandby = false;
   m_bOnPlayReceived = false;
   m_bPlaybackPaused = false;
@@ -148,6 +151,7 @@ void CPeripheralCecAdapter::ResetMembers(void)
   m_currentButton.iDuration = 0;
   m_standbySent.SetValid(false);
   m_ScreensaverStandbySent.SetValid(false);
+  m_tvStandbyReceived.SetValid(false);
   m_configuration.Clear();
 }
 
@@ -427,6 +431,9 @@ void CPeripheralCecAdapter::Process(void)
       ProcessStandbyDevices();
 
     if (!m_bStop)
+      ProcessInactiveView();
+
+    if (!m_bStop)
       CThread::Sleep(5ms);
   }
 
@@ -687,6 +694,17 @@ void CPeripheralCecAdapter::CecCommand(void* cbParam, const cec_command* command
              CDateTime::GetCurrentDateTime() - adapter->m_standbySent >
                  CDateTimeSpan(0, 0, 0, SCREENSAVER_TIMEOUT)))
         {
+          {
+            std::unique_lock<CCriticalSection> lock(adapter->m_critSection);
+            adapter->m_tvStandbyReceived = CDateTime::GetCurrentDateTime();
+          }
+
+          if (adapter->m_bSendInactiveSource)
+          {
+            CLog::Log(LOGDEBUG, "{} - pending inactive source command because TV initiated standby", __FUNCTION__);
+            std::unique_lock<CCriticalSection> lock(adapter->m_critSection);
+            adapter->m_bInactiveViewPending = true;
+          }
           adapter->OnTvStandby();
         }
         break;
@@ -1906,10 +1924,41 @@ void CPeripheralCecAdapter::ProcessActivateSource(void)
     std::unique_lock<CCriticalSection> lock(m_critSection);
     bActivate = m_bActiveSourcePending;
     m_bActiveSourcePending = false;
+
+    // If a standby is currently queued to be sent, or if a standby was just triggered in the last STANDBY_WAKE_COOLDOWN seconds,
+    // silently swallow any queued ActivateSource commands (such as those generated blindly by OnActionPre)
+    // because they will conflict with the standby request and wake the TV back up.
+    if (m_bStandbyPending || 
+        (m_standbySent.IsValid() && (CDateTime::GetCurrentDateTime() - m_standbySent < CDateTimeSpan(0, 0, 0, STANDBY_WAKE_COOLDOWN))) ||
+        (m_tvStandbyReceived.IsValid() && (CDateTime::GetCurrentDateTime() - m_tvStandbyReceived < CDateTimeSpan(0, 0, 0, STANDBY_WAKE_COOLDOWN))))
+    {
+      if (bActivate)
+      {
+        CLog::Log(LOGDEBUG, "{} - swallowing pending ActivateSource due to pending or recent standby", __FUNCTION__);
+      }
+      bActivate = false;
+    }
   }
 
   if (bActivate && m_cecAdapter && !m_cecAdapter->IsLibCECActiveSource())
     m_cecAdapter->SetActiveSource();
+}
+
+void CPeripheralCecAdapter::ProcessInactiveView(void)
+{
+  bool bInactiveView(false);
+
+  {
+    std::unique_lock<CCriticalSection> lock(m_critSection);
+    bInactiveView = m_bInactiveViewPending;
+    m_bInactiveViewPending = false;
+  }
+
+  if (bInactiveView && m_cecAdapter)
+  {
+    CLog::Log(LOGDEBUG, "{} - sending inactive source command", __FUNCTION__);
+    m_cecAdapter->SetInactiveView();
+  }
 }
 
 void CPeripheralCecAdapter::UnregisterDevice(void)
@@ -1945,11 +1994,14 @@ void CPeripheralCecAdapter::UnregisterDevice(void)
   }
 }
 
-void CPeripheralCecAdapter::StandbyDevices(void)
+void CPeripheralCecAdapter::StandbyDevices(bool bBypassTimer /* = false */)
 {
   std::unique_lock<CCriticalSection> lock(m_critSection);
   m_bStandbyPending = true;
-  m_ScreensaverStandbySent = CDateTime::GetCurrentDateTime();
+  if (bBypassTimer)
+    m_ScreensaverStandbySent.SetValid(false);
+  else
+    m_ScreensaverStandbySent = CDateTime::GetCurrentDateTime();
 }
 
 void CPeripheralCecAdapter::ProcessStandbyDevices(void)
@@ -1998,7 +2050,41 @@ bool CPeripheralCecAdapter::ToggleDeviceState(CecStateChange mode /*= STATE_SWIT
       (mode == STATE_SWITCH_TOGGLE || mode == STATE_STANDBY))
   {
     CLog::Log(LOGDEBUG, "{} - putting CEC device on standby...", __FUNCTION__);
-    StandbyDevices();
+    StandbyDevices(true);
+
+    int iActionOnExplicitStandby = GetSettingInt("action_on_explicit_standby");
+    switch (iActionOnExplicitStandby)
+    {
+      case LOCALISED_ID_POWEROFF:
+        CServiceBroker::GetAppMessenger()->PostMsg(TMSG_SYSTEM_POWERDOWN, TMSG_SHUTDOWN);
+        break;
+      case LOCALISED_ID_SUSPEND:
+        CServiceBroker::GetAppMessenger()->PostMsg(TMSG_SYSTEM_POWERDOWN, TMSG_SUSPEND);
+        break;
+      case LOCALISED_ID_HIBERNATE:
+        CServiceBroker::GetAppMessenger()->PostMsg(TMSG_SYSTEM_POWERDOWN, TMSG_HIBERNATE);
+        break;
+      case LOCALISED_ID_QUIT:
+        CServiceBroker::GetAppMessenger()->PostMsg(TMSG_QUIT);
+        break;
+      case LOCALISED_ID_PAUSE:
+        CServiceBroker::GetAppMessenger()->PostMsg(TMSG_MEDIA_PAUSE_IF_PLAYING);
+        break;
+      case LOCALISED_ID_STOP:
+      {
+        const auto& components = CServiceBroker::GetAppComponents();
+        const auto appPlayer = components.GetComponent<CApplicationPlayer>();
+        if (appPlayer->IsPlaying())
+          CServiceBroker::GetAppMessenger()->PostMsg(TMSG_MEDIA_STOP);
+        break;
+      }
+      case LOCALISED_ID_IGNORE:
+        break;
+      default:
+        CLog::Log(LOGERROR, "{} - Unexpected [action_on_explicit_standby] setting value", __FUNCTION__);
+        break;
+    }
+
     return false;
   }
   else if (mode == STATE_SWITCH_TOGGLE || mode == STATE_ACTIVATE_SOURCE)
@@ -2039,9 +2125,9 @@ void CPeripheralCecAdapter::OnActionPre(const CAction& action)
     }
 
     if (std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastCecKeypressTime).count() > 1000 &&
-        std::chrono::duration_cast<std::chrono::seconds>(now - m_lastSourceDeactivatedTime).count() > 5)
+        std::chrono::duration_cast<std::chrono::seconds>(now - m_lastSourceDeactivatedTime).count() > ACTIVATE_SOURCE_COOLDOWN)
     {
-         if (std::chrono::duration_cast<std::chrono::seconds>(now - m_lastActivateSourceTime).count() >= 5)
+         if (std::chrono::duration_cast<std::chrono::seconds>(now - m_lastActivateSourceTime).count() >= ACTIVATE_SOURCE_COOLDOWN)
          {
            m_lastActivateSourceTime = now;
            

@@ -14606,6 +14606,10 @@ msgctxt "#36059"
 msgid "Wake-Up by active route"
 msgstr "Aufwecken durch aktive Route"
 
+msgctxt "#36061"
+msgid "When manual CEC standby is triggered"
+msgstr "Wenn manueller CEC-Standby ausgelöst wird"
+
 msgctxt "#36096"
 msgid "Use system HDR/SDR brightness balance"
 msgstr "Systemeinstellung für HDR-/SDR-Helligkeitsbalance verwenden"
