@@ -19864,6 +19864,18 @@ msgctxt "#60645"
 msgid "Skips the HDMI mode switch when entering or leaving Dolby Vision playback. Avoids black screens during transitions, but some TVs need the mode switch to pick up the Dolby Vision signalling correctly."
 msgstr "Überspringt den HDMI-Moduswechsel beim Starten oder Beenden der Dolby Vision-Wiedergabe. Verhindert schwarze Bildschirme bei Übergängen, aber einige Fernseher benötigen den Moduswechsel, um das Dolby Vision-Signal korrekt zu erkennen."
 
+#. "Keep SDR state on stop"
+#: system/settings/settings.xml
+msgctxt "#60646"
+msgid "Keep SDR output state on playback stop"
+msgstr "SDR-Ausgabeformat beim Stoppen der Wiedergabe beibehalten"
+
+#. "Keep SDR output state on playback stop"
+#: system/settings/settings.xml
+msgctxt "#60647"
+msgid "Prevents shutting down the Dolby Vision pipeline on playback stop when outputting SDR under On Demand mode, avoiding screen blinks when returning to the GUI."
+msgstr "Verhindert das Herunterfahren der Dolby Vision-Pipeline beim Stoppen der Wiedergabe im On-Demand-Modus, wenn SDR ausgegeben wird, und vermeidet so Bildschirmflackern bei der Rückkehr zur Benutzeroberfläche."
+
 msgctxt "#69196"
 msgid "Convert DV Profile 7 FEL to MEL or to Profile 8.1"
 msgstr "DV Profil 7 umwandeln"
