@@ -105,6 +105,8 @@ private:
 
 // DVP_FLAG 0x00000100 - 0x00000f00 is in use by libmpeg2!
 
+#define DVP_FLAG_STREAM_CORRUPTION  0x00001000  //< decoder output shows a corrupt-stream artifact (pts stepped backwards onto an already-output timestamp)
+
 #define DVP_QSCALE_UNKNOWN          0
 #define DVP_QSCALE_MPEG1            1
 #define DVP_QSCALE_MPEG2            2

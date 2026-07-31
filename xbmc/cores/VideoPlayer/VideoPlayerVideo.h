@@ -21,6 +21,7 @@
 #include "utils/BitstreamStats.h"
 
 #include <atomic>
+#include <chrono>
 
 #define DROP_DROPPED 1
 #define DROP_VERYLATE 2
@@ -135,6 +136,8 @@ protected:
   bool m_paused;
   IDVDStreamPlayer::ESyncState m_syncState;
   std::atomic_bool m_bAbortOutput;
+  // Debounce for the corrupt-splice recovery reseek (DVP_FLAG_STREAM_CORRUPTION)
+  std::chrono::steady_clock::time_point m_lastCorruptionRecovery{};
 
   BitstreamStats m_videoStats;
 

@@ -16,6 +16,7 @@
 #include "utils/BitstreamConverter.h"
 #include "utils/Geometry.h"
 
+#include <array>
 #include <deque>
 #include <atomic>
 
@@ -128,6 +129,12 @@ private:
   int              m_speed;
   uint64_t         m_cur_pts;
   uint64_t         m_last_pts;
+  // Recently output (display-order) pts, for corrupt-splice detection: a pts
+  // that steps backwards onto a value already output is a broken splice
+  // (duplicate GOP / out-of-place keyframe), not a legal reorder.
+  std::array<uint64_t, 8> m_outPtsRing{};
+  size_t           m_outPtsRingPos = 0;
+  size_t           m_outPtsRingCount = 0;
   uint32_t         m_bufferIndex;
 
   CRect            m_dst_rect;

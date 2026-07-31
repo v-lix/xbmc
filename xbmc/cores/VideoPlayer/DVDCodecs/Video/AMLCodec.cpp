@@ -1925,6 +1925,9 @@ bool CAMLCodec::OpenDecoder()
   m_drain = false;
   m_stream_eof = false;
   m_cur_pts = DVD_NOPTS_VALUE;
+  m_last_pts = DVD_NOPTS_VALUE;
+  m_outPtsRingPos = 0;
+  m_outPtsRingCount = 0;
   m_dst_rect.SetRect(0, 0, 0, 0);
   CDVDStreamInfo &hints = m_hints;  // Fudge to avoid large chnage delta renaming hints to m_hints.
   m_state = 0;
@@ -2455,6 +2458,8 @@ void CAMLCodec::Reset()
   // reset some interal vars
   m_cur_pts = DVD_NOPTS_VALUE;
   m_last_pts = DVD_NOPTS_VALUE;
+  m_outPtsRingPos = 0;
+  m_outPtsRingCount = 0;
   m_state = 0;
   m_stream_eof = false;
   m_buffer_level_ready = false;
@@ -2826,13 +2831,43 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
 
     // Calculate frame duration
     const double rate_duration = static_cast<double>(am_private->video_rate * DVD_TIME_BASE) / UNIT_FREQ;
+    const bool is_vc1 = (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
+    const bool pts_reversal = (m_last_pts != DVD_NOPTS_VALUE && m_cur_pts < m_last_pts);
     const double picture_duration = static_cast<double>(m_cur_pts - m_last_pts);
+
+    // Corrupt-splice detection: the decoder outputs in display order, so a pts
+    // that steps BACKWARDS onto a timestamp this decode session already output
+    // is a broken splice (duplicate GOP / out-of-place keyframe), not a legal
+    // reorder. Feeding such a GOP can knock the kernel presentation chain out
+    // of step while every Kodi-side sync metric stays clean, so flag the
+    // picture and let the video player run a recovery reseek. VC-1 excluded:
+    // its interlaced modes emit legitimate out-of-order pts (handled below).
+    if (pts_reversal && !is_vc1 && m_speed == DVD_PLAYSPEED_NORMAL)
+    {
+      for (size_t i = 0; i < m_outPtsRingCount; i++)
+      {
+        if (m_outPtsRing[i] == m_cur_pts)
+        {
+          CLog::Log(LOGWARNING,
+                    "CAMLCodec::GetPicture: corrupt stream: pts {:.3f} stepped backwards onto an "
+                    "already-output timestamp (last {:.3f})",
+                    static_cast<double>(m_cur_pts) / DVD_TIME_BASE,
+                    static_cast<double>(m_last_pts) / DVD_TIME_BASE);
+          videoPicture.iFlags |= DVP_FLAG_STREAM_CORRUPTION;
+          break;
+        }
+      }
+    }
+    m_outPtsRing[m_outPtsRingPos] = m_cur_pts;
+    m_outPtsRingPos = (m_outPtsRingPos + 1) % m_outPtsRing.size();
+    if (m_outPtsRingCount < m_outPtsRing.size())
+      m_outPtsRingCount++;
 
     if (m_last_pts == DVD_NOPTS_VALUE)
     {
       videoPicture.iDuration = rate_duration;
     }
-    else if (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3)
+    else if (is_vc1)
     {
       // VC-1 specific: correct PTS reversals (but not for 25Hz interlaced which has legitimate out-of-order PTS)
       const bool is_vc1_25hz_interlaced = (m_processInfo.GetVideoFps() == 25.0f) &&
@@ -2849,6 +2884,12 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
       {
         videoPicture.iDuration = picture_duration;
       }
+    }
+    else if (pts_reversal)
+    {
+      // The uint64 subtraction above wraps a backwards step into a garbage
+      // duration (dur:1.8e16ms in logs); use the nominal rate instead.
+      videoPicture.iDuration = rate_duration;
     }
     else
     {

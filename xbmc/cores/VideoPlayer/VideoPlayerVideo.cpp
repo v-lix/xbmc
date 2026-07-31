@@ -753,6 +753,36 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
   {
     bool hasTimestamp = true;
 
+    // Corrupt-splice recovery: the decoder flagged a frame whose pts stepped
+    // backwards onto an already-output timestamp (broken splice / duplicate
+    // GOP). The hardware presentation chain can come out of such a GOP
+    // displaying late while every Kodi-side sync metric stays clean, and only
+    // a seek re-latches it — so run a quiet forward reseek past the damage.
+    // Relative +1s lands on the next clean keyframe behind the splice.
+    if ((m_picture.iFlags & DVP_FLAG_STREAM_CORRUPTION) &&
+        m_syncState == IDVDStreamPlayer::SYNC_INSYNC && m_speed == DVD_PLAYSPEED_NORMAL)
+    {
+      const auto now = std::chrono::steady_clock::now();
+      if (m_lastCorruptionRecovery == std::chrono::steady_clock::time_point{} ||
+          now - m_lastCorruptionRecovery >= std::chrono::seconds(60))
+      {
+        m_lastCorruptionRecovery = now;
+        CLog::Log(LOGWARNING,
+                  "CVideoPlayerVideo - corrupt stream signature at pts {:.3f}, "
+                  "recovering via internal reseek",
+                  m_picture.pts / DVD_TIME_BASE);
+        CDVDMsgPlayerSeek::CMode mode;
+        mode.time = 1000;
+        mode.relative = true;
+        mode.backward = false;
+        mode.accurate = true;
+        mode.sync = true;
+        mode.restore = false;
+        mode.trickplay = true;
+        m_messageParent.Put(std::make_shared<CDVDMsgPlayerSeek>(mode));
+      }
+    }
+
     // Detect progressive content misidentified as interlaced: if picture
     // duration consistently equals double what the fps implies, halve fps.
     // Never override when the demuxer flagged interlaced (CODEC_INTERLACED) —
