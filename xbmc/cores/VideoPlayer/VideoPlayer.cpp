@@ -5776,11 +5776,6 @@ void CVideoPlayer::UpdatePlayState(double timeout)
 
   if (m_pDemuxer)
   {
-    if (IsInMenuInternal() && pMenu && !pMenu->CanSeek())
-      state.chapter = 0;
-    else
-      state.chapter = m_pDemuxer->GetChapter();
-
     state.chapters.clear();
     if (m_pDemuxer->GetChapterCount() > 0)
     {
@@ -5795,6 +5790,30 @@ void CVideoPlayer::UpdatePlayState(double timeout)
 
     state.time = m_clock.GetClock(false) * 1000 / DVD_TIME_BASE;
     state.timeMax = m_pDemuxer->GetStreamLength();
+
+    if (IsInMenuInternal() && pMenu && !pMenu->CanSeek())
+      state.chapter = 0;
+    else
+    {
+      // Find the current chapter from the real playback clock (state.time, ms)
+      // against each chapter's static start position (state.chapters[i].second,
+      // seconds), rather than asking the demuxer for its own notion of "current
+      // chapter". CDVDDemuxFFmpeg::GetChapter() compares against m_currentPts,
+      // which tracks how far the demuxer has read ahead into its buffers -- not
+      // what is actually being decoded/displayed. That gap is usually
+      // negligible for long files, but for short chapter ranges buffered
+      // quickly it can jump the reported chapter far past the real position,
+      // right after any seek.
+      state.chapter = 0;
+      for (size_t i = 0; i < state.chapters.size(); ++i)
+      {
+        double chapterStartMs = state.chapters[i].second * 1000.0;
+        if (state.time >= chapterStartMs)
+          state.chapter = static_cast<int>(i) + 1;
+        else
+          break;
+      }
+    }
   }
 
   state.canpause = false;
