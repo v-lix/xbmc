@@ -273,6 +273,19 @@ bool CDVDDemuxFFmpeg::Open(const std::shared_ptr<CDVDInputStream>& pInput, bool 
   m_pInput = pInput;
   strFile = m_pInput->GetFileName();
 
+  // --- MKV EDITIONS READ ---
+  m_edIndex = -1;
+  if (m_pInput)
+  {
+    CVariant edProp = m_pInput->GetProperty("mkv_edition");
+    if (!edProp.isNull())
+    {
+      m_edIndex = static_cast<int>(edProp.asInteger());
+      CLog::Log(LOGDEBUG, "CDVDDemuxFFmpeg::Open - MKV Edition index {} requested from input stream property", m_edIndex);
+    }
+  }
+  // -------------------------
+
   if (m_pInput->GetContent().length() > 0)
   {
     std::string content = m_pInput->GetContent();
@@ -302,6 +315,11 @@ bool CDVDDemuxFFmpeg::Open(const std::shared_ptr<CDVDInputStream>& pInput, bool 
     // special stream type that makes avformat handle file opening
     // allows internal ffmpeg protocols to be used
     AVDictionary* options = GetFFMpegOptionsFromInput();
+    if (m_edIndex >= 0)
+    {
+      CLog::Log(LOGDEBUG, "CDVDDemuxFFmpeg::Open - Passing 'edition={}' option to FFmpeg demuxer (stream type)", m_edIndex);
+      av_dict_set_int(&options, "edition", m_edIndex, 0);
+    }
 
     int result = -1;
     if (url.IsProtocol("mms"))
@@ -446,6 +464,14 @@ bool CDVDDemuxFFmpeg::Open(const std::shared_ptr<CDVDInputStream>& pInput, bool 
     m_pFormatContext->pb = m_ioContext;
 
     AVDictionary* options = NULL;
+
+    // Pass selected edition to FFmpeg's Matroska demuxer
+    if (m_edIndex >= 0)
+    {
+      CLog::Log(LOGDEBUG, "CDVDDemuxFFmpeg::Open - Requesting MKV edition index: {}", m_edIndex);
+      av_dict_set_int(&options, "edition", m_edIndex, 0);
+    }
+
     if (iformat->name && (strcmp(iformat->name, "mp3") == 0 || strcmp(iformat->name, "mp2") == 0))
     {
       CLog::Log(LOGDEBUG, "{} - setting usetoc to 0 for accurate VBR MP3 seek", __FUNCTION__);
@@ -2993,4 +3019,31 @@ StreamHdrType CDVDDemuxFFmpeg::DetermineHdrType(AVStream* pStream)
     hdrType = StreamHdrType::HDR_TYPE_HDR10;
 
   return hdrType;
+}
+
+int CDVDDemuxFFmpeg::GetEditionCount()
+{
+  if (!m_pFormatContext)
+    return 0;
+
+  // Retrieve Matroska edition count exposed in container metadata by FFmpeg demuxer
+  AVDictionaryEntry* elemCount = av_dict_get(m_pFormatContext->metadata, "mkv_num_editions", NULL, 0);
+  if (elemCount && elemCount->value)
+    return atoi(elemCount->value);
+
+  return 0;
+}
+
+std::string CDVDDemuxFFmpeg::GetEditionName(int index)
+{
+  if (!m_pFormatContext)
+    return "";
+
+  std::string key = "mkv_edition_" + std::to_string(index) + "_name";
+  AVDictionaryEntry* nameEntry = av_dict_get(m_pFormatContext->metadata, key.c_str(), NULL, 0);
+
+  if (nameEntry && nameEntry->value && strlen(nameEntry->value) > 0)
+    return nameEntry->value;
+
+  return "Edition " + std::to_string(index + 1);
 }
