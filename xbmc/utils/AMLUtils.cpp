@@ -1796,21 +1796,39 @@ static void _dv_start_locked()
   if (aml_is_dv_enable())
   {
     unsigned int mode = aml_dv_dolby_vision_mode();
-    if (mode == DOLBY_VISION_OUTPUT_MODE_IPT || mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
-      return;
+    if (mode != DOLBY_VISION_OUTPUT_MODE_IPT && mode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
+    {
+      // The kernel needs the full Bypass toggle + disable cycle to set
+      // mode_changed and CP_FLAG_CHANGE_ALL for proper register updates.
+      // For DV_MODE_ON, skip the display_auto_now in aml_dv_off — it sends
+      // an intermediate SDR signal that corrupts HDMI TX color-space on
+      // some displays.  aml_dv_on(IPT) below handles its own HDMI update.
+      aml_dv_off(/*skip_hdmi_update=*/aml_dv_mode() == DV_MODE_ON);
 
-    // The kernel needs the full Bypass toggle + disable cycle to set
-    // mode_changed and CP_FLAG_CHANGE_ALL for proper register updates.
-    // For DV_MODE_ON, skip the display_auto_now in aml_dv_off — it sends
-    // an intermediate SDR signal that corrupts HDMI TX color-space on
-    // some displays.  aml_dv_on(IPT) below handles its own HDMI update.
-    aml_dv_off(/*skip_hdmi_update=*/aml_dv_mode() == DV_MODE_ON);
+      if (aml_dv_mode() == DV_MODE_ON)
+        aml_dv_on(DOLBY_VISION_OUTPUT_MODE_IPT);
+    }
+    // else: already IPT/IPT_TUNNEL -- nothing to switch, avoids an
+    // unnecessary DV off/on cycle.
   }
-
-  if (aml_dv_mode() == DV_MODE_ON) {
-    aml_dv_reset_osd_max();
+  else if (aml_dv_mode() == DV_MODE_ON)
+  {
     aml_dv_on(DOLBY_VISION_OUTPUT_MODE_IPT);
   }
+
+  // Always re-apply the configured GUI OSD max luminance LAST, after any
+  // mode switch above -- not before it. aml_dv_on() itself re-applies the
+  // "DV OSD peak brightness" (nits) setting to the very same shared
+  // dolby_vision_graphic_max kernel parameter whenever it (re-)engages IPT
+  // (see its "mode != SDR10 && mode != SDR8" branch, which IPT falls into),
+  // so resetting the GUI luminance *before* calling aml_dv_on() above got
+  // immediately clobbered by that call whenever an actual mode switch was
+  // needed -- only the (very common) already-IPT case, which skips
+  // aml_dv_on() entirely above, was unaffected. This is why the previous fix
+  // still showed inconsistent GUI luminance after stopping playback,
+  // depending on whether a mode switch happened to be needed at that moment.
+  if (aml_dv_mode() == DV_MODE_ON)
+    aml_dv_reset_osd_max();
 }
 
 void aml_dv_start()
@@ -1847,13 +1865,21 @@ bool aml_dv_restore_gui_ipt(const char* reason)
   }
 
   unsigned int mode = aml_dv_dolby_vision_mode();
-  if (mode == DOLBY_VISION_OUTPUT_MODE_IPT || mode == DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL)
-    return false; // already in a GUI-suitable mode — nothing to restore
+  bool needs_mode_switch = mode != DOLBY_VISION_OUTPUT_MODE_IPT &&
+                            mode != DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL;
 
-  CLog::Log(LOGINFO, "AMLUtils::{} - [{}] restoring GUI IPT (from mode {})",
-            __FUNCTION__, reason, aml_dv_output_mode_to_string(mode));
+  if (needs_mode_switch)
+    CLog::Log(LOGINFO, "AMLUtils::{} - [{}] restoring GUI IPT (from mode {})",
+              __FUNCTION__, reason, aml_dv_output_mode_to_string(mode));
+  else
+    // Already in a GUI-suitable output mode — no mode switch needed, but
+    // _dv_start_locked() still re-applies the OSD max luminance that
+    // playback may have relaxed.
+    CLog::Log(LOGDEBUG, "AMLUtils::{} - [{}] already IPT, re-applying OSD max luminance only",
+              __FUNCTION__, reason);
+
   _dv_start_locked();
-  return true;
+  return needs_mode_switch;
 }
 
 void aml_dv_wait_for_pipeline()
