@@ -12806,6 +12806,18 @@ msgctxt "#29805"
 msgid "This Blu-ray disc (or file) is encrypted and can't be played."
 msgstr "Diese Blu-ray Disc (oder Datei) ist verschlüsselt und kann nicht wiedergegeben werden."
 
+msgctxt "#29806"
+msgid "Enable MKV Editions selection"
+msgstr "Auswahl von MKV-Editionen aktivieren"
+
+msgctxt "#29807"
+msgid "Show a selection dialog when an MKV with multiple editions or ordered chapters is detected."
+msgstr "Zeigt einen Auswahldialog an, wenn eine MKV-Datei mit mehreren Editionen oder geordneten Kapiteln erkannt wird."
+
+msgctxt "#29808"
+msgid "Select MKV edition"
+msgstr "MKV-Edition auswählen"
+
 msgctxt "#29900"
 msgid "RadioText Plus info"
 msgstr "RadioText-Plus-Information"
