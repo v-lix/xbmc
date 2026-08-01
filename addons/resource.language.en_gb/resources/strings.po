@@ -27103,3 +27103,7 @@ msgstr ""
 msgctxt "#36060"
 msgid "Switch source to this device on activity"
 msgstr ""
+
+msgctxt "#36061"
+msgid "When manual CEC standby is triggered"
+msgstr ""

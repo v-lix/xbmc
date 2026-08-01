@@ -135,7 +135,7 @@ public:
   // public CEC methods
   void ActivateSource(void);
   void UnregisterDevice(void);
-  void StandbyDevices(void);
+  void StandbyDevices(bool bBypassTimer = false);
   bool ToggleDeviceState(CecStateChange mode = STATE_SWITCH_TOGGLE, bool forceType = false);
 
 private:
@@ -168,6 +168,7 @@ private:
   void PushCecKeypress(const CEC::cec_keypress& key);
   void PushCecKeypress(const CecButtonPress& key);
   void GetNextKey(void);
+  void ProcessInactiveView(void);
 
   void SetAudioSystemConnected(bool bSetTo);
   void SetMenuLanguage(const char* strLanguage);
@@ -208,7 +209,9 @@ private:
   CEC::libcec_configuration m_configuration;
   bool m_bActiveSourcePending;
   bool m_bStandbyPending;
+  bool m_bInactiveViewPending;
   CDateTime m_preventActivateSourceOnPlay;
+  CDateTime m_tvStandbyReceived;
   bool m_bActiveSourceBeforeStandby;
   bool m_bOnPlayReceived;
   bool m_bPlaybackPaused;
