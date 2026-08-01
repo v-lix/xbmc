@@ -1081,7 +1081,17 @@ void CDolbyVisionAML::OnSettingChanged(const std::shared_ptr<const CSetting>& se
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_OSD_BRIGHTNESS)
   {
-    if (aml_is_dv_enable() && aml_dv_dolby_vision_mode() != DOLBY_VISION_OUTPUT_MODE_HDR10)
+    // This setting is documented as applying "during DV playback" -- gate the
+    // live-apply on aml_dv_playback_active() rather than the current output
+    // mode. IPT/IPT_TUNNEL is what a Display-LED setup outputs *during DV
+    // playback* too, not just for the GUI, so checking the mode would also
+    // block live adjustment during the very playback this setting exists
+    // for. Playback-vs-GUI is the actual distinction to make here, since
+    // this shares the same underlying dolby_vision_graphic_max kernel
+    // parameter as coreelec.amlogic.dolbyvision.mode.on.luminance ("GUI max
+    // luminance in menus"), which governs it outside of playback instead.
+    if (aml_is_dv_enable() && aml_dv_playback_active() &&
+        aml_dv_dolby_vision_mode() != DOLBY_VISION_OUTPUT_MODE_HDR10)
       aml_dv_set_osd_brightness(std::dynamic_pointer_cast<const CSettingInt>(setting)->GetValue());
   }
   else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DV_VS10_HDR10_OSD_BRIGHTNESS)
