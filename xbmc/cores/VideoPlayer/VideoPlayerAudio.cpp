@@ -72,6 +72,7 @@ constexpr unsigned int ANCHOR_TRIM_MIN_MS = 10;
 constexpr unsigned int ANCHOR_TRIM_MAX_MS = 150;
 constexpr auto ANCHOR_TRIM_WINDOW_MS = std::chrono::milliseconds(10000);
 constexpr unsigned int ANCHOR_TRIM_SETTLE_MS = 5;
+constexpr auto ANCHOR_TRIM_MIN_AGE_MS = std::chrono::milliseconds(3000);
 constexpr auto ANCHOR_TRIM_HOLD_MS = std::chrono::milliseconds(1500);
 
 class CDVDMsgAudioCodecChange : public CDVDMsg
@@ -498,10 +499,7 @@ void CVideoPlayerAudio::Process()
 
       // arm the anchor trim: validate this anchor against the first settled
       // AE error average (see the SYNC_DISCON block)
-      m_anchorTrimDone = false;
-      m_anchorTrimErrorTime = m_audioSink.GetSyncErrorTime();
-      m_anchorTrimHavePrev = false;
-      m_anchorTrimWindow.Set(ANCHOR_TRIM_WINDOW_MS);
+      ArmAnchorTrim();
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_RESET))
     {
@@ -570,10 +568,7 @@ void CVideoPlayerAudio::Process()
             // field as the same delay returning on every unpause)
             if (m_speed == DVD_PLAYSPEED_PAUSE && speed == DVD_PLAYSPEED_NORMAL)
             {
-              m_anchorTrimDone = false;
-              m_anchorTrimErrorTime = m_audioSink.GetSyncErrorTime();
-              m_anchorTrimHavePrev = false;
-              m_anchorTrimWindow.Set(ANCHOR_TRIM_WINDOW_MS);
+              ArmAnchorTrim();
             }
           }
         }
@@ -962,8 +957,14 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
       {
         // fresh AE average since the last one we looked at
         m_anchorTrimErrorTime = errorTime;
+        // "settled" must mean settled AFTER the disturbance: two agreeing
+        // averages taken before the churn reaches the averaging window closed
+        // the epoch early (silently, below the trim floor) and the corrector
+        // then stepped on the ramp as if the trim did not exist. The display
+        // reset re-arms the epoch when its churn actually starts, and the
+        // minimum age keeps pre-churn agreement from counting.
         const bool settled =
-            m_anchorTrimHavePrev &&
+            m_anchorTrimMinAge.IsTimePast() && m_anchorTrimHavePrev &&
             std::abs(syncerror - m_anchorTrimPrevError) < DVD_MSEC_TO_TIME(ANCHOR_TRIM_SETTLE_MS);
         m_anchorTrimPrevError = syncerror;
         m_anchorTrimHavePrev = true;
@@ -1154,8 +1155,20 @@ bool CVideoPlayerAudio::AcceptsData() const
   return !full;
 }
 
+void CVideoPlayerAudio::ArmAnchorTrim()
+{
+  // open (or re-open) the anchor epoch: hold clock corrections and wait for
+  // the AE error average to settle, then correct the audio labels once
+  m_anchorTrimDone = false;
+  m_anchorTrimErrorTime = m_audioSink.GetSyncErrorTime();
+  m_anchorTrimHavePrev = false;
+  m_anchorTrimWindow.Set(ANCHOR_TRIM_WINDOW_MS);
+  m_anchorTrimMinAge.Set(ANCHOR_TRIM_MIN_AGE_MS);
+}
+
 bool CVideoPlayerAudio::SwitchCodecIfNeeded()
 {
+  const bool wasDisplayReset = m_displayReset;
   if (m_displayReset)
     CLog::Log(LOGINFO, "CVideoPlayerAudio: display reset occurred, checking for passthrough");
   else
@@ -1205,6 +1218,13 @@ bool CVideoPlayerAudio::SwitchCodecIfNeeded()
     {
       CLog::Log(LOGDEBUG, "CVideoPlayerAudio::SwitchCodecIfNeeded - LAV Full: keeping existing codec (display reset, passthrough unchanged)");
     }
+
+    // the display reset's sink reopen is the disturbance the anchor epoch
+    // exists for - restart settle tracking so it measures the post-churn
+    // state, not the calm before it (applies to the PCM path as well)
+    if (wasDisplayReset)
+      ArmAnchorTrim();
+
     return false;
   }
 
