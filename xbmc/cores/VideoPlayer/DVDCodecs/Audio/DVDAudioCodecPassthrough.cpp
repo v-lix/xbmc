@@ -768,6 +768,26 @@ void CDVDAudioCodecPassthrough::SyncToResyncPts(double pts)
   }
 }
 
+void CDVDAudioCodecPassthrough::TrimLavClock(double offset)
+{
+  if (!m_lavStyleSyncEnabled)
+    return;
+
+  if (m_internalClock == LOCAL_NOPTS || m_needsResync)
+  {
+    CLog::Log(LOGDEBUG, "CDVDAudioCodecPassthrough::TrimLavClock - no anchored clock, ignoring");
+    return;
+  }
+
+  m_internalClock += offset;
+  // keep the jitter baseline consistent so the tracker does not later
+  // "correct" the trim back out
+  m_jitterTracker.OffsetValues(offset);
+
+  CLog::Log(LOGDEBUG, "CDVDAudioCodecPassthrough::TrimLavClock - internal clock shifted by {:.3f}ms",
+            offset / 1000.0);
+}
+
 int CDVDAudioCodecPassthrough::GetBufferSize()
 {
   return (int)m_parser.GetBufferSize();

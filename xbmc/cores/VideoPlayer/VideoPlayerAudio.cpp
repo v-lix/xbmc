@@ -62,6 +62,17 @@ inline bool IsValidPts(double pts) {
 // to admit errors that window can act on).
 constexpr unsigned int DISCON_VSYNC_ADJUST_TIME_MS = 20;
 
+// Anchor trim (see the SYNC_DISCON block): the first settled AE error average
+// after a resync is attributed to the anchor's delay reading and corrects the
+// audio labels instead of the clock. Errors below the floor are left to the
+// normal machinery; errors above the ceiling are not plausible anchor error
+// and are handled normally too. The hold covers one AE error interval (1s)
+// plus margin so the clock corrector never acts on pre-trim samples.
+constexpr unsigned int ANCHOR_TRIM_MIN_MS = 10;
+constexpr unsigned int ANCHOR_TRIM_MAX_MS = 150;
+constexpr auto ANCHOR_TRIM_WINDOW_MS = std::chrono::milliseconds(5000);
+constexpr auto ANCHOR_TRIM_HOLD_MS = std::chrono::milliseconds(1500);
+
 class CDVDMsgAudioCodecChange : public CDVDMsg
 {
 public:
@@ -483,6 +494,12 @@ void CVideoPlayerAudio::Process()
         m_pcmResyncTimestamp = true;
         m_pcmJitterTracker.Reset();
       }
+
+      // arm the anchor trim: validate this anchor against the first settled
+      // AE error average (see the SYNC_DISCON block)
+      m_anchorTrimDone = false;
+      m_anchorTrimErrorTime = m_audioSink.GetSyncErrorTime();
+      m_anchorTrimWindow.Set(ANCHOR_TRIM_WINDOW_MS);
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_RESET))
     {
@@ -544,6 +561,17 @@ void CVideoPlayerAudio::Process()
           {
             m_audioSink.Resume();
             m_stalled = false;
+
+            // resuming from pause restarts the physical audio path (bitstream
+            // halt, receiver re-lock) while the labels roll on - re-validate
+            // the alignment exactly like a fresh anchor (reported in the
+            // field as the same delay returning on every unpause)
+            if (m_speed == DVD_PLAYSPEED_PAUSE && speed == DVD_PLAYSPEED_NORMAL)
+            {
+              m_anchorTrimDone = false;
+              m_anchorTrimErrorTime = m_audioSink.GetSyncErrorTime();
+              m_anchorTrimWindow.Set(ANCHOR_TRIM_WINDOW_MS);
+            }
           }
         }
       }
@@ -907,6 +935,62 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
   if (m_synctype == SYNC_DISCON)
   {
     double syncerror = m_audioSink.GetSyncError();
+
+    // Anchor trim. The RESYNC anchor is pts + sink delay, and the delay
+    // reading during start/seek churn can be tens of ms off (observed up to
+    // 95ms). Left alone, the corrections below drag the master clock - and
+    // with it video presentation - to match the mislabeled audio, converting
+    // the anchor error into a physical A/V offset that afterwards measures
+    // as zero: audible, invisible to the machinery, different on every
+    // restart. While the anchor is fresh the labels are the suspect, not
+    // the clock, so the first settled AE error average after a resync
+    // corrects the audio labels and leaves the clock alone. Genuine drift
+    // later still goes through ErrorAdjust as before.
+    if (!m_anchorTrimDone)
+    {
+      const unsigned int errorTime = m_audioSink.GetSyncErrorTime();
+      if (m_anchorTrimWindow.IsTimePast())
+        m_anchorTrimDone = true;
+      else if (errorTime != 0 && errorTime != m_anchorTrimErrorTime)
+      {
+        // first fresh AE average since the resync
+        m_anchorTrimDone = true;
+        if (std::abs(syncerror) > DVD_MSEC_TO_TIME(ANCHOR_TRIM_MIN_MS) &&
+            std::abs(syncerror) < DVD_MSEC_TO_TIME(ANCHOR_TRIM_MAX_MS))
+        {
+          bool trimmed = false;
+          if (m_pAudioCodec && m_pAudioCodec->NeedPassthrough())
+          {
+            CDVDAudioCodecPassthrough* passthroughCodec =
+                dynamic_cast<CDVDAudioCodecPassthrough*>(m_pAudioCodec.get());
+            if (passthroughCodec && passthroughCodec->IsLavStyleSyncEnabled())
+            {
+              passthroughCodec->TrimLavClock(-syncerror);
+              trimmed = true;
+            }
+          }
+          else if (m_lavStylePcmSyncEnabled && IsValidPts(m_pcmOutputClock))
+          {
+            m_pcmOutputClock -= syncerror;
+            trimmed = true;
+          }
+
+          if (trimmed)
+          {
+            m_audioSink.SetSyncErrorCorrection(-syncerror);
+            // the AE average still contains pre-trim samples for up to one
+            // error interval - hold clock corrections until it has re-settled
+            m_anchorTrimHold.Set(ANCHOR_TRIM_HOLD_MS);
+            CLog::Log(LOGDEBUG,
+                      "CVideoPlayerAudio:: anchor trim: shifted audio labels by {:.3f}ms "
+                      "instead of stepping the clock",
+                      -syncerror / 1000.0);
+          }
+        }
+      }
+    }
+    if (!m_anchorTrimHold.IsTimePast())
+      syncerror = 0;
 
     // With LAV Full smoothing the PTS stream and the vsync reference clock
     // driving CDVDClock, ErrorAdjust quantizes corrections to whole frame

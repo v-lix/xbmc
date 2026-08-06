@@ -47,6 +47,9 @@ public:
   double GetMaxDelay(); // returns total time of audio in AE for the stream
   double GetDelay(); // returns the time it takes to play a packet if we add one at this time
   double GetSyncError();
+  //! \brief Timestamp of the AE error average GetSyncError() is based on -
+  //! changes exactly when a fresh average has been published
+  unsigned int GetSyncErrorTime() const { return m_syncErrorTime; }
   void SetSyncErrorCorrection(double correction);
 
   /*!
