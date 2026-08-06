@@ -1002,8 +1002,7 @@ bool CBitstreamConverter::Convert(uint8_t *pData, int iSize, double pts)
             nal_size = AV_RB24(nal_start);
             nal_start += 3;
             // clamp corrupt length fields to the remaining packet size
-            if (nal_size > (uint32_t)(end - nal_start))
-              nal_size = (uint32_t)(end - nal_start);
+            nal_size = std::min<uint32_t>(nal_size, end - nal_start);
             avio_wb32(pb, nal_size);
             avio_write(pb, nal_start, nal_size);
             nal_start += nal_size;
