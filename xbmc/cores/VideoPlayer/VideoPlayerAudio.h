@@ -145,9 +145,12 @@ protected:
   std::atomic<bool> m_audioSettingsChanged{false};
 
   // anchor trim state (see SYNC_DISCON block): one-shot label correction from
-  // the first settled AE error average after a resync/unpause
+  // the first settled AE error average after a resync/unpause; clock stepping
+  // is held while the epoch is open
   bool m_anchorTrimDone = true;
   unsigned int m_anchorTrimErrorTime = 0;
+  double m_anchorTrimPrevError = 0.0;
+  bool m_anchorTrimHavePrev = false;
   XbmcThreads::EndTime<> m_anchorTrimWindow;
   XbmcThreads::EndTime<> m_anchorTrimHold;
   unsigned int m_disconAdjustTimeMs = 30; // maximum sync-off before adjusting
