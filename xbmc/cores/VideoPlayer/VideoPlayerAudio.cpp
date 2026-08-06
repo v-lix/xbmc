@@ -224,6 +224,7 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
 
   /* store our stream hints */
   m_streaminfo = hints;
+  m_streaminfoOrig = hints;
 
   /* update codec information from what codec gave out, if any */
   int channelsFromCodec   = m_pAudioCodec->GetFormat().m_channelLayout.Count();
@@ -1062,10 +1063,19 @@ bool CVideoPlayerAudio::SwitchCodecIfNeeded()
   if (m_synctype == SYNC_RESAMPLE)
     allowpassthrough = false;
 
+  // probe with the pristine demuxer hints, not m_streaminfo: the latter holds
+  // the current codec's output (a passthrough codec reports its RAW transport
+  // layout, e.g. 8 channels for DTS-HD MA), which makes the ffmpeg decoder
+  // fail to open ("[dca] Invalid channel layout") when switching passthrough
+  // to decode. Keep the samplerate we learned from the codec - the demuxer
+  // value can be missing or wrong (e.g. AAC SBR).
+  CDVDStreamInfo probeHints = m_streaminfoOrig;
+  probeHints.samplerate = m_streaminfo.samplerate;
+
   CAEStreamInfo::DataType streamType = m_audioSink.GetPassthroughStreamType(
-      m_streaminfo.codec, m_streaminfo.samplerate, m_streaminfo.profile);
+      probeHints.codec, probeHints.samplerate, probeHints.profile);
   std::unique_ptr<CDVDAudioCodec> codec = CDVDFactoryCodec::CreateAudioCodec(
-      m_streaminfo, m_processInfo, allowpassthrough, m_processInfo.AllowDTSHDDecode(), streamType);
+      probeHints, m_processInfo, allowpassthrough, m_processInfo.AllowDTSHDDecode(), streamType);
 
   // Check LAV setting BEFORE the early return
   int algoValue = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_AUDIO_SEAMLESSBRANCH);

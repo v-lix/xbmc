@@ -106,6 +106,10 @@ protected:
 
   // holds stream information for current playing stream
   CDVDStreamInfo m_streaminfo;
+  // pristine demuxer hints - m_streaminfo gets the current codec's output
+  // (e.g. a passthrough codec's RAW transport layout) folded in, which a
+  // decoder probe in SwitchCodecIfNeeded can fail to open with
+  CDVDStreamInfo m_streaminfoOrig;
 
   double m_audioClock;
 
