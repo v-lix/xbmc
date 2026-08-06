@@ -57,6 +57,30 @@ public:
    */
   static bool ShouldUse(const SampleConfig& dstConfig, const SampleConfig& srcConfig);
 
+  /*!
+   * \brief Publish whether a binaural render is what the listener is hearing.
+   *
+   * Surfaced as Player.Process(omniphony.output). Deliberately reports the effective
+   * state rather than the selected one: an engine that could not be loaded, or
+   * that failed mid-stream, leaves this false even though this class was
+   * chosen, because the audio at that point is the ordinary downmix.
+   */
+  static void ReportActive(bool active);
+
+  /*!
+   * \brief Re-assert the last reported state.
+   *
+   * CActiveAE::Configure() creates the stream's resample pool - which is what
+   * decides and reports this - and only afterwards clears the audio player
+   * cache when the internal format changed. That clear is right for everything
+   * else in the cache and wrong for this one field, which describes the
+   * conversion just configured rather than the one before it. Calling this
+   * after the clear puts it back. Without it the label appears only on the
+   * next Configure() that leaves the format alone, which in practice means
+   * after a seek.
+   */
+  static void Republish();
+
   bool Init(SampleConfig dstConfig,
             SampleConfig srcConfig,
             bool upmix,

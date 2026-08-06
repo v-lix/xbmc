@@ -13,10 +13,12 @@
 #include "cores/AudioEngine/Omniphony/OmniphonyConfig.h"
 #include "cores/AudioEngine/Utils/AEChannelInfo.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
+#include "cores/DataCacheCore.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/log.h"
 
+#include <atomic>
 #include <cstring>
 
 extern "C"
@@ -34,6 +36,10 @@ namespace
 //! is considered too small. Generous: the WAV bridge is close to 1:1, so this
 //! is several times any plausible block.
 constexpr size_t RENDER_CEILING_FRAMES = 8192;
+
+//! Last state handed to ReportActive, so it can be re-asserted after something
+//! else clears the cache it was written into. See Republish().
+std::atomic<bool> s_active{false};
 
 //! Consecutive engine failures tolerated before giving up on it entirely. A
 //! single bad block must not silence a whole track.
@@ -129,10 +135,23 @@ bool CActiveAEResampleBinaural::ShouldUse(const SampleConfig& dstConfig,
          !settings->GetBool(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH);
 }
 
+void CActiveAEResampleBinaural::ReportActive(bool active)
+{
+  s_active.store(active, std::memory_order_relaxed);
+  CServiceBroker::GetDataCacheCore().SetOmniphonyOutput(active ? "Binaural" : "");
+}
+
+void CActiveAEResampleBinaural::Republish()
+{
+  ReportActive(s_active.load(std::memory_order_relaxed));
+}
+
 void CActiveAEResampleBinaural::FallBack(const char* reason)
 {
   if (m_bypass)
     return;
+
+  ReportActive(false);
 
   CLog::Log(LOGWARNING, "Omniphony: {} - reverting to the standard downmix for this stream",
             reason);
@@ -161,6 +180,11 @@ bool CActiveAEResampleBinaural::Init(SampleConfig dstConfig,
   m_inner = CAEResampleFactory::Create();
   if (!m_inner)
     return false;
+
+  // Cleared up front so that every path out of here that ends in the ordinary
+  // downmix - a missing engine, a session that will not start, an unexpected
+  // channel count - leaves it cleared without each one having to say so.
+  ReportActive(false);
 
   // Anything that stops the engine coming up leaves this object behaving
   // exactly like the resampler it replaced - same Init arguments, same
@@ -258,6 +282,7 @@ bool CActiveAEResampleBinaural::Init(SampleConfig dstConfig,
 
   CLog::Log(LOGINFO, "Omniphony: binaural rendering {} channels at {} Hz to stereo",
             srcConfig.channels, srcConfig.sample_rate);
+  ReportActive(true);
   return true;
 }
 

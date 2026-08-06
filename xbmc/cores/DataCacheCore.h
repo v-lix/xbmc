@@ -113,6 +113,16 @@ public:
   int GetAudioSampleRate();
   void SetAudioBitsPerSample(int bitsPerSample);
   int GetAudioBitsPerSample();
+  /*!
+   * \brief What the Omniphony spatial audio engine is doing to the sound on its
+   *        way to the sink. Empty when it is doing nothing, so a skin can hide
+   *        the row rather than print a word for "nothing special". Named for
+   *        the engine rather than for audio in general: it is surfaced as the
+   *        Player.Process(omniphony.output) infolabel, and a generic name here
+   *        would invite unrelated state into a feature-scoped label.
+   */
+  void SetOmniphonyOutput(std::string output);
+  std::string GetOmniphonyOutput();
 
   // Additional Player Process Info data (Only set in Data Core Cache)
   void SetAudioLiveBitRate(double bitRate);
@@ -297,6 +307,7 @@ protected:
   {
     std::string decoderName;
     std::string channels;
+    std::string omniphonyOutput;
     int sampleRate;
     int bitsPerSample;
     double liveBitRate = 0;

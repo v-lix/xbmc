@@ -8,6 +8,7 @@
 
 #include "ActiveAE.h"
 
+#include "ActiveAEResampleBinaural.h"
 #include "ActiveAESettings.h"
 #include "ActiveAESound.h"
 #include "ActiveAEStream.h"
@@ -1453,6 +1454,10 @@ void CActiveAE::Configure(AEAudioFormat *desiredFmt)
   if (!CompareFormat(oldInternalFormat, m_internalFormat))
   {
     CServiceBroker::GetDataCacheCore().ResetAudioCache();
+    // The stream pools above have already chosen their converters for this
+    // format and reported whether the result is a binaural render, so that
+    // report is about to be lost to a clear meant for the previous format.
+    CActiveAEResampleBinaural::Republish();
     if (m_settings.guisoundmode == AE_SOUND_ALWAYS ||
        (m_settings.guisoundmode == AE_SOUND_IDLE && m_streams.empty()) ||
        m_aeGUISoundForce)

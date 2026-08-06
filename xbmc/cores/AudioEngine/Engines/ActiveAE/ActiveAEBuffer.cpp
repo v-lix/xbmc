@@ -10,6 +10,7 @@
 
 #include "ActiveAE.h"
 #include "ActiveAEFilter.h"
+#include "ActiveAEResampleBinaural.h"
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/AEResampleFactory.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
@@ -130,8 +131,9 @@ bool CActiveAEBufferPool::Create(unsigned int totaltime)
 
 CActiveAEBufferPoolResample::CActiveAEBufferPoolResample(const AEAudioFormat& inputFormat,
                                                          const AEAudioFormat& outputFormat,
-                                                         AEQuality quality)
-  : CActiveAEBufferPool(outputFormat), m_inputFormat(inputFormat)
+                                                         AEQuality quality,
+                                                         bool allowBinaural)
+  : CActiveAEBufferPool(outputFormat), m_inputFormat(inputFormat), m_allowBinaural(allowBinaural)
 {
   if (m_inputFormat.m_dataFormat == AE_FMT_RAW)
   {
@@ -178,11 +180,9 @@ bool CActiveAEBufferPoolResample::Create(
   return true;
 }
 
-void CActiveAEBufferPoolResample::ChangeResampler()
+void CActiveAEBufferPoolResample::BuildConfigs(SampleConfig& dstConfig,
+                                               SampleConfig& srcConfig) const
 {
-  m_resampler = CAEResampleFactory::Create();
-
-  SampleConfig dstConfig, srcConfig;
   dstConfig.channel_layout = CAEUtil::GetAVChannelLayout(m_format.m_channelLayout);
   dstConfig.channels = m_format.m_channelLayout.Count();
   dstConfig.sample_rate = m_format.m_sampleRate;
@@ -196,6 +196,40 @@ void CActiveAEBufferPoolResample::ChangeResampler()
   srcConfig.fmt = CAEUtil::GetAVSampleFormat(m_inputFormat.m_dataFormat);
   srcConfig.bits_per_sample = CAEUtil::DataFormatToUsedBits(m_inputFormat.m_dataFormat);
   srcConfig.dither_bits = CAEUtil::DataFormatToDitherBits(m_inputFormat.m_dataFormat);
+}
+
+bool CActiveAEBufferPoolResample::WantsBinaural() const
+{
+  if (!m_allowBinaural)
+    return false;
+
+  SampleConfig dstConfig{}, srcConfig{};
+  BuildConfigs(dstConfig, srcConfig);
+  return CActiveAEResampleBinaural::ShouldUse(dstConfig, srcConfig);
+}
+
+void CActiveAEBufferPoolResample::ChangeResampler()
+{
+  SampleConfig dstConfig{}, srcConfig{};
+  BuildConfigs(dstConfig, srcConfig);
+
+  // A multichannel to stereo conversion is the one Kodi performs with a matrix
+  // downmix; on headphones it can instead be rendered binaurally, which is the
+  // same conversion done differently. Everything else, and every other pool
+  // using this class, keeps the stock resampler.
+  m_binaural = m_allowBinaural && CActiveAEResampleBinaural::ShouldUse(dstConfig, srcConfig);
+  if (m_binaural)
+  {
+    m_resampler = std::make_unique<CActiveAEResampleBinaural>();
+  }
+  else
+  {
+    m_resampler = CAEResampleFactory::Create();
+    // A stream that reaches the sink through the ordinary downmix has to say so,
+    // or the previous stream's report would still be on screen.
+    if (m_allowBinaural)
+      CActiveAEResampleBinaural::ReportActive(false);
+  }
 
   if (srcConfig.sample_rate != dstConfig.sample_rate)
     CLog::Log(LOGDEBUG, "CActiveAEBufferPoolResample::ChangeResampler - resampling {} Hz -> {} Hz",
@@ -382,9 +416,13 @@ void CActiveAEBufferPoolResample::ConfigureResampler(bool normalizelevels,
   double boostCenter = settings->GetNumber(CSettings::SETTING_AUDIOOUTPUT_BOOSTCENTER);
   int lfeMixTo = settings->GetInt(CSettings::SETTING_AUDIOOUTPUT_LFEMIXTO);
 
-  if (m_normalize != normalize || m_resampleQuality != quality ||
-      m_stereoUpmix != stereoupmix || m_mixSubLevel != sublevel ||
-      m_boostCenter != boostCenter || m_lfeMixTo != lfeMixTo)
+  // WantsBinaural() re-reads the setting the same way, so toggling binaural
+  // recreates the resampler like any other downmix setting. Comparing the
+  // resulting decision rather than the setting means a stream it could never
+  // apply to is left alone.
+  if (m_normalize != normalize || m_resampleQuality != quality || m_stereoUpmix != stereoupmix ||
+      m_mixSubLevel != sublevel || m_boostCenter != boostCenter || m_lfeMixTo != lfeMixTo ||
+      m_binaural != WantsBinaural())
   {
     m_changeResampler = true;
   }

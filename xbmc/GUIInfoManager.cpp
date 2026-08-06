@@ -1147,6 +1147,18 @@ const infomap player_times[] =   {{ "seektime",         PLAYER_SEEKTIME },
 ///     @skinning_v17 **[New Infolabel]** \link Player_Process_audiosamplerate `Player.Process(audiosamplerate)`\endlink
 ///     <p>
 ///   }
+///   \table_row3{   <b>`Player.Process(omniphony.output)`</b>,
+///                  \anchor Player_Process_omniphony_output
+///                  _string_,
+///     @return What the Omniphony spatial audio engine is doing to the sound on
+///     its way to the sink. `Binaural` while a multichannel soundtrack is being
+///     rendered for headphones\, and empty otherwise - including when binaural
+///     was selected but the engine could not be used\, since the ordinary
+///     downmix is what is being heard in that case.
+///     <p><hr>
+///     @skinning_v21 **[New Infolabel]** \link Player_Process_omniphony_output `Player.Process(omniphony.output)`\endlink
+///     <p>
+///   }
 ///   \table_row3{   <b>`Player.Process(videointerlace)`</b>,
 ///                  \anchor Player_Process_videointerlace
 ///                  _string_,
@@ -1313,7 +1325,9 @@ const infomap player_process[] = {{"videodecoder", PLAYER_PROCESS_VIDEODECODER},
                                   {"amlogic.video.fps.drop", PLAYER_PROCESS_AML_VIDEO_FPS_DROP },
                                   {"video.vpmode", PLAYER_PROCESS_AML_VP_MODE },
                                   
-                                  {"av.change", PLAYER_PROCESS_AV_CHANGE }};
+                                  {"av.change", PLAYER_PROCESS_AV_CHANGE },
+
+                                  {"omniphony.output", PLAYER_PROCESS_OMNIPHONY_OUTPUT }};
 
 /// \page modules__infolabels_boolean_conditions
 /// \subsection modules__infolabels_boolean_conditions_Weather Weather

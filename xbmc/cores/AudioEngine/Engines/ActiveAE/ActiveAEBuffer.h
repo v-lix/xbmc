@@ -76,7 +76,18 @@ class IAEResample;
 class CActiveAEBufferPoolResample : public CActiveAEBufferPool
 {
 public:
-  CActiveAEBufferPoolResample(const AEAudioFormat& inputFormat, const AEAudioFormat& outputFormat, AEQuality quality);
+  /*!
+   * \param allowBinaural Whether a multichannel to stereo conversion in this
+   *        pool may be performed by an HRTF render instead of a matrix
+   *        downmix. True only for the per-stream chain: the same class also
+   *        backs the sink pool and the visualiser pool, and the visualiser's
+   *        output is stereo by construction, so an unscoped substitution would
+   *        run a second render for audio nobody hears.
+   */
+  CActiveAEBufferPoolResample(const AEAudioFormat& inputFormat,
+                              const AEAudioFormat& outputFormat,
+                              AEQuality quality,
+                              bool allowBinaural = false);
   ~CActiveAEBufferPoolResample() override;
   using CActiveAEBufferPool::Create;
   bool Create(
@@ -100,6 +111,10 @@ public:
 
 protected:
   void ChangeResampler();
+  //! \brief Derive the conversion this pool performs, as the resampler sees it.
+  void BuildConfigs(SampleConfig& dstConfig, SampleConfig& srcConfig) const;
+  //! \brief Whether the conversion should be an HRTF render rather than a downmix.
+  bool WantsBinaural() const;
 
   uint8_t *m_planes[16];
   bool m_empty = true;
@@ -120,6 +135,8 @@ protected:
   bool m_forceResampler = false;
   AEQuality m_resampleQuality;
   bool m_stereoUpmix = false;
+  bool m_allowBinaural = false; //!< per-stream chain only; see the constructor
+  bool m_binaural = false; //!< what the current resampler was built as
 };
 
 class CActiveAEFilter;

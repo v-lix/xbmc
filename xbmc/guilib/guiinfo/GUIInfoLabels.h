@@ -856,6 +856,10 @@ static constexpr unsigned int SYSTEM_LOCALE = 1012;
 
 #define PLAYER_PROCESS_RENDER_PTS (PLAYER_PROCESS + 150)
 
+// Omniphony spatial audio engine. Its own block so the "omniphony." infolabel
+// family can grow without borrowing numbers from the generic audio ones.
+#define PLAYER_PROCESS_OMNIPHONY_OUTPUT (PLAYER_PROCESS + 160)
+
 #define ADDON_INFOS                 1700
 #define ADDON_SETTING_STRING        (ADDON_INFOS)
 #define ADDON_SETTING_BOOL          (ADDON_INFOS + 1)

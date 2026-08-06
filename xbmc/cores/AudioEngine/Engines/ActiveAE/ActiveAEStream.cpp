@@ -582,8 +582,10 @@ CActiveAEStreamBuffers::CActiveAEStreamBuffers(const AEAudioFormat& inputFormat,
                                                const AEAudioFormat& outputFormat,
                                                AEQuality quality)
   : m_inputFormat(inputFormat),
+    // Only this pool may render binaurally: it is the per-stream chain, the one
+    // whose multichannel to stereo conversion is what the listener hears.
     m_resampleBuffers(
-        std::make_unique<CActiveAEBufferPoolResample>(inputFormat, outputFormat, quality)),
+        std::make_unique<CActiveAEBufferPoolResample>(inputFormat, outputFormat, quality, true)),
     m_atempoBuffers(std::make_unique<CActiveAEBufferPoolAtempo>(outputFormat))
 {
 }
