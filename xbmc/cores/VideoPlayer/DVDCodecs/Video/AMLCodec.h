@@ -129,6 +129,7 @@ private:
   int              m_speed;
   uint64_t         m_cur_pts;
   uint64_t         m_last_pts;
+  uint64_t         m_prev_last_pts; // pts before m_last_pts (excursion detection)
   // Recently output (display-order) pts, for corrupt-splice detection: a pts
   // that steps backwards onto a value already output is a broken splice
   // (duplicate GOP / out-of-place keyframe), not a legal reorder.

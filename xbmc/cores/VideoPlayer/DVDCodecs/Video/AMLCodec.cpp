@@ -1926,6 +1926,7 @@ bool CAMLCodec::OpenDecoder()
   m_stream_eof = false;
   m_cur_pts = DVD_NOPTS_VALUE;
   m_last_pts = DVD_NOPTS_VALUE;
+  m_prev_last_pts = DVD_NOPTS_VALUE;
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
   m_dst_rect.SetRect(0, 0, 0, 0);
@@ -2458,6 +2459,7 @@ void CAMLCodec::Reset()
   // reset some interal vars
   m_cur_pts = DVD_NOPTS_VALUE;
   m_last_pts = DVD_NOPTS_VALUE;
+  m_prev_last_pts = DVD_NOPTS_VALUE;
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
   m_state = 0;
@@ -2746,6 +2748,7 @@ int CAMLCodec::DequeueBuffer()
 
   if (ret == 0)
   {
+    m_prev_last_pts = m_last_pts;
     m_last_pts = m_cur_pts;
 
     m_cur_pts =  static_cast<uint64_t>(static_cast<uint32_t>(vbuf.timestamp.tv_sec)) << 32;
@@ -2855,6 +2858,29 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
                     static_cast<double>(m_last_pts) / DVD_TIME_BASE);
           videoPicture.iFlags |= DVP_FLAG_STREAM_CORRUPTION;
           break;
+        }
+      }
+
+      // A corrupt region can also make the decoder emit a single frame with a
+      // wild forward pts before the real sequence resumes behind it - the
+      // reversal then lands on a never-output timestamp, so the duplicate
+      // check above stays silent. Match the excursion shape instead: the
+      // previous transition jumped abnormally far forward and this frame
+      // steps back to a point inside that jump. Legal jumps (seeks, edition
+      // switches) flush the decoder and clear this state first.
+      if (!(videoPicture.iFlags & DVP_FLAG_STREAM_CORRUPTION) &&
+          m_prev_last_pts != DVD_NOPTS_VALUE && m_last_pts > m_prev_last_pts &&
+          m_cur_pts > m_prev_last_pts)
+      {
+        const uint64_t prevDelta = m_last_pts - m_prev_last_pts;
+        if (prevDelta > 8 * static_cast<uint64_t>(rate_duration))
+        {
+          CLog::Log(LOGWARNING,
+                    "CAMLCodec::GetPicture: corrupt stream: pts {:.3f} stepped backwards inside "
+                    "a {:.0f}ms forward excursion (last {:.3f})",
+                    static_cast<double>(m_cur_pts) / DVD_TIME_BASE, static_cast<double>(prevDelta) / 1000.0,
+                    static_cast<double>(m_last_pts) / DVD_TIME_BASE);
+          videoPicture.iFlags |= DVP_FLAG_STREAM_CORRUPTION;
         }
       }
     }
