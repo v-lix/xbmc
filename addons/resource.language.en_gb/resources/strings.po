@@ -27019,6 +27019,18 @@ msgctxt "#60627"
 msgid "For Player-Led output on projectors whose automatic dynamic-range detection flip-flops between SDR and HDR. Re-applies the Dolby Vision / VS10 output after the resolution switches at playback start (the same effect as manually toggling the VS10 mode). May cause a brief blip at playback start, so leave this off unless you actually see SDR/HDR flickering."
 msgstr ""
 
+#. "Binaural headphone rendering"
+#: system/settings/settings.xml
+msgctxt "#60650"
+msgid "Binaural rendering for headphones"
+msgstr ""
+
+#. Help text for setting "Binaural rendering for headphones" of label #60650
+#: system/settings/settings.xml
+msgctxt "#60651"
+msgid "When surround sound is folded down to stereo, place each surround channel around your head and render it with a head-related transfer function instead of simply mixing it in. On headphones this makes surround and height channels appear to come from around and above you rather than from inside your head. Only offered when the output is stereo, which includes S/PDIF and other digital outputs that are always driven in stereo. It is hidden while passthrough is enabled, because an amplifier is then doing the decoding and the listener is on speakers. Requires the spatial audio engine to be installed; without it the normal downmix is used."
+msgstr ""
+
 #. Title of Dolby Vision RPU conversion setting
 #: system/settings/settings.xml
 msgctxt "#69196"

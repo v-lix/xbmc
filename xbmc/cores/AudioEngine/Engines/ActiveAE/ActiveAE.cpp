@@ -3074,6 +3074,32 @@ bool CActiveAE::IsSettingVisible(const std::string &settingId)
         CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_AUDIOOUTPUT_CHANNELS) > AE_CH_LAYOUT_2_0)
     return true;
   }
+  else if (settingId == CSettings::SETTING_AUDIOOUTPUT_BINAURAL)
+  {
+    const std::shared_ptr<CSettings> settings =
+        CServiceBroker::GetSettingsComponent()->GetSettings();
+
+    // Only meaningful when multichannel content is folded to stereo. Read the
+    // layout the engine will actually use, not the setting: an IEC958 device
+    // offers no channel selection and is always driven in stereo, so it is
+    // precisely the case this applies to. Same expression as LoadSettings.
+    const int channels =
+        (m_sink.GetDeviceType(settings->GetString(CSettings::SETTING_AUDIOOUTPUT_AUDIODEVICE)) ==
+         AE_DEVTYPE_IEC958)
+            ? AE_CH_LAYOUT_2_0
+            : settings->GetInt(CSettings::SETTING_AUDIOOUTPUT_CHANNELS);
+    if (channels > AE_CH_LAYOUT_2_0)
+      return false;
+
+    // Passthrough means an amplifier is decoding, so the listener is on
+    // speakers rather than headphones; no headphone DAC accepts a bitstream.
+    if (m_sink.HasPassthroughDevice() &&
+        settings->GetInt(CSettings::SETTING_AUDIOOUTPUT_CONFIG) != AE_CONFIG_FIXED &&
+        settings->GetBool(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH))
+      return false;
+
+    return true;
+  }
   else if (settingId == CSettings::SETTING_AUDIOOUTPUT_AC3TRANSCODE)
   {
     const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();

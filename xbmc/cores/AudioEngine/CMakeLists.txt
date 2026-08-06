@@ -8,6 +8,7 @@ set(SOURCES AEResampleFactory.cpp
             Engines/ActiveAE/ActiveAEStream.cpp
             Engines/ActiveAE/ActiveAESound.cpp
             Engines/ActiveAE/ActiveAESettings.cpp
+            Omniphony/OmniphonyConfig.cpp
             Omniphony/OmniphonyLib.cpp
             Utils/AEBitstreamPacker.cpp
             Utils/AEChannelInfo.cpp
@@ -36,6 +37,7 @@ set(HEADERS AEResampleFactory.h
             Interfaces/AEStream.h
             Interfaces/IAudioCallback.h
             Interfaces/ThreadedAE.h
+            Omniphony/OmniphonyConfig.h
             Omniphony/OmniphonyLib.h
             Omniphony/orender.h
             Utils/AEAudioFormat.h
@@ -102,8 +104,12 @@ if(TARGET Sndio::Sndio)
 endif()
 
 if(TARGET ${APP_NAME_LC}::FFMPEG)
-  list(APPEND SOURCES Engines/ActiveAE/ActiveAEResampleFFMPEG.cpp)
-  list(APPEND HEADERS Engines/ActiveAE/ActiveAEResampleFFMPEG.h)
+  # The binaural converter delegates rate and format conversion to the FFmpeg
+  # resampler, so it is only built where that one is.
+  list(APPEND SOURCES Engines/ActiveAE/ActiveAEResampleBinaural.cpp
+                      Engines/ActiveAE/ActiveAEResampleFFMPEG.cpp)
+  list(APPEND HEADERS Engines/ActiveAE/ActiveAEResampleBinaural.h
+                      Engines/ActiveAE/ActiveAEResampleFFMPEG.h)
 endif()
 
 if(CORE_SYSTEM_NAME MATCHES windows)

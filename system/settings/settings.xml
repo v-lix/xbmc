@@ -3399,6 +3399,21 @@
           </dependencies>
           <control type="toggle" />
         </setting>
+        <setting id="audiooutput.binaural" type="boolean" label="60650" help="60651">
+          <level>1</level>
+          <default>false</default>
+          <dependencies>
+            <dependency type="visible">
+              <and>
+                <condition on="property" name="aesettingvisible" setting="audiooutput.channels">audiooutput.binaural</condition>
+                <condition on="property" name="aesettingvisible" setting="audiooutput.audiodevice">audiooutput.binaural</condition>
+                <condition on="property" name="aesettingvisible" setting="audiooutput.config">audiooutput.binaural</condition>
+                <condition on="property" name="aesettingvisible" setting="audiooutput.passthrough">audiooutput.binaural</condition>
+              </and>
+            </dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
         <setting id="audiooutput.boostcenter" type="number" label="38007" help="38008">
           <level>2</level>
           <default>0</default>

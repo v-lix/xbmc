@@ -398,6 +398,7 @@ public:
   static constexpr auto SETTING_VIDEOSCREEN_DITHER = "videoscreen.dither";
   static constexpr auto SETTING_VIDEOSCREEN_DITHERDEPTH = "videoscreen.ditherdepth";
   static constexpr auto SETTING_AUDIOOUTPUT_AUDIODEVICE = "audiooutput.audiodevice";
+  static constexpr auto SETTING_AUDIOOUTPUT_BINAURAL = "audiooutput.binaural";
   static constexpr auto SETTING_AUDIOOUTPUT_BTCODEC = "audiooutput.btcodec";
   static constexpr auto SETTING_AUDIOOUTPUT_BTVOLUMEBOOST = "audiooutput.btvolumeboost";
   static constexpr auto SETTING_AUDIOOUTPUT_CHANNELS = "audiooutput.channels";
