@@ -141,6 +141,36 @@ bool CDVDAudioCodecPassthrough::Open(CDVDStreamInfo &hints, CDVDCodecOptions &op
   UpdateLavModeSettings();
 
   m_parser.SetCoreOnly(false);
+
+  // The track's codec family is fixed by the demuxer - it never legitimately
+  // changes mid-stream (genuine codec changes arrive as a demuxer stream
+  // change with a fresh codec). Lock the parser's resync detection to that
+  // family so a corrupt region cannot make it "detect" a foreign format
+  // (AC3's syncword is two bytes, trivially present in garbage) and tear the
+  // audio stream down for it; through corruption it keeps scanning for the
+  // right syncword instead and re-locks onto the real stream.
+  switch (m_format.m_streamInfo.m_type)
+  {
+    case CAEStreamInfo::STREAM_TYPE_AC3:
+    case CAEStreamInfo::STREAM_TYPE_EAC3:
+      m_parser.SetSyncFamily(CAEStreamParser::SyncFamily::AC3);
+      break;
+    case CAEStreamInfo::STREAM_TYPE_DTSHD_MA:
+    case CAEStreamInfo::STREAM_TYPE_DTSHD:
+    case CAEStreamInfo::STREAM_TYPE_DTSHD_CORE:
+    case CAEStreamInfo::STREAM_TYPE_DTS_512:
+    case CAEStreamInfo::STREAM_TYPE_DTS_1024:
+    case CAEStreamInfo::STREAM_TYPE_DTS_2048:
+      m_parser.SetSyncFamily(CAEStreamParser::SyncFamily::DTS);
+      break;
+    case CAEStreamInfo::STREAM_TYPE_TRUEHD:
+      m_parser.SetSyncFamily(CAEStreamParser::SyncFamily::TrueHD);
+      break;
+    default:
+      m_parser.SetSyncFamily(CAEStreamParser::SyncFamily::Any);
+      break;
+  }
+
   switch (m_format.m_streamInfo.m_type)
   {
     case CAEStreamInfo::STREAM_TYPE_AC3:

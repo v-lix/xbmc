@@ -298,8 +298,9 @@ unsigned int CAEStreamParser::DetectType(uint8_t* data, unsigned int size)
     unsigned int header = data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3];
 
     // if it could be DTS
-    if (header == DTS_SYNC_CORE_14BE || header == DTS_SYNC_CORE_14LE || 
-        header == DTS_SYNC_CORE_16BE || header == DTS_SYNC_CORE_16LE)
+    if ((m_syncFamily == SyncFamily::Any || m_syncFamily == SyncFamily::DTS) &&
+        (header == DTS_SYNC_CORE_14BE || header == DTS_SYNC_CORE_14LE ||
+         header == DTS_SYNC_CORE_16BE || header == DTS_SYNC_CORE_16LE))
     {
       unsigned int skip = SyncDTS(data, size);
       if (m_hasSync || m_needBytes)
@@ -310,7 +311,8 @@ unsigned int CAEStreamParser::DetectType(uint8_t* data, unsigned int size)
     }
 
     // if it could be AC3
-    if (data[0] == 0x0b && data[1] == 0x77)
+    if ((m_syncFamily == SyncFamily::Any || m_syncFamily == SyncFamily::AC3) &&
+        data[0] == 0x0b && data[1] == 0x77)
     {
       unsigned int skip = SyncAC3(data, size);
       if (m_hasSync || m_needBytes)
@@ -320,7 +322,8 @@ unsigned int CAEStreamParser::DetectType(uint8_t* data, unsigned int size)
     }
 
     // if it could be TrueHD
-    if (data[4] == 0xf8 && data[5] == 0x72 && data[6] == 0x6f && data[7] == 0xba)
+    if ((m_syncFamily == SyncFamily::Any || m_syncFamily == SyncFamily::TrueHD) &&
+        data[4] == 0xf8 && data[5] == 0x72 && data[6] == 0x6f && data[7] == 0xba)
     {
       unsigned int skip = SyncTrueHD(data, size);
       if (m_hasSync)

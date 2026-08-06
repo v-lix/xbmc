@@ -62,6 +62,20 @@ public:
 
   int AddData(uint8_t *data, unsigned int size, uint8_t **buffer = NULL, unsigned int *bufferSize = 0);
 
+  //! \brief Restrict which codec families DetectType() may sync to after a
+  //! total sync loss. A demuxer-typed track never legitimately changes codec
+  //! family mid-stream, but a corrupt region can contain a foreign syncword
+  //! (AC3's is only two bytes) and without the restriction the parser locks
+  //! onto it, "detecting" a bogus format and tearing the audio stream down.
+  enum class SyncFamily
+  {
+    Any,
+    AC3, // AC3 and E-AC3 (shared syncword)
+    DTS,
+    TrueHD
+  };
+  void SetSyncFamily(SyncFamily family) { m_syncFamily = family; }
+
   void SetCoreOnly(bool value) { m_coreOnly = value; }
   void SetDefeatTrueHDDialNorm(bool value) { m_defeatTrueHDDialNorm = value; }
   void SetDefeatAC3DialNorm(bool value) { m_defeatAC3DialNorm = value; }
@@ -90,6 +104,7 @@ private:
   typedef unsigned int (CAEStreamParser::*ParseFunc)(uint8_t *data, unsigned int size);
 
   CAEStreamInfo m_info;
+  SyncFamily m_syncFamily = SyncFamily::Any;
   bool m_coreOnly = false;
   bool m_defeatTrueHDDialNorm = false;
   bool m_defeatAC3DialNorm = false;
