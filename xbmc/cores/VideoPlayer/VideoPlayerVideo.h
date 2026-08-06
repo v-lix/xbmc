@@ -138,6 +138,7 @@ protected:
   std::atomic_bool m_bAbortOutput;
   // Debounce for the corrupt-splice recovery reseek (DVP_FLAG_STREAM_CORRUPTION)
   std::chrono::steady_clock::time_point m_lastCorruptionRecovery{};
+  int m_corruptionRecoveryCount = 0;
 
   BitstreamStats m_videoStats;
 

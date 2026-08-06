@@ -755,24 +755,34 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
 
     // Corrupt-splice recovery: the decoder flagged a frame whose pts stepped
     // backwards onto an already-output timestamp (broken splice / duplicate
-    // GOP). The hardware presentation chain can come out of such a GOP
-    // displaying late while every Kodi-side sync metric stays clean, and only
-    // a seek re-latches it — so run a quiet forward reseek past the damage.
-    // Relative +1s lands on the next clean keyframe behind the splice.
+    // GOP) or back inside a wild forward excursion. The hardware presentation
+    // chain can come out of such a GOP displaying late while every Kodi-side
+    // sync metric stays clean, and only a seek re-latches it — so run a quiet
+    // forward reseek past the damage. Where inside a multi-second corrupt
+    // span the detection fires varies per run, so a fixed +1s hop sometimes
+    // lands short and replays the damage (field log: 2 of 3 runs cleared,
+    // the third re-detected and was left stranded by the debounce): chain up
+    // to 3 recoveries with a doubling hop (1s/2s/4s) while re-detections
+    // arrive within 15s of the last one, then back off for 60s.
     if ((m_picture.iFlags & DVP_FLAG_STREAM_CORRUPTION) &&
         m_syncState == IDVDStreamPlayer::SYNC_INSYNC && m_speed == DVD_PLAYSPEED_NORMAL)
     {
       const auto now = std::chrono::steady_clock::now();
-      if (m_lastCorruptionRecovery == std::chrono::steady_clock::time_point{} ||
-          now - m_lastCorruptionRecovery >= std::chrono::seconds(60))
+      const bool fresh = m_lastCorruptionRecovery == std::chrono::steady_clock::time_point{} ||
+                         now - m_lastCorruptionRecovery >= std::chrono::seconds(60);
+      const bool chained = !fresh && m_corruptionRecoveryCount < 3 &&
+                           now - m_lastCorruptionRecovery <= std::chrono::seconds(15);
+      if (fresh || chained)
       {
+        m_corruptionRecoveryCount = fresh ? 1 : m_corruptionRecoveryCount + 1;
         m_lastCorruptionRecovery = now;
+        const int hopMs = 1000 << (m_corruptionRecoveryCount - 1);
         CLog::Log(LOGWARNING,
                   "CVideoPlayerVideo - corrupt stream signature at pts {:.3f}, "
-                  "recovering via internal reseek",
-                  m_picture.pts / DVD_TIME_BASE);
+                  "recovering via internal reseek (+{}ms, attempt {})",
+                  m_picture.pts / DVD_TIME_BASE, hopMs, m_corruptionRecoveryCount);
         CDVDMsgPlayerSeek::CMode mode;
-        mode.time = 1000;
+        mode.time = hopMs;
         mode.relative = true;
         mode.backward = false;
         mode.accurate = true;
