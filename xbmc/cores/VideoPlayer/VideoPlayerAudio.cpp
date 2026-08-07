@@ -76,6 +76,14 @@ constexpr auto ANCHOR_TRIM_MIN_AGE_MS = std::chrono::milliseconds(3000);
 // interruption.
 constexpr auto SYNC_LOST_RECOVERY_DEBOUNCE_MS = std::chrono::milliseconds(30000);
 
+// After a reseek we requested ourselves, the pending flush and resync make the
+// current AE error average meaningless. Corrections stay held until the
+// resync re-arms the anchor epoch, which then carries the suppression until
+// the average has settled; this timeout is only the fallback for a resync
+// that never arrives (seek failed, stream ended), so it is generous rather
+// than tuned - a slow network seek must not expire it early.
+constexpr auto POST_RESEEK_HOLD_MS = std::chrono::milliseconds(10000);
+
 class CDVDMsgAudioCodecChange : public CDVDMsg
 {
 public:
@@ -259,6 +267,7 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
   m_avrStartResyncDone = false;
   m_anchorTrimFromReset = false;
   m_lastSyncLostCount = 0;
+  m_awaitingReseekResync = false;
 
   m_prevsynctype = -1;
   m_synctype = m_processInfo.IsRealtimeStream() ? SYNC_RESAMPLE : SYNC_DISCON;
@@ -950,6 +959,8 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
       if (!debounced)
       {
         m_syncLostRecovery.Set(SYNC_LOST_RECOVERY_DEBOUNCE_MS);
+        m_correctionHold.Set(POST_RESEEK_HOLD_MS);
+        m_awaitingReseekResync = true;
         CLog::Log(LOGWARNING,
                   "CVideoPlayerAudio:: bitstream sync lost mid-stream ({} total) - audio was "
                   "physically shortened, requesting recovery reseek",
@@ -1026,6 +1037,22 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
       // while the epoch is open, averages are still developing - no clock
       // stepping on them (this is what double-stepped every start before)
       syncerror = 0;
+    }
+
+    // a reseek we requested is in flight: the average still describes the
+    // pre-seek state and the flush is about to invalidate it entirely
+    if (m_awaitingReseekResync)
+    {
+      if (m_correctionHold.IsTimePast())
+      {
+        CLog::Log(LOGDEBUG,
+                  "CVideoPlayerAudio:: no resync within {}ms of the requested reseek, resuming "
+                  "clock corrections",
+                  std::chrono::milliseconds(POST_RESEEK_HOLD_MS).count());
+        m_awaitingReseekResync = false;
+      }
+      else
+        syncerror = 0;
     }
 
     // With LAV Full smoothing the PTS stream and the vsync reference clock
@@ -1172,6 +1199,10 @@ bool CVideoPlayerAudio::AcceptsData() const
 
 void CVideoPlayerAudio::ArmAnchorTrim(bool fromDisplayReset)
 {
+  // a resync arrived - whatever reseek we were waiting for has landed, and
+  // the epoch below now owns the suppression
+  m_awaitingReseekResync = false;
+
   // open (or re-open) the anchor epoch: hold clock corrections and wait for
   // the AE error average to settle, then correct the audio labels once.
   // The display-reset origin is sticky for the playback: RESYNC and the
@@ -1209,6 +1240,8 @@ void CVideoPlayerAudio::CloseAnchorTrimEpoch(const char* reason, double lastErro
   {
     m_avrStartResyncDone = true;
     m_anchorTrimFromReset = false;
+    m_correctionHold.Set(POST_RESEEK_HOLD_MS);
+    m_awaitingReseekResync = true;
     CLog::Log(LOGINFO, "CVideoPlayerAudio:: AVR start re-sync: issuing internal reseek");
     CDVDMsgPlayerSeek::CMode mode;
     mode.time = 100;
