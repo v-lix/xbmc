@@ -75,6 +75,13 @@ constexpr auto ANCHOR_TRIM_MIN_AGE_MS = std::chrono::milliseconds(3000);
 // immediately rather than accumulating behind the suppression.
 constexpr unsigned int ANCHOR_EPOCH_ESCAPE_MS = 45;
 
+// Hysteresis after a clock correction: for this long, an error must exceed the
+// normal gate by this much to trigger another one. Sized so a correction that
+// lands near the far edge of ErrorAdjust's deadband cannot be re-triggered by
+// measurement noise, while real drift still gets corrected promptly.
+constexpr auto CORRECTION_COOLDOWN_MS = std::chrono::milliseconds(10000);
+constexpr unsigned int CORRECTION_HYSTERESIS_MS = 15;
+
 // One recovery reseek per damaged region: a corrupt span can make the parser
 // lose sync several times in quick succession, and each reseek costs a brief
 // interruption.
@@ -1075,6 +1082,19 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
         adjustTimeMs = std::min(adjustTimeMs, DISCON_VSYNC_ADJUST_TIME_MS);
     }
 
+    // Correction hysteresis. A quantized correction of one frame time lands an
+    // error just over the tightened gate near the far edge of ErrorAdjust's
+    // +20/-27ms deadband (21ms in -> -20.7ms out), where a few ms of
+    // measurement noise tips it back over and the next correction reverses -
+    // the player then hunts indefinitely, and every step makes the renderer
+    // discard queued frames (field log: 27 frames dropped 14ms after a
+    // correction, alternating error signs for a whole playback). After a
+    // correction, require a clearly larger error for a short while so noise
+    // around the deadband edge cannot retrigger; genuine drift crosses the
+    // raised bar quickly and is still corrected.
+    if (!m_correctionCooldown.IsTimePast())
+      adjustTimeMs += CORRECTION_HYSTERESIS_MS;
+
     if (std::abs(syncerror) > DVD_MSEC_TO_TIME(adjustTimeMs))
     {
       // Normal gradual correction via ErrorAdjust
@@ -1082,6 +1102,7 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
       if (correction != 0)
       {
         m_audioSink.SetSyncErrorCorrection(-correction);
+        m_correctionCooldown.Set(CORRECTION_COOLDOWN_MS);
         m_disconAdjustCounter++;
         CLog::Log(LOGDEBUG, LOGAUDIO, "CVideoPlayerAudio:: sync error correction:{:.3f}",
                   correction / DVD_TIME_BASE);

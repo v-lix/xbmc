@@ -158,6 +158,7 @@ protected:
   XbmcThreads::EndTime<> m_syncLostRecovery;
   bool m_awaitingReseekResync = false;
   XbmcThreads::EndTime<> m_correctionHold;
+  XbmcThreads::EndTime<> m_correctionCooldown;
   XbmcThreads::EndTime<> m_anchorTrimWindow;
   XbmcThreads::EndTime<> m_anchorTrimMinAge;
   unsigned int m_disconAdjustTimeMs = 30; // maximum sync-off before adjusting
