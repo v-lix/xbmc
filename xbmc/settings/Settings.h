@@ -475,6 +475,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING = "coreelec.amlogic.disableguiscaling";
   static constexpr auto SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK = "coreelec.amlogic.usedisplayasclock";
   static constexpr auto SETTING_COREELEC_AMLOGIC_FAST_SEEK = "coreelec.amlogic.fastseek";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_AVR_START_RESYNC = "coreelec.amlogic.avr_start_resync";
   static constexpr auto SETTING_COREELEC_AMLOGIC_VIDEOSYNC_FALLBACK_ON_STALL = "coreelec.amlogic.videosync.fallback.on.stall";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_TV_PRESET = "coreelec.amlogic.dolbyvision.tv.preset";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_MODE = "coreelec.amlogic.dolbyvision.mode";
@@ -534,6 +535,7 @@ public:
   static constexpr auto SETTING_COREELEC_AUDIO_DTS_DIALNORM = "coreelec.audio.dts.dialnorm";
   static constexpr auto SETTING_COREELEC_AUDIO_DDR_PRIORITY = "coreelec.audio.ddr_priority";
   static constexpr auto SETTING_COREELEC_AUDIO_CORRECT_5060HZ_SYNC = "coreelec.audio.correct_5060hz_sync";
+
   static constexpr auto SETTING_COREELEC_VIDEOPLAYER_DETECT_BROKEN_FILES = "coreelec.videoplayer.detectbrokenfiles";
   static constexpr auto SETTING_CACHE_HARDDISK = "cache.harddisk";
   static constexpr auto SETTING_CACHEVIDEO_DVDROM = "cachevideo.dvdrom";

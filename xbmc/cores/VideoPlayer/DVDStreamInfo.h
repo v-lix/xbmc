@@ -129,6 +129,7 @@ public:
   int width; // width of the stream reported by the demuxer
   double aspect; // display aspect as reported by demuxer
   bool vfr; // variable framerate
+  bool fpssnapped; // demuxer snapped a ms-quantised container frame rate
   bool stills; // there may be odd still frames in video
   int level; // encoder level of the stream reported by the decoder. used to qualify hw decoders.
   int profile; // encoder profile of the stream reported by the decoder. used to qualify hw decoders.

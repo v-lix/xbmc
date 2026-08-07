@@ -255,6 +255,8 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
 
   m_audioClock = 0;
   m_stalled = m_messageQueue.GetPacketCount(CDVDMsg::DEMUXER_PACKET) == 0;
+  m_avrStartResyncDone = false;
+  m_anchorTrimFromReset = false;
 
   m_prevsynctype = -1;
   m_synctype = m_processInfo.IsRealtimeStream() ? SYNC_RESAMPLE : SYNC_DISCON;
@@ -952,7 +954,7 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
     {
       const unsigned int errorTime = m_audioSink.GetSyncErrorTime();
       if (m_anchorTrimWindow.IsTimePast())
-        m_anchorTrimDone = true;
+        CloseAnchorTrimEpoch("window expired", syncerror / 1000.0);
       else if (errorTime != 0 && errorTime != m_anchorTrimErrorTime)
       {
         // fresh AE average since the last one we looked at
@@ -969,11 +971,13 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
         m_anchorTrimPrevError = syncerror;
         m_anchorTrimHavePrev = true;
 
-        if (settled)
+        // A settle below the trim floor does NOT close the epoch: the ramp
+        // can pause on a small-value plateau long enough for two averages to
+        // agree and then resume (observed in the field) - keep watching
+        // until a substantial value settles or the window expires.
+        if (settled && std::abs(syncerror) >= DVD_MSEC_TO_TIME(ANCHOR_TRIM_MIN_MS))
         {
-          m_anchorTrimDone = true;
-          if (std::abs(syncerror) > DVD_MSEC_TO_TIME(ANCHOR_TRIM_MIN_MS) &&
-              std::abs(syncerror) < DVD_MSEC_TO_TIME(ANCHOR_TRIM_MAX_MS))
+          if (std::abs(syncerror) < DVD_MSEC_TO_TIME(ANCHOR_TRIM_MAX_MS))
           {
             bool trimmed = false;
             if (m_pAudioCodec && m_pAudioCodec->NeedPassthrough())
@@ -1003,6 +1007,12 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
                         "instead of stepping the clock",
                         -syncerror / 1000.0);
             }
+            CloseAnchorTrimEpoch("settled and trimmed", syncerror / 1000.0);
+          }
+          else
+          {
+            // beyond any plausible anchor error - not ours to relabel
+            CloseAnchorTrimEpoch("settled beyond trim ceiling", syncerror / 1000.0);
           }
         }
       }
@@ -1155,15 +1165,56 @@ bool CVideoPlayerAudio::AcceptsData() const
   return !full;
 }
 
-void CVideoPlayerAudio::ArmAnchorTrim()
+void CVideoPlayerAudio::ArmAnchorTrim(bool fromDisplayReset)
 {
   // open (or re-open) the anchor epoch: hold clock corrections and wait for
-  // the AE error average to settle, then correct the audio labels once
+  // the AE error average to settle, then correct the audio labels once.
+  // The display-reset origin is sticky for the playback: RESYNC and the
+  // display reset race in either order (both observed), and a RESYNC re-arm
+  // after the reset must not discard the pending AVR re-sync eligibility.
   m_anchorTrimDone = false;
+  if (fromDisplayReset)
+    m_anchorTrimFromReset = true;
   m_anchorTrimErrorTime = m_audioSink.GetSyncErrorTime();
   m_anchorTrimHavePrev = false;
   m_anchorTrimWindow.Set(ANCHOR_TRIM_WINDOW_MS);
   m_anchorTrimMinAge.Set(ANCHOR_TRIM_MIN_AGE_MS);
+}
+
+void CVideoPlayerAudio::CloseAnchorTrimEpoch(const char* reason, double lastErrorMs)
+{
+  m_anchorTrimDone = true;
+  CLog::Log(LOGDEBUG, "CVideoPlayerAudio:: anchor epoch closed ({}), last error {:.3f}ms", reason,
+            lastErrorMs);
+
+  // Optional workaround for receivers/TVs that latch their lip-sync
+  // compensation while the HDMI mode switch at playback start is still
+  // settling: the resulting offset sits below ALSA where no Kodi metric can
+  // see it, and only a seek forces a clean re-lock. Automate that seek once
+  // per playback, quietly, after the sync epoch has settled. Opt-in: the
+  // offset is invisible from here, so the user's symptom is the trigger.
+  // Scoped to streams whose container frame rate the demuxer had to snap:
+  // in the field the from-start latch problem tracks exactly those files,
+  // and firing on every start regressed healthy content (audible drop +
+  // brief blackout for no benefit).
+  if (m_anchorTrimFromReset && !m_avrStartResyncDone &&
+      m_processInfo.GetVideoFpsSnapped() &&
+      CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+          CSettings::SETTING_COREELEC_AMLOGIC_AVR_START_RESYNC))
+  {
+    m_avrStartResyncDone = true;
+    m_anchorTrimFromReset = false;
+    CLog::Log(LOGINFO, "CVideoPlayerAudio:: AVR start re-sync: issuing internal reseek");
+    CDVDMsgPlayerSeek::CMode mode;
+    mode.time = 100;
+    mode.relative = true;
+    mode.backward = false;
+    mode.accurate = true;
+    mode.sync = true;
+    mode.restore = false;
+    mode.trickplay = true;
+    m_messageParent.Put(std::make_shared<CDVDMsgPlayerSeek>(mode));
+  }
 }
 
 bool CVideoPlayerAudio::SwitchCodecIfNeeded()
@@ -1223,7 +1274,7 @@ bool CVideoPlayerAudio::SwitchCodecIfNeeded()
     // exists for - restart settle tracking so it measures the post-churn
     // state, not the calm before it (applies to the PCM path as well)
     if (wasDisplayReset)
-      ArmAnchorTrim();
+      ArmAnchorTrim(true);
 
     return false;
   }

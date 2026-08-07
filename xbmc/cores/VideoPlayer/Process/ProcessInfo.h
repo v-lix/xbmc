@@ -48,6 +48,8 @@ public:
   void GetVideoDimensions(int &width, int &height);
   void SetVideoFps(float fps);
   float GetVideoFps();
+  void SetVideoFpsSnapped(bool snapped);
+  bool GetVideoFpsSnapped();
   void SetVideoDAR(float dar);
   float GetVideoDAR();
   void SetVideoInterlaced(bool interlaced);
@@ -136,6 +138,7 @@ protected:
   int m_videoWidth;
   int m_videoHeight;
   float m_videoFPS;
+  bool m_videoFpsSnapped = false;
   float m_videoDAR;
   bool m_videoIsInterlaced;
   std::list<EINTERLACEMETHOD> m_deintMethods;

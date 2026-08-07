@@ -54,6 +54,7 @@ void CDVDStreamInfo::Clear()
   width    = 0;
   aspect   = 0.0;
   vfr      = false;
+  fpssnapped = false;
   stills   = false;
   level    = 0;
   profile  = 0;
@@ -110,6 +111,7 @@ bool CDVDStreamInfo::Equal(const CDVDStreamInfo& right, int compare)
   || bitsperpixel != right.bitsperpixel
   || bitdepth != right.bitdepth
   || vfr != right.vfr
+  || fpssnapped != right.fpssnapped
   || hdrType != right.hdrType
   || colorSpace != right.colorSpace
   || colorRange != right.colorRange
@@ -230,6 +232,7 @@ void CDVDStreamInfo::Assign(const CDVDStreamInfo& right, bool withextradata)
   bitsperpixel = right.bitsperpixel;
   bitdepth = right.bitdepth;
   vfr = right.vfr;
+  fpssnapped = right.fpssnapped;
   codecOptions = right.codecOptions;
   hdrType = right.hdrType;
   colorSpace = right.colorSpace;
@@ -303,6 +306,7 @@ void CDVDStreamInfo::Assign(const CDemuxStream& right, bool withextradata)
     width     = stream->iWidth;
     aspect    = stream->fAspect;
     vfr       = stream->bVFR;
+    fpssnapped = stream->bFpsSnapped;
     ptsinvalid = stream->bPTSInvalid;
     forced_aspect = stream->bForcedAspect;
     orientation = stream->iOrientation;

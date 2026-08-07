@@ -17030,6 +17030,14 @@ msgctxt "#38089"
 msgid "Removes the built-in audio delay compensation for 49-61Hz display output modes below 4K. This build's default audio latency of 165ms (stock Kodi uses 0ms) is calibrated for film-rate output of 24Hz and below; at 50/60Hz the display pipeline runs with lower latency, so on some setups the full value overcompensates and pushes audio ahead of video. 4K/2160p output keeps its own values. On by default; takes effect on the next playback start."
 msgstr "Entfernt die eingebaute Audioverzögerungskompensation für Anzeigemodi mit 49–61 Hz unterhalb von 4K. Die Standard-Audiolatenz dieses Builds von 165 ms (Standard-Kodi verwendet 0 ms) ist auf Ausgabe mit Filmbildraten von 24 Hz und darunter abgestimmt; bei 50/60 Hz arbeitet die Anzeige-Pipeline mit geringerer Latenz, sodass der volle Wert bei manchen Konfigurationen überkompensiert und den Ton dem Bild vorauseilen lässt. Die 4K-/2160p-Ausgabe behält ihre eigenen Werte. Standardmäßig aktiviert; wird beim nächsten Wiedergabestart wirksam."
 
+msgctxt "#38090"
+msgid "Re-sync audio device after playback start"
+msgstr "Audiogerät nach Wiedergabestart neu synchronisieren"
+
+msgctxt "#38091"
+msgid "Some AV receivers and TVs latch their lip-sync compensation while the HDMI mode switch at playback start is still settling, leaving audio audibly late until a manual seek forces a clean re-lock. This performs that re-lock automatically: one brief internal reseek (a short audio/video interruption) a few seconds into playback, once the audio sync has settled. Only triggers on files whose declared frame rate needed repairing - in practice the affected ones. Only needed if you experience audio delay from the start of playback that a small seek fixes. On by default; takes effect on the next playback start."
+msgstr "Manche AV-Receiver und Fernseher speichern ihre Lippensynchronisations-Kompensation, während der HDMI-Moduswechsel beim Wiedergabestart noch nicht abgeschlossen ist. Der Ton bleibt dann hörbar verzögert, bis ein manueller Sprung eine saubere Neusynchronisation erzwingt. Diese Option führt diese Neusynchronisation automatisch durch: ein kurzer interner Sprung (eine kurze Ton-/Bildunterbrechung) wenige Sekunden nach Wiedergabebeginn, sobald sich die Audiosynchronisation stabilisiert hat. Wird nur bei Dateien ausgelöst, deren angegebene Bildrate repariert werden musste - in der Praxis die betroffenen. Nur nötig, wenn der Ton ab Wiedergabebeginn verzögert ist und ein kleiner Sprung das behebt. Standardmäßig aktiviert; wirkt ab dem nächsten Wiedergabestart."
+
 msgctxt "#38023"
 msgid "Set my rating"
 msgstr "Bewerten"

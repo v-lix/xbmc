@@ -202,6 +202,20 @@ void CProcessInfo::SetVideoFps(float fps)
     m_dataCache->SetVideoFps(m_videoFPS);
 }
 
+void CProcessInfo::SetVideoFpsSnapped(bool snapped)
+{
+  std::unique_lock<CCriticalSection> lock(m_videoCodecSection);
+
+  m_videoFpsSnapped = snapped;
+}
+
+bool CProcessInfo::GetVideoFpsSnapped()
+{
+  std::unique_lock<CCriticalSection> lock(m_videoCodecSection);
+
+  return m_videoFpsSnapped;
+}
+
 float CProcessInfo::GetVideoFps()
 {
   std::unique_lock<CCriticalSection> lock(m_videoCodecSection);

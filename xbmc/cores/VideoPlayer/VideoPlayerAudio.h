@@ -96,7 +96,8 @@ protected:
   //! Switch codec if needed. Called when the sample rate gotten from the
   //! codec changes, in which case we may want to switch passthrough on/off.
   bool SwitchCodecIfNeeded();
-  void ArmAnchorTrim();
+  void ArmAnchorTrim(bool fromDisplayReset = false);
+  void CloseAnchorTrimEpoch(const char* reason, double lastErrorMs);
   void SetSyncType(bool passthrough);
 
   CDVDMessageQueue m_messageQueue;
@@ -152,6 +153,8 @@ protected:
   unsigned int m_anchorTrimErrorTime = 0;
   double m_anchorTrimPrevError = 0.0;
   bool m_anchorTrimHavePrev = false;
+  bool m_anchorTrimFromReset = false;
+  bool m_avrStartResyncDone = false;
   XbmcThreads::EndTime<> m_anchorTrimWindow;
   XbmcThreads::EndTime<> m_anchorTrimMinAge;
   XbmcThreads::EndTime<> m_anchorTrimHold;

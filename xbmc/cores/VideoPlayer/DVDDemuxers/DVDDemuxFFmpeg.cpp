@@ -1952,6 +1952,7 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
           const int declaredScale = st->iFpsScale;
           if (CDVDDemuxUtils::SnapMsQuantisedFrameRate(st->iFpsRate, st->iFpsScale, statsFps))
           {
+            st->bFpsSnapped = true;
             CLog::Log(LOGINFO,
                       "CDVDDemuxFFmpeg::AddStream - stream {}: snapping ms-quantised container "
                       "fps {:.3f} ({}/{}) to {}/{} (statistics fps: {:.3f})",

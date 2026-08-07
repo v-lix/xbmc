@@ -211,6 +211,7 @@ void CVideoPlayerVideo::OpenStream(CDVDStreamInfo& hint, std::unique_ptr<CDVDVid
     m_bFpsInvalid = true;
     m_processInfo.SetVideoFps(0);
   }
+  m_processInfo.SetVideoFpsSnapped(hint.fpssnapped);
 
   m_ptsTracker.ResetVFRDetection();
   ResetFrameRateCalc();
