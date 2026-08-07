@@ -62,18 +62,14 @@ inline bool IsValidPts(double pts) {
 // to admit errors that window can act on).
 constexpr unsigned int DISCON_VSYNC_ADJUST_TIME_MS = 20;
 
-// Anchor trim (see the SYNC_DISCON block): the first settled AE error average
-// after a resync is attributed to the anchor's delay reading and corrects the
-// audio labels instead of the clock. Errors below the floor are left to the
-// normal machinery; errors above the ceiling are not plausible anchor error
-// and are handled normally too. The hold covers one AE error interval (1s)
-// plus margin so the clock corrector never acts on pre-trim samples.
+// Anchor epoch (see the SYNC_DISCON block): after a resync, clock corrections
+// are held until the AE error average has settled - two consecutive averages
+// agreeing within SETTLE on a value at or above MIN, no earlier than MIN_AGE
+// after the disturbance, or the WINDOW expiring.
 constexpr unsigned int ANCHOR_TRIM_MIN_MS = 10;
-constexpr unsigned int ANCHOR_TRIM_MAX_MS = 150;
 constexpr auto ANCHOR_TRIM_WINDOW_MS = std::chrono::milliseconds(10000);
 constexpr unsigned int ANCHOR_TRIM_SETTLE_MS = 5;
 constexpr auto ANCHOR_TRIM_MIN_AGE_MS = std::chrono::milliseconds(3000);
-constexpr auto ANCHOR_TRIM_HOLD_MS = std::chrono::milliseconds(1500);
 
 class CDVDMsgAudioCodecChange : public CDVDMsg
 {
@@ -936,20 +932,21 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
   {
     double syncerror = m_audioSink.GetSyncError();
 
-    // Anchor trim. The RESYNC anchor is pts + sink delay, and the delay
-    // reading during start/seek churn can be tens of ms off (observed up to
-    // 95ms). Left alone, the corrections below drag the master clock - and
-    // with it video presentation - to match the mislabeled audio, converting
-    // the anchor error into a physical A/V offset that afterwards measures
-    // as zero: audible, invisible to the machinery, different on every
-    // restart. While the anchor is fresh the labels are the suspect, not
-    // the clock: the anchor epoch belongs to the trim - clock corrections
-    // are held while the AE average is still developing (it ramps for
-    // several seconds through the mode-switch churn; acting on immature
-    // averages is what produced the double frame-step at every start), and
-    // once two consecutive averages agree the settled error corrects the
-    // audio labels and the epoch ends. Genuine drift later still goes
-    // through ErrorAdjust as before.
+    // Anchor epoch. After a resync the AE error average is not yet a
+    // measurement: it ramps for several seconds through the mode-switch
+    // churn, and correcting on those immature values produced two visible
+    // one-frame video jumps at every whitelisted start. So hold clock
+    // corrections while the epoch is open and close it once two consecutive
+    // averages agree on a substantial value (or the window expires).
+    //
+    // The epoch used to also shift the audio labels by that settled value,
+    // on the theory that a mis-measured anchor delay was the cause. Field
+    // testing refuted it (the delay persisted with the shift working
+    // perfectly) and showed the shift doing harm: it absorbs real physical
+    // offsets - e.g. the audio hole a corrupt stream region leaves behind -
+    // into the labels, so the offset becomes permanent and invisible with
+    // no correction ever following. The epoch now only gates corrections;
+    // the clock handles every error it is given, as before.
     if (!m_anchorTrimDone)
     {
       const unsigned int errorTime = m_audioSink.GetSyncErrorTime();
@@ -971,57 +968,17 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
         m_anchorTrimPrevError = syncerror;
         m_anchorTrimHavePrev = true;
 
-        // A settle below the trim floor does NOT close the epoch: the ramp
-        // can pause on a small-value plateau long enough for two averages to
+        // A settle below the floor does NOT close the epoch: the ramp can
+        // pause on a small-value plateau long enough for two averages to
         // agree and then resume (observed in the field) - keep watching
         // until a substantial value settles or the window expires.
         if (settled && std::abs(syncerror) >= DVD_MSEC_TO_TIME(ANCHOR_TRIM_MIN_MS))
-        {
-          if (std::abs(syncerror) < DVD_MSEC_TO_TIME(ANCHOR_TRIM_MAX_MS))
-          {
-            bool trimmed = false;
-            if (m_pAudioCodec && m_pAudioCodec->NeedPassthrough())
-            {
-              CDVDAudioCodecPassthrough* passthroughCodec =
-                  dynamic_cast<CDVDAudioCodecPassthrough*>(m_pAudioCodec.get());
-              if (passthroughCodec && passthroughCodec->IsLavStyleSyncEnabled())
-              {
-                passthroughCodec->TrimLavClock(-syncerror);
-                trimmed = true;
-              }
-            }
-            else if (m_lavStylePcmSyncEnabled && IsValidPts(m_pcmOutputClock))
-            {
-              m_pcmOutputClock -= syncerror;
-              trimmed = true;
-            }
-
-            if (trimmed)
-            {
-              m_audioSink.SetSyncErrorCorrection(-syncerror);
-              // the AE average still contains pre-trim samples for up to one
-              // error interval - hold clock corrections until it has re-settled
-              m_anchorTrimHold.Set(ANCHOR_TRIM_HOLD_MS);
-              CLog::Log(LOGDEBUG,
-                        "CVideoPlayerAudio:: anchor trim: shifted audio labels by {:.3f}ms "
-                        "instead of stepping the clock",
-                        -syncerror / 1000.0);
-            }
-            CloseAnchorTrimEpoch("settled and trimmed", syncerror / 1000.0);
-          }
-          else
-          {
-            // beyond any plausible anchor error - not ours to relabel
-            CloseAnchorTrimEpoch("settled beyond trim ceiling", syncerror / 1000.0);
-          }
-        }
+          CloseAnchorTrimEpoch("settled", syncerror / 1000.0);
       }
       // while the epoch is open, averages are still developing - no clock
       // stepping on them (this is what double-stepped every start before)
       syncerror = 0;
     }
-    if (!m_anchorTrimHold.IsTimePast())
-      syncerror = 0;
 
     // With LAV Full smoothing the PTS stream and the vsync reference clock
     // driving CDVDClock, ErrorAdjust quantizes corrections to whole frame

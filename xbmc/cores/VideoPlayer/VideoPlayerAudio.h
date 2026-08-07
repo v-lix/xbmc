@@ -146,9 +146,8 @@ protected:
   bool m_displayReset = false;
   std::atomic<bool> m_audioSettingsChanged{false};
 
-  // anchor trim state (see SYNC_DISCON block): one-shot label correction from
-  // the first settled AE error average after a resync/unpause; clock stepping
-  // is held while the epoch is open
+  // anchor epoch state (see SYNC_DISCON block): clock stepping is held after
+  // a resync/unpause until the AE error average has settled
   bool m_anchorTrimDone = true;
   unsigned int m_anchorTrimErrorTime = 0;
   double m_anchorTrimPrevError = 0.0;
@@ -157,7 +156,6 @@ protected:
   bool m_avrStartResyncDone = false;
   XbmcThreads::EndTime<> m_anchorTrimWindow;
   XbmcThreads::EndTime<> m_anchorTrimMinAge;
-  XbmcThreads::EndTime<> m_anchorTrimHold;
   unsigned int m_disconAdjustTimeMs = 30; // maximum sync-off before adjusting
   int m_disconAdjustCounter = 0;
   // LAV Full smoothing active on the current codec path (passthrough codec

@@ -55,11 +55,6 @@ public:
 
   // Reset LAV sync state (for GENERAL_RESYNC without full codec reset)
   void ResetLavSyncState();
-  //! \brief Shift the LAV internal clock (and the jitter baseline with it) by
-  //! offset, re-labeling future output without physically moving anything.
-  //! Used to absorb a mis-measured RESYNC anchor delay into the labels
-  //! instead of letting the sync machinery drag the master clock to it.
-  void TrimLavClock(double offset);
 
   // Sync internal clock to VideoPlayer's coordinated RESYNC timestamp
   // This is the AUTHORITATIVE clock value that accounts for both audio and video
