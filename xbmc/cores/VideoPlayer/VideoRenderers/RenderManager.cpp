@@ -1012,7 +1012,7 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
                                          (m_latencyTweak / 1000.0));
         if (m_dvdClock.GetClockInfo(missedvblanks, clockspeed, refreshrate))
         {
-          info.vsync += StringUtils::Format("VSync: refresh:{:.3f} missed:{} speed:{:.3f}%",
+          info.vsync += StringUtils::Format(" VSync: refresh:{:.3f} missed:{} speed:{:.3f}%",
                                             refreshrate, missedvblanks, clockspeed * 100);
         }
 
