@@ -71,6 +71,11 @@ constexpr auto ANCHOR_TRIM_WINDOW_MS = std::chrono::milliseconds(10000);
 constexpr unsigned int ANCHOR_TRIM_SETTLE_MS = 5;
 constexpr auto ANCHOR_TRIM_MIN_AGE_MS = std::chrono::milliseconds(3000);
 
+// One recovery reseek per damaged region: a corrupt span can make the parser
+// lose sync several times in quick succession, and each reseek costs a brief
+// interruption.
+constexpr auto SYNC_LOST_RECOVERY_DEBOUNCE_MS = std::chrono::milliseconds(30000);
+
 class CDVDMsgAudioCodecChange : public CDVDMsg
 {
 public:
@@ -253,6 +258,7 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
   m_stalled = m_messageQueue.GetPacketCount(CDVDMsg::DEMUXER_PACKET) == 0;
   m_avrStartResyncDone = false;
   m_anchorTrimFromReset = false;
+  m_lastSyncLostCount = 0;
 
   m_prevsynctype = -1;
   m_synctype = m_processInfo.IsRealtimeStream() ? SYNC_RESAMPLE : SYNC_DISCON;
@@ -919,6 +925,48 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
     if (!audioframe.hasDownmix)
       audioframe.surroundMixLevel = M_SQRT1_2;
     audioframe.hasDownmix = true;
+  }
+
+  // A corrupt stream region eats bitstream bytes before the parser can
+  // re-lock. The frames in that gap are simply never output, so audio is
+  // physically shorter than its timestamps claim - and since the codec then
+  // resyncs its internal clock to the demuxer PTS, every label reads correct
+  // afterwards and no Kodi-side metric ever shows the offset. Only a seek
+  // re-establishes real alignment. The video-side corruption recovery cannot
+  // cover this: it fires when the decoder trips, which is before the audio
+  // damage has even been consumed. Ask the player for a recovery reseek when
+  // the parser reports a fresh mid-stream sync loss, debounced so a burst of
+  // losses in one damaged region costs one reseek.
+  if (m_pAudioCodec && m_syncState == IDVDStreamPlayer::SYNC_INSYNC &&
+      m_speed == DVD_PLAYSPEED_NORMAL)
+  {
+    const unsigned int syncLost = m_pAudioCodec->GetSyncLostCount();
+    // only growth counts - a codec swap brings a fresh parser whose counter
+    // restarts at zero
+    if (syncLost > m_lastSyncLostCount)
+    {
+      const bool debounced = !m_syncLostRecovery.IsTimePast();
+      m_lastSyncLostCount = syncLost;
+      if (!debounced)
+      {
+        m_syncLostRecovery.Set(SYNC_LOST_RECOVERY_DEBOUNCE_MS);
+        CLog::Log(LOGWARNING,
+                  "CVideoPlayerAudio:: bitstream sync lost mid-stream ({} total) - audio was "
+                  "physically shortened, requesting recovery reseek",
+                  syncLost);
+        CDVDMsgPlayerSeek::CMode mode;
+        mode.time = 1000;
+        mode.relative = true;
+        mode.backward = false;
+        mode.accurate = true;
+        mode.sync = true;
+        mode.restore = false;
+        mode.trickplay = true;
+        m_messageParent.Put(std::make_shared<CDVDMsgPlayerSeek>(mode));
+      }
+    }
+    else if (syncLost < m_lastSyncLostCount)
+      m_lastSyncLostCount = syncLost; // fresh parser after a codec swap
   }
 
   //============================================================================

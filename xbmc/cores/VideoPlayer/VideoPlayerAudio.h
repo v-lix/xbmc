@@ -154,6 +154,8 @@ protected:
   bool m_anchorTrimHavePrev = false;
   bool m_anchorTrimFromReset = false;
   bool m_avrStartResyncDone = false;
+  unsigned int m_lastSyncLostCount = 0;
+  XbmcThreads::EndTime<> m_syncLostRecovery;
   XbmcThreads::EndTime<> m_anchorTrimWindow;
   XbmcThreads::EndTime<> m_anchorTrimMinAge;
   unsigned int m_disconAdjustTimeMs = 30; // maximum sync-off before adjusting

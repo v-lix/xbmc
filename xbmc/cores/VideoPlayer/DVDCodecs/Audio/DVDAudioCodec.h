@@ -99,6 +99,13 @@ public:
    */
   virtual bool NeedPassthrough() { return false; }
 
+  /*!
+   * \brief Times the codec's bitstream parser lost sync mid-stream. Non-zero
+   * growth means a corrupt region physically ate audio while the timestamps
+   * kept looking correct.
+   */
+  virtual unsigned int GetSyncLostCount() const { return 0; }
+
   /*
    * should return codecs name
    */

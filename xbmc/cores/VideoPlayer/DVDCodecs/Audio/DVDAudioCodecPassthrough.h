@@ -53,6 +53,10 @@ public:
   bool IsLavStyleSyncEnabled() const { return m_lavStyleSyncEnabled; }
   bool IsLavSeamlessBranchEnabled() const { return m_lavSeamlessBranchEnabled; }
 
+  //! \brief Times the bitstream parser lost sync mid-stream - see
+  //! CAEStreamParser::GetSyncLostCount()
+  unsigned int GetSyncLostCount() const override { return m_parser.GetSyncLostCount(); }
+
   // Reset LAV sync state (for GENERAL_RESYNC without full codec reset)
   void ResetLavSyncState();
 

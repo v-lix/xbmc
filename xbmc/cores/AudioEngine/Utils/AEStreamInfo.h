@@ -76,6 +76,12 @@ public:
   };
   void SetSyncFamily(SyncFamily family) { m_syncFamily = family; }
 
+  //! \brief Number of times sync was lost mid-stream (i.e. not through
+  //! Reset()). A corrupt stream region eats bytes before the parser re-locks,
+  //! which physically shortens the audio while every timestamp still looks
+  //! correct - the player uses this to notice that it happened at all.
+  unsigned int GetSyncLostCount() const { return m_syncLostCount; }
+
   void SetCoreOnly(bool value) { m_coreOnly = value; }
   void SetDefeatTrueHDDialNorm(bool value) { m_defeatTrueHDDialNorm = value; }
   void SetDefeatAC3DialNorm(bool value) { m_defeatAC3DialNorm = value; }
@@ -105,6 +111,7 @@ private:
 
   CAEStreamInfo m_info;
   SyncFamily m_syncFamily = SyncFamily::Any;
+  unsigned int m_syncLostCount = 0;
   bool m_coreOnly = false;
   bool m_defeatTrueHDDialNorm = false;
   bool m_defeatAC3DialNorm = false;

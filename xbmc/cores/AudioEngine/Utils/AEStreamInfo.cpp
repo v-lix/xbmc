@@ -987,6 +987,7 @@ unsigned int CAEStreamParser::SyncAC3(uint8_t* data, unsigned int size)
   // if we get here, the entire packet is invalid and we have lost sync
   CLog::Log(LOGINFO, "CAEStreamParser::SyncAC3 - AC3 sync lost");
   m_hasSync = false;
+  m_syncLostCount++;
   return skip;
 }
 
@@ -1294,6 +1295,7 @@ unsigned int CAEStreamParser::SyncDTS(uint8_t* data, unsigned int size)
   // lost sync
   CLog::Log(LOGINFO, "CAEStreamParser::SyncDTS - DTS sync lost");
   m_hasSync = false;
+  m_syncLostCount++;
   return skip;
 }
 
