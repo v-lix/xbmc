@@ -71,6 +71,10 @@ constexpr auto ANCHOR_TRIM_WINDOW_MS = std::chrono::milliseconds(10000);
 constexpr unsigned int ANCHOR_TRIM_SETTLE_MS = 5;
 constexpr auto ANCHOR_TRIM_MIN_AGE_MS = std::chrono::milliseconds(3000);
 
+// An error this big during an open epoch is not churn - let it through
+// immediately rather than accumulating behind the suppression.
+constexpr unsigned int ANCHOR_EPOCH_ESCAPE_MS = 45;
+
 // One recovery reseek per damaged region: a corrupt span can make the parser
 // lose sync several times in quick succession, and each reseek costs a brief
 // interruption.
@@ -510,9 +514,9 @@ void CVideoPlayerAudio::Process()
         m_pcmJitterTracker.Reset();
       }
 
-      // arm the anchor trim: validate this anchor against the first settled
-      // AE error average (see the SYNC_DISCON block)
-      ArmAnchorTrim();
+      // a reseek we requested has landed - corrections may resume (the epoch
+      // is armed only for display-reset starts, see ArmAnchorTrim)
+      m_awaitingReseekResync = false;
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_RESET))
     {
@@ -575,14 +579,7 @@ void CVideoPlayerAudio::Process()
             m_audioSink.Resume();
             m_stalled = false;
 
-            // resuming from pause restarts the physical audio path (bitstream
-            // halt, receiver re-lock) while the labels roll on - re-validate
-            // the alignment exactly like a fresh anchor (reported in the
-            // field as the same delay returning on every unpause)
-            if (m_speed == DVD_PLAYSPEED_PAUSE && speed == DVD_PLAYSPEED_NORMAL)
-            {
-              ArmAnchorTrim();
-            }
+
           }
         }
       }
@@ -1009,7 +1006,13 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
     if (!m_anchorTrimDone)
     {
       const unsigned int errorTime = m_audioSink.GetSyncErrorTime();
-      if (m_anchorTrimWindow.IsTimePast())
+      if (std::abs(syncerror) > DVD_MSEC_TO_TIME(ANCHOR_EPOCH_ESCAPE_MS))
+      {
+        // too large to be mode-switch churn - this is real drift and holding
+        // it back only lets it grow into a visible lurch when the epoch ends
+        CloseAnchorTrimEpoch("error beyond churn range", syncerror / 1000.0);
+      }
+      else if (m_anchorTrimWindow.IsTimePast())
         CloseAnchorTrimEpoch("window expired", syncerror / 1000.0);
       else if (errorTime != 0 && errorTime != m_anchorTrimErrorTime)
       {
@@ -1199,15 +1202,16 @@ bool CVideoPlayerAudio::AcceptsData() const
 
 void CVideoPlayerAudio::ArmAnchorTrim(bool fromDisplayReset)
 {
-  // a resync arrived - whatever reseek we were waiting for has landed, and
-  // the epoch below now owns the suppression
+  // the reseek we may have been waiting for has landed
   m_awaitingReseekResync = false;
 
-  // open (or re-open) the anchor epoch: hold clock corrections and wait for
-  // the AE error average to settle, then correct the audio labels once.
-  // The display-reset origin is sticky for the playback: RESYNC and the
-  // display reset race in either order (both observed), and a RESYNC re-arm
-  // after the reset must not discard the pending AVR re-sync eligibility.
+  // Open the anchor epoch: hold clock corrections until the AE error average
+  // has settled. Only a display reset opens it - its sink reopen makes the
+  // averages ramp for seconds, and stepping the clock on those immature
+  // values put two visible frame jumps into every whitelisted start. Ordinary
+  // seeks do NOT open it: their averages are trustworthy, and suppressing
+  // corrections there let real drift accumulate into a lurch (field report of
+  // frame skips and dropouts on a file with genuine ongoing drift).
   m_anchorTrimDone = false;
   if (fromDisplayReset)
     m_anchorTrimFromReset = true;
