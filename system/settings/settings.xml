@@ -4848,6 +4848,12 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
+        <setting id="coreelec.amlogic.vc1_reorder" type="boolean" label="38092" help="38093">
+          <requirement>HAVE_AMCODEC</requirement>
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
       </group>
     </category>
     <category id="cache" label="439" help="36399">

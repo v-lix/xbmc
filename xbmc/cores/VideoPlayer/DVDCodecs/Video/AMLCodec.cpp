@@ -2076,10 +2076,21 @@ bool CAMLCodec::OpenDecoder()
     hints.width, hints.height, hints.codec, hints.codec_tag, hints.bitdepth);
   // Codecs whose AML decoder hands frames over in decode order need the
   // display-order window; H.264/HEVC come out already ordered.
-  m_reorderFrames = (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
-  if (m_reorderFrames)
-    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - reordering decoder output to display order "
-                       "(window {} frames)", REORDER_WINDOW);
+  // Two strategies, see coreelec.amlogic.vc1_reorder: hold a window and release
+  // by timestamp (keeps the decoder's timestamps), or discard the out-of-order
+  // timestamps and rebuild the timeline at the nominal rate in GetPicture. The
+  // second is what other Amlogic builds do; it is the more robust of the two if
+  // the decoder's timestamps themselves are wrong, which is not something the
+  // reordering path can detect.
+  const bool isVc1 = (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
+  m_reorderFrames = isVc1 && CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+                                 CSettings::SETTING_COREELEC_AMLOGIC_VC1_REORDER);
+  if (isVc1)
+    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame order: {}",
+              m_reorderFrames
+                  ? StringUtils::Format("reordering to display order (window {} frames)",
+                                        REORDER_WINDOW)
+                  : "rebuilding the timeline at the nominal rate");
 
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder hints.fpsrate({:d}), hints.fpsscale({:d}), video_rate({:d})",
     hints.fpsrate, hints.fpsscale, am_private->video_rate);
@@ -2960,11 +2971,24 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
       // legitimate field pairs.
       const bool is_vc1_25hz_interlaced = (m_processInfo.GetVideoFps() == 25.0f) &&
                                            m_processInfo.GetVideoInterlaced();
+      const double duration_ratio = picture_duration / rate_duration;
 
       if ((m_speed == DVD_PLAYSPEED_NORMAL) &&
           !is_vc1_25hz_interlaced &&
           (m_cur_pts < m_last_pts))
       {
+        m_cur_pts = m_last_pts + rate_duration;
+        videoPicture.iDuration = rate_duration;
+      }
+      else if ((m_speed == DVD_PLAYSPEED_NORMAL) &&
+               ((duration_ratio < 0.2) || ((duration_ratio > 1.5) && (duration_ratio < 4.0))))
+      {
+        // A forward gap that is not a whole number of frames is the other half
+        // of the same problem: the decode-order sequence steps forward several
+        // frames before stepping back. Flatten those to the nominal rate too,
+        // otherwise only the backwards halves get repaired and the timeline
+        // still drifts. Gaps of four frames or more are left alone - those are
+        // real discontinuities, not reordering.
         m_cur_pts = m_last_pts + rate_duration;
         videoPicture.iDuration = rate_duration;
       }
