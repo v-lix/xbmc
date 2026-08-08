@@ -2974,14 +2974,28 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
                                            m_processInfo.GetVideoInterlaced();
       const double duration_ratio = picture_duration / rate_duration;
 
-      if ((m_speed == DVD_PLAYSPEED_NORMAL) &&
+      // Repair while paused as well as while playing. Pausing flushes the
+      // decoder, which re-decodes several seconds from the preceding keyframe,
+      // and all of that arrives with m_speed at PAUSE. Repairing only at normal
+      // speed let every one of those frames through with its raw decode-order
+      // timestamp: they were emitted out of order, and whichever one happened
+      // to be last became the anchor the timeline was rebuilt from once
+      // playback resumed, leaving it one to three frames adrift for good. A
+      // seek cleared it because the flush resets m_last_pts and the chain
+      // re-anchors on a real timestamp. Trickplay still keeps the raw values -
+      // its pts jumps are legitimate, and the ratio test below ignores gaps of
+      // four frames or more anyway.
+      const bool repair_speed = (m_speed == DVD_PLAYSPEED_NORMAL) ||
+                                (m_speed == DVD_PLAYSPEED_PAUSE);
+
+      if (repair_speed &&
           !is_vc1_25hz_interlaced &&
           (m_cur_pts < m_last_pts))
       {
         m_cur_pts = m_last_pts + rate_duration;
         videoPicture.iDuration = rate_duration;
       }
-      else if ((m_speed == DVD_PLAYSPEED_NORMAL) &&
+      else if (repair_speed &&
                ((duration_ratio < 0.2) || ((duration_ratio > 1.5) && (duration_ratio < 4.0))))
       {
         // A forward gap that is not a whole number of frames is the other half
