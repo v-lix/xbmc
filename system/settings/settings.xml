@@ -4082,6 +4082,12 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
+        <setting id="coreelec.amlogic.vc1_repair_timestamps" type="boolean" label="38092" help="38093">
+          <requirement>HAVE_AMCODEC</requirement>
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
       </group>
       <group id="2" label="60001">
         <setting id="coreelec.amlogic.dolbyvision.tv.preset" type="notifyint" label="60616" help="60617">
@@ -4843,12 +4849,6 @@
           <control type="toggle" />
         </setting>
         <setting id="coreelec.amlogic.avr_start_resync" type="boolean" label="38090" help="38091">
-          <requirement>HAVE_AMCODEC</requirement>
-          <level>2</level>
-          <default>true</default>
-          <control type="toggle" />
-        </setting>
-        <setting id="coreelec.amlogic.vc1_reorder" type="boolean" label="38092" help="38093">
           <requirement>HAVE_AMCODEC</requirement>
           <level>2</level>
           <default>true</default>

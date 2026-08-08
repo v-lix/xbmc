@@ -2076,21 +2076,22 @@ bool CAMLCodec::OpenDecoder()
     hints.width, hints.height, hints.codec, hints.codec_tag, hints.bitdepth);
   // Codecs whose AML decoder hands frames over in decode order need the
   // display-order window; H.264/HEVC come out already ordered.
-  // Two strategies, see coreelec.amlogic.vc1_reorder: hold a window and release
-  // by timestamp (keeps the decoder's timestamps), or discard the out-of-order
-  // timestamps and rebuild the timeline at the nominal rate in GetPicture. The
-  // second is what other Amlogic builds do; it is the more robust of the two if
-  // the decoder's timestamps themselves are wrong, which is not something the
-  // reordering path can detect.
+  // Two strategies, see coreelec.amlogic.vc1_repair_timestamps. On (default):
+  // discard the decoder's out-of-order timestamps and rebuild the timeline at
+  // the stream's nominal rate in GetPicture. Off: keep those timestamps and
+  // instead hold a short window of frames, releasing them lowest-first. The
+  // reordering path is only correct while the timestamps themselves are
+  // trustworthy, and on this decoder they are not - it is the repair that puts
+  // VC-1 back in sync, which is why it is the default.
   const bool isVc1 = (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
-  m_reorderFrames = isVc1 && CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
-                                 CSettings::SETTING_COREELEC_AMLOGIC_VC1_REORDER);
+  m_reorderFrames = isVc1 && !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+                                 CSettings::SETTING_COREELEC_AMLOGIC_VC1_REPAIR_TIMESTAMPS);
   if (isVc1)
-    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame order: {}",
+    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: {}",
               m_reorderFrames
                   ? StringUtils::Format("reordering to display order (window {} frames)",
                                         REORDER_WINDOW)
-                  : "rebuilding the timeline at the nominal rate");
+                  : "repairing timestamps, timeline rebuilt at the nominal rate");
 
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder hints.fpsrate({:d}), hints.fpsscale({:d}), video_rate({:d})",
     hints.fpsrate, hints.fpsscale, am_private->video_rate);

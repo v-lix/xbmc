@@ -22860,16 +22860,16 @@ msgctxt "#38091"
 msgid "Some AV receivers and TVs latch their lip-sync compensation while the HDMI mode switch at playback start is still settling, leaving audio audibly late until a manual seek forces a clean re-lock. This performs that re-lock automatically: one brief internal reseek (a short audio/video interruption) a few seconds into playback, once the audio sync has settled. Only triggers on files whose declared frame rate needed repairing - in practice the affected ones. Only needed if you experience audio delay from the start of playback that a small seek fixes. On by default; takes effect on the next playback start."
 msgstr ""
 
-#. Setting "Reorder VC-1 frames by timestamp"
+#. Setting "Repair VC-1 frame timing"
 #: system/settings/settings.xml
 msgctxt "#38092"
-msgid "Reorder VC-1 frames by timestamp"
+msgid "Repair VC-1 frame timing"
 msgstr ""
 
 #. Description for the setting with label #38092
 #: system/settings/settings.xml
 msgctxt "#38093"
-msgid "The Amlogic VC-1 decoder hands frames over in decode order rather than display order. Two ways to deal with that. On (default) holds a short window of frames and releases them by timestamp, keeping the original timestamps intact. Off discards the out-of-order timestamps instead and rebuilds the timeline at the stream's nominal frame rate, which is what other Amlogic builds do. On is correct when the decoder's timestamps are trustworthy; off is more robust when they are not. Only affects VC-1 and WMV3 on the hardware decoder. Try off if VC-1 playback is out of sync in a way that seeking does not fix; takes effect on the next playback start."
+msgid "The Amlogic VC-1 decoder hands frames over in decode order and its timestamps do not survive that reliably, which leaves VC-1 playback out of sync in a way seeking does not fix. On (default) discards those timestamps and rebuilds the timeline at the stream's nominal frame rate. Off keeps them and instead holds a short window of frames, releasing them in timestamp order - correct only if the timestamps are sound, which on this decoder they generally are not. Only affects VC-1 and WMV3 on the hardware decoder. Leave on unless VC-1 shows judder or stutter that turning it off resolves; takes effect on the next playback start."
 msgstr ""
 
 #. Used for the rating selection

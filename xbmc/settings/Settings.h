@@ -476,7 +476,7 @@ public:
   static constexpr auto SETTING_COREELEC_AMLOGIC_USE_DISPLAY_AS_CLOCK = "coreelec.amlogic.usedisplayasclock";
   static constexpr auto SETTING_COREELEC_AMLOGIC_FAST_SEEK = "coreelec.amlogic.fastseek";
   static constexpr auto SETTING_COREELEC_AMLOGIC_AVR_START_RESYNC = "coreelec.amlogic.avr_start_resync";
-  static constexpr auto SETTING_COREELEC_AMLOGIC_VC1_REORDER = "coreelec.amlogic.vc1_reorder";
+  static constexpr auto SETTING_COREELEC_AMLOGIC_VC1_REPAIR_TIMESTAMPS = "coreelec.amlogic.vc1_repair_timestamps";
   static constexpr auto SETTING_COREELEC_AMLOGIC_VIDEOSYNC_FALLBACK_ON_STALL = "coreelec.amlogic.videosync.fallback.on.stall";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_TV_PRESET = "coreelec.amlogic.dolbyvision.tv.preset";
   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_MODE = "coreelec.amlogic.dolbyvision.mode";
