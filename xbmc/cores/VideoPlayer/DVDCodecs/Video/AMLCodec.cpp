@@ -245,6 +245,11 @@ public:
 #define MODE_3D_OUT_LR          0x00020000
 
 #define PTS_FREQ        90000
+// How many decoded frames to hold before releasing the lowest pts. Two covers
+// every reversal seen in the field (VC-1 reorders by one or two frame times);
+// the cost is that many frames of extra latency in the video path.
+static constexpr size_t REORDER_WINDOW = 2;
+
 #define UNIT_FREQ       96000
 #define AV_SYNC_THRESH  PTS_FREQ*30
 
@@ -1927,6 +1932,7 @@ bool CAMLCodec::OpenDecoder()
   m_cur_pts = DVD_NOPTS_VALUE;
   m_last_pts = DVD_NOPTS_VALUE;
   m_prev_last_pts = DVD_NOPTS_VALUE;
+  m_reorderQueue.clear();
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
   m_dst_rect.SetRect(0, 0, 0, 0);
@@ -2068,6 +2074,13 @@ bool CAMLCodec::OpenDecoder()
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder "
     "hints.width({:d}), hints.height({:d}), hints.codec({:d}), hints.codec_tag({:d}), hints.bitdepth({:d})",
     hints.width, hints.height, hints.codec, hints.codec_tag, hints.bitdepth);
+  // Codecs whose AML decoder hands frames over in decode order need the
+  // display-order window; H.264/HEVC come out already ordered.
+  m_reorderFrames = (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
+  if (m_reorderFrames)
+    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - reordering decoder output to display order "
+                       "(window {} frames)", REORDER_WINDOW);
+
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder hints.fpsrate({:d}), hints.fpsscale({:d}), video_rate({:d})",
     hints.fpsrate, hints.fpsscale, am_private->video_rate);
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder hints.aspect({:f}), video_ratio.num({:d}), video_ratio.den({:d})",
@@ -2460,6 +2473,7 @@ void CAMLCodec::Reset()
   m_cur_pts = DVD_NOPTS_VALUE;
   m_last_pts = DVD_NOPTS_VALUE;
   m_prev_last_pts = DVD_NOPTS_VALUE;
+  m_reorderQueue.clear();
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
   m_state = 0;
@@ -2748,16 +2762,15 @@ int CAMLCodec::DequeueBuffer()
 
   if (ret == 0)
   {
-    m_prev_last_pts = m_last_pts;
-    m_last_pts = m_cur_pts;
-
-    m_cur_pts =  static_cast<uint64_t>(static_cast<uint32_t>(vbuf.timestamp.tv_sec)) << 32;
-    m_cur_pts += static_cast<uint32_t>(vbuf.timestamp.tv_usec);
+    uint64_t pts = static_cast<uint64_t>(static_cast<uint32_t>(vbuf.timestamp.tv_sec)) << 32;
+    pts += static_cast<uint32_t>(vbuf.timestamp.tv_usec);
 
     CLog::Log(LOGDEBUG, LOGAVTIMING, "CAMLCodec::DequeueBuffer: pts:{:.3f} idx:{:d}",
-  			static_cast<double>(m_cur_pts) /  DVD_TIME_BASE, vbuf.index);
+  			static_cast<double>(pts) /  DVD_TIME_BASE, vbuf.index);
 
-    m_bufferIndex = vbuf.index;
+    // The pts history advances in DISPLAY order, which is decided when a frame
+    // leaves the reorder queue, not here.
+    m_reorderQueue.push_back({pts, vbuf.index});
   }
   else if (ret != EAGAIN)
   {
@@ -2820,6 +2833,38 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   // around the minimum threshold while the decoder still has output frames ready.
   if (m_buffer_level_ready && ((ret = DequeueBuffer()) == 0))
   {
+    // Emit in display order. The decoder hands frames over in decode order
+    // whenever the stream uses B-frames - VC-1 does so constantly, roughly
+    // every third frame arriving one or two frame times early (measured: 367
+    // reversals in a capture, clustered at exactly 1 and 2 frame durations).
+    // Presenting that order as-is misplaces those frames against the audio,
+    // which is what the old VC-1 workaround tried to paper over by rewriting
+    // their timestamps to the nominal rate. Hold a short window instead and
+    // release the lowest pts once the window is full, which is the same thing
+    // a software decoder does before handing a frame over.
+    if (m_reorderFrames)
+    {
+      if (m_reorderQueue.size() <= REORDER_WINDOW)
+        return CDVDVideoCodec::VC_BUFFER; // need more frames to order them
+
+      auto oldest = std::min_element(m_reorderQueue.begin(), m_reorderQueue.end(),
+                                     [](const DecodedFrame& a, const DecodedFrame& b)
+                                     { return a.pts < b.pts; });
+      m_prev_last_pts = m_last_pts;
+      m_last_pts = m_cur_pts;
+      m_cur_pts = oldest->pts;
+      m_bufferIndex = oldest->index;
+      m_reorderQueue.erase(oldest);
+    }
+    else
+    {
+      m_prev_last_pts = m_last_pts;
+      m_last_pts = m_cur_pts;
+      m_cur_pts = m_reorderQueue.front().pts;
+      m_bufferIndex = m_reorderQueue.front().index;
+      m_reorderQueue.pop_front();
+    }
+
     videoPicture.iFlags = 0;
 
     // First valid frame after a (re)start — release the green-flash hold so the
@@ -2893,9 +2938,12 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     {
       videoPicture.iDuration = rate_duration;
     }
-    else if (is_vc1)
+    else if (is_vc1 && !m_reorderFrames)
     {
-      // VC-1 specific: correct PTS reversals (but not for 25Hz interlaced which has legitimate out-of-order PTS)
+      // VC-1 without reordering (the decoder gave us no usable order to work
+      // with): fall back to the old behaviour of flattening a reversal to the
+      // nominal rate. 25Hz interlaced is excluded - its out-of-order pts are
+      // legitimate field pairs.
       const bool is_vc1_25hz_interlaced = (m_processInfo.GetVideoFps() == 25.0f) &&
                                            m_processInfo.GetVideoInterlaced();
 
@@ -2908,7 +2956,7 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
       }
       else
       {
-        videoPicture.iDuration = picture_duration;
+        videoPicture.iDuration = rate_duration;
       }
     }
     else if (pts_reversal)
@@ -2960,7 +3008,10 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     // switch only proceeds (and the DV core only leaves playback IPT) once
     // this drain returns VC_EOF.
     if (m_no_data_since_reset)
+    {
+      m_reorderQueue.clear();
       return CDVDVideoCodec::VC_EOF;
+    }
 
     auto drain_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::system_clock::now() - m_tp_drain_start);

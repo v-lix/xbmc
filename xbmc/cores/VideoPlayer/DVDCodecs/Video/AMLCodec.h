@@ -130,6 +130,17 @@ private:
   uint64_t         m_cur_pts;
   uint64_t         m_last_pts;
   uint64_t         m_prev_last_pts; // pts before m_last_pts (excursion detection)
+
+  // Display-order reordering: the decoder hands frames over in decode order
+  // for codecs with B-frames (VC-1 notably), so a short window of decoded
+  // frames is held and emitted lowest-pts-first.
+  struct DecodedFrame
+  {
+    uint64_t pts;
+    uint32_t index;
+  };
+  std::deque<DecodedFrame> m_reorderQueue;
+  bool m_reorderFrames = false;
   // Recently output (display-order) pts, for corrupt-splice detection: a pts
   // that steps backwards onto a value already output is a broken splice
   // (duplicate GOP / out-of-place keyframe), not a legal reorder.
