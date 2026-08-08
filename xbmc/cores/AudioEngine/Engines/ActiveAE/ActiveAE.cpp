@@ -2185,9 +2185,12 @@ bool CActiveAE::RunStages()
 
             // for stream amplification,
             // turned off downmix normalization,
+            // a binaural render, which sums HRTF filtered channels at unity and
+            // is not covered by the downmix normalization either way,
             // or if sink format is float (in order to prevent from clipping)
             // we need to run on a per sample basis
             if ((*it)->m_amplify != 1.0f || !(*it)->m_processingBuffers->DoesNormalize() ||
+                (*it)->m_processingBuffers->IsBinaural() ||
                 (m_sinkFormat.m_dataFormat == AE_FMT_FLOAT))
             {
               nb_floats = out->pkt->config.channels / out->pkt->planes;
@@ -2253,9 +2256,12 @@ bool CActiveAE::RunStages()
               fadingStep = delta / samples;
             }
 
-            // for streams amplification of turned off downmix normalization
+            // for streams amplification of turned off downmix normalization,
+            // or a binaural render, which the downmix normalization does not
+            // cover either way
             // we need to run on a per sample basis
-            if ((*it)->m_amplify != 1.0f || !(*it)->m_processingBuffers->DoesNormalize())
+            if ((*it)->m_amplify != 1.0f || !(*it)->m_processingBuffers->DoesNormalize() ||
+                (*it)->m_processingBuffers->IsBinaural())
             {
               nb_floats = out->pkt->config.channels / out->pkt->planes;
               nb_loops = out->pkt->nb_samples;

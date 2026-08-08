@@ -123,6 +123,8 @@ public:
    */
   void SetOmniphonyOutput(std::string output);
   std::string GetOmniphonyOutput();
+  void SetOmniphonySofa(std::string sofa);
+  std::string GetOmniphonySofa();
 
   // Additional Player Process Info data (Only set in Data Core Cache)
   void SetAudioLiveBitRate(double bitRate);
@@ -308,6 +310,7 @@ protected:
     std::string decoderName;
     std::string channels;
     std::string omniphonyOutput;
+    std::string omniphonySofa;
     int sampleRate;
     int bitsPerSample;
     double liveBitRate = 0;

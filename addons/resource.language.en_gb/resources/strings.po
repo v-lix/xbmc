@@ -27028,7 +27028,181 @@ msgstr ""
 #. Help text for setting "Binaural rendering for headphones" of label #60650
 #: system/settings/settings.xml
 msgctxt "#60651"
-msgid "When surround sound is folded down to stereo, place each surround channel around your head and render it with a head-related transfer function instead of simply mixing it in. On headphones this makes surround and height channels appear to come from around and above you rather than from inside your head. Only offered when the output is stereo, which includes S/PDIF and other digital outputs that are always driven in stereo. It is hidden while passthrough is enabled, because an amplifier is then doing the decoding and the listener is on speakers. Requires the spatial audio engine to be installed; without it the normal downmix is used."
+msgid "When surround sound is folded down to stereo, place each surround channel around your head and render it with a head-related transfer function instead of simply mixing it in. On headphones this makes surround and height channels appear to come from around and above you rather than from inside your head. Available only when the output is stereo, which includes S/PDIF and other digital outputs that are always driven in stereo. It cannot be switched on while passthrough is enabled, because an amplifier is then doing the decoding and the listener is on speakers. Requires the spatial audio engine to be installed; without it the normal downmix is used."
+msgstr ""
+
+#. Title of the binaural output level setting
+#: system/settings/settings.xml
+msgctxt "#60652"
+msgid "- Binaural level"
+msgstr ""
+
+#. Help text for setting "Binaural level" of label #60652
+#: system/settings/settings.xml
+msgctxt "#60653"
+msgid "Output level of the binaural render, so that turning the feature on does not also change the volume. The ordinary fold to stereo loses level as six channels become two; a binaural render does not, so without this it plays louder. The default is set to match, and is adjusted automatically for the \"Maintain original volume\" setting, which changes how loud the ordinary fold is. Raising this well above the default does not distort - the limiter catches it - but the limiter will then be working most of the time, which flattens loud scenes. If you want it louder, raise the volume instead."
+msgstr ""
+
+#. Title of the binaural HRTF file setting
+#: system/settings/settings.xml
+msgctxt "#60654"
+msgid "- Personal HRTF file (SOFA)"
+msgstr ""
+
+#. Help text for setting "Personal HRTF file (SOFA)" of label #60654
+#: system/settings/settings.xml
+msgctxt "#60655"
+msgid "Choose the SOFA file to use. It is checked and copied into your profile when you select it, and you are told straight away whether it can be used - a file that fails is refused and whatever you had before is kept. To go back, set \"Head-related transfer function\" to \"Built-in\"; that also removes the copy. The file must be a free-field HRIR measurement (SOFA convention SimpleFreeFieldHRIR); a file of any other kind will be refused even if it ends in .sofa."
+msgstr ""
+
+#. Title of the binaural stage distance setting
+#: system/settings/settings.xml
+msgctxt "#60656"
+msgid "- Speaker distance"
+msgstr ""
+
+#. Help text for setting "Speaker distance" of label #60656
+#: system/settings/settings.xml
+msgctxt "#60657"
+msgid "How far away the virtual speakers are placed. Larger values push the sound further out and make the room feel bigger; smaller values bring it closer in. This changes the sense of distance, not the level."
+msgstr ""
+
+#. Title of the binaural room simulation setting
+#: system/settings/settings.xml
+msgctxt "#60658"
+msgid "- Room simulation"
+msgstr ""
+
+#. Help text for setting "Room simulation" of label #60658
+#: system/settings/settings.xml
+msgctxt "#60659"
+msgid "Adds the early reflections a real room would give, which is most of what makes the sound seem to come from around you rather than from inside your head. Larger rooms place the sound further away and sound more spacious; turning it off gives the driest and most direct presentation."
+msgstr ""
+
+#. Title of the binaural reverb setting
+#: system/settings/settings.xml
+msgctxt "#60660"
+msgid "- Reverb amount"
+msgstr ""
+
+#. Help text for setting "Reverb amount" of label #60660
+#: system/settings/settings.xml
+msgctxt "#60661"
+msgid "The reverberant tail that follows the reflections. More of it increases the sense of space and distance, at the cost of clarity on dialogue. Zero switches the tail off and leaves only the reflections."
+msgstr ""
+
+#. Room simulation: disabled
+#: system/settings/settings.xml
+msgctxt "#60662"
+msgid "Off"
+msgstr ""
+
+#. Room simulation: small room
+#: system/settings/settings.xml
+msgctxt "#60663"
+msgid "Small room"
+msgstr ""
+
+#. Room simulation: medium room
+#: system/settings/settings.xml
+msgctxt "#60664"
+msgid "Medium room"
+msgstr ""
+
+#. Room simulation: large room
+#: system/settings/settings.xml
+msgctxt "#60665"
+msgid "Large room"
+msgstr ""
+
+#. Title of the binaural HRTF source setting
+#: system/settings/settings.xml
+msgctxt "#60667"
+msgid "- Head-related transfer function"
+msgstr ""
+
+#. Help text for setting "Head-related transfer function" of label #60667
+#: system/settings/settings.xml
+msgctxt "#60668"
+msgid "Whether to use the measurements built into the spatial audio engine, which suit most listeners, or a SOFA file of your own. Choosing \"Personal\" asks for the file straight away, and goes back to \"Built-in\" if you pick none. Choosing \"Built-in\" deletes the copy of your file held in the profile, so the profile only ever holds the one that is in use."
+msgstr ""
+
+#. HRTF source: the engine's own measurements
+#: system/settings/settings.xml
+msgctxt "#60669"
+msgid "Built-in"
+msgstr ""
+
+#. HRTF file check: accepted
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
+msgctxt "#60670"
+msgid "This file can be used. It has been copied into your profile and will be used from the next thing you play."
+msgstr ""
+
+#. HRTF file check: could not be opened
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
+msgctxt "#60671"
+msgid "The file could not be opened."
+msgstr ""
+
+#. HRTF file check: far too small
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
+msgctxt "#60672"
+msgid "The file is far too small to hold a set of measurements. It may be an incomplete download."
+msgstr ""
+
+#. HRTF file check: not a SOFA container
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
+msgctxt "#60673"
+msgid "This is not a SOFA file. The name ends in .sofa but the contents are something else."
+msgstr ""
+
+#. HRTF file check: unsupported HDF5 revision
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
+msgctxt "#60674"
+msgid "This SOFA file was written in a newer format than the spatial audio engine can read. Re-saving it with an older tool may help."
+msgstr ""
+
+#. HRTF file check: no impulse responses
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
+msgctxt "#60675"
+msgid "This SOFA file holds no impulse responses. Filter coefficients and frequency-domain measurements cannot be used; the file must contain Data.IR."
+msgstr ""
+
+#. HRTF file check: wrong SOFA convention
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
+msgctxt "#60676"
+msgid "This SOFA file is not a free-field HRIR measurement. Look for a file whose convention is SimpleFreeFieldHRIR - room responses and loudspeaker measurements will not work here."
+msgstr ""
+
+#. HRTF file check: could not be copied
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
+msgctxt "#60677"
+msgid "The file could not be copied into your profile. Check there is space left on the device."
+msgstr ""
+
+#. HRTF source: a file supplied by the listener
+#: system/settings/settings.xml
+msgctxt "#60678"
+msgid "Personal"
+msgstr ""
+
+#. Title of the binaural LFE level setting
+#: system/settings/settings.xml
+msgctxt "#60679"
+msgid "- LFE level"
+msgstr ""
+
+#. Help text for setting "LFE level" of label #60679
+#: system/settings/settings.xml
+msgctxt "#60680"
+msgid "Level of the low-frequency effects channel in the binaural render, as a percentage of how it was recorded. The LFE is the one channel that is not placed around you - it goes to both ears as it is - so it has its own control here rather than following \"Include LFE when downmixing\", which applies to the ordinary fold to stereo and defaults to leaving the LFE out altogether."
+msgstr ""
+
+#. Heading of the dialog shown after a personal HRTF file is checked
+#: xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESettings.cpp
+msgctxt "#60681"
+msgid "Personal HRTF file"
 msgstr ""
 
 #. Title of Dolby Vision RPU conversion setting

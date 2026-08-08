@@ -104,6 +104,22 @@ public:
   double GetRR() const;
   void FillBuffer();
   bool DoesNormalize() const;
+
+  /*!
+   * \brief Whether this pool is currently rendering binaurally.
+   *
+   * Read by the mixer to decide whether the stream needs the limiter. A
+   * binaural render is a fold to stereo that the downmix normalisation never
+   * reaches - that flag is handed to an inner stereo to stereo resampler,
+   * where it does nothing - so it can leave full scale behind whatever the
+   * normalisation setting says.
+   *
+   * Answers what the pool became, not what it was asked to be: a converter
+   * that fell back to the ordinary downmix reads false, because the audio
+   * leaving it is the one the normalisation already covers.
+   */
+  bool IsBinaural() const;
+
   void ForceResampler(bool force);
   AEAudioFormat m_inputFormat;
   std::deque<CSampleBuffer*> m_inputSamples;
@@ -136,7 +152,8 @@ protected:
   AEQuality m_resampleQuality;
   bool m_stereoUpmix = false;
   bool m_allowBinaural = false; //!< per-stream chain only; see the constructor
-  bool m_binaural = false; //!< what the current resampler was built as
+  bool m_binaural = false; //!< what the current resampler was asked to be
+  bool m_binauralActive = false; //!< and what it turned out to be; see IsBinaural()
 };
 
 class CActiveAEFilter;

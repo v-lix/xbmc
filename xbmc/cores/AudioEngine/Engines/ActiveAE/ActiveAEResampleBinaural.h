@@ -81,6 +81,16 @@ public:
    */
   static void Republish();
 
+  /*!
+   * \brief Whether the engine is actually rendering, rather than merely chosen.
+   *
+   * Init() falls back to the inner stock resampler whenever the engine cannot
+   * be used, and the object then behaves exactly like the converter it
+   * replaced. The pool asks this afterwards so that what it reports is what
+   * the listener is hearing.
+   */
+  bool IsRendering() const { return !m_bypass; }
+
   bool Init(SampleConfig dstConfig,
             SampleConfig srcConfig,
             bool upmix,
@@ -132,6 +142,18 @@ private:
 
   SampleConfig m_src{};
   SampleConfig m_dst{};
+
+  /*!
+   * Index of the LFE channel in the source, or -1 when there is none, and the
+   * gain applied to it on the way in.
+   *
+   * The stock downmix folds the LFE into the fronts through its rematrix, at a
+   * level the listener sets; that matrix does not exist here, and the engine
+   * renders the LFE directly to both ears instead. Scaling the channel before
+   * the engine sees it is the equivalent knob, and the only place it can go.
+   */
+  int m_lfeIndex{-1};
+  float m_lfeGain{1.0f};
 
   int m_consecutiveErrors{0};
   bool m_bypass{false}; //!< true once behaving exactly like the stock resampler

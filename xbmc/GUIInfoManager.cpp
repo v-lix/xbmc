@@ -1159,6 +1159,19 @@ const infomap player_times[] =   {{ "seektime",         PLAYER_SEEKTIME },
 ///     @skinning_v21 **[New Infolabel]** \link Player_Process_omniphony_output `Player.Process(omniphony.output)`\endlink
 ///     <p>
 ///   }
+///   \table_row3{   <b>`Player.Process(omniphony.sofa)`</b>,
+///                  \anchor Player_Process_omniphony_sofa
+///                  _string_,
+///     @return Which set of head-related measurements the binaural render is
+///     using: `Built-in` for the ones the engine ships\, `Personal` for a SOFA
+///     file the listener supplied. Worded from the options of the
+///     corresponding setting\, so the two always agree. Empty whenever
+///     \link Player_Process_omniphony_output `Player.Process(omniphony.output)`\endlink
+///     is\, since nothing is being rendered.
+///     <p><hr>
+///     @skinning_v21 **[New Infolabel]** \link Player_Process_omniphony_sofa `Player.Process(omniphony.sofa)`\endlink
+///     <p>
+///   }
 ///   \table_row3{   <b>`Player.Process(videointerlace)`</b>,
 ///                  \anchor Player_Process_videointerlace
 ///                  _string_,
@@ -1327,7 +1340,8 @@ const infomap player_process[] = {{"videodecoder", PLAYER_PROCESS_VIDEODECODER},
                                   
                                   {"av.change", PLAYER_PROCESS_AV_CHANGE },
 
-                                  {"omniphony.output", PLAYER_PROCESS_OMNIPHONY_OUTPUT }};
+                                  {"omniphony.output", PLAYER_PROCESS_OMNIPHONY_OUTPUT },
+                                  {"omniphony.sofa", PLAYER_PROCESS_OMNIPHONY_SOFA }};
 
 /// \page modules__infolabels_boolean_conditions
 /// \subsection modules__infolabels_boolean_conditions_Weather Weather

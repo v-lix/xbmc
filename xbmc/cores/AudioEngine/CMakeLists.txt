@@ -9,6 +9,7 @@ set(SOURCES AEResampleFactory.cpp
             Engines/ActiveAE/ActiveAESound.cpp
             Engines/ActiveAE/ActiveAESettings.cpp
             Omniphony/OmniphonyConfig.cpp
+            Omniphony/OmniphonyHrtf.cpp
             Omniphony/OmniphonyLib.cpp
             Utils/AEBitstreamPacker.cpp
             Utils/AEChannelInfo.cpp
@@ -38,6 +39,7 @@ set(HEADERS AEResampleFactory.h
             Interfaces/IAudioCallback.h
             Interfaces/ThreadedAE.h
             Omniphony/OmniphonyConfig.h
+            Omniphony/OmniphonyHrtf.h
             Omniphony/OmniphonyLib.h
             Omniphony/orender.h
             Utils/AEAudioFormat.h

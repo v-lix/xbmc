@@ -12,18 +12,28 @@
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/Engines/ActiveAE/ActiveAE.h"
 #include "cores/AudioEngine/Interfaces/AE.h"
+#include "cores/AudioEngine/Omniphony/OmniphonyHrtf.h"
+#include "dialogs/GUIDialogFileBrowser.h"
+#include "dialogs/GUIDialogOK.h"
 #include "guilib/LocalizeStrings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "settings/lib/SettingDefinitions.h"
 #include "settings/lib/SettingsManager.h"
-#include "utils/log.h"
+#include "storage/MediaManager.h"
 #include "utils/StringUtils.h"
+#include "utils/log.h"
 
 #include <mutex>
 
 namespace ActiveAE
 {
+
+namespace
+{
+//! audiooutput.binauralhrtfmode, in the order the setting lists its options.
+constexpr int HRTF_BUILTIN = 0;
+} // unnamed namespace
 
 CActiveAESettings* CActiveAESettings::m_instance = nullptr;
 
@@ -44,6 +54,13 @@ CActiveAESettings::CActiveAESettings(CActiveAE &ae) : m_audioEngine(ae)
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_GUISOUNDMODE);
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_STEREOUPMIX);
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_BINAURAL);
+  settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_BINAURALDISTANCE);
+  settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_BINAURALHRTF);
+  settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_BINAURALHRTFMODE);
+  settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_BINAURALLEVEL);
+  settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_BINAURALLFE);
+  settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_BINAURALREVERB);
+  settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_BINAURALROOM);
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_AC3PASSTHROUGH);
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_AC3TRANSCODE);
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_EAC3PASSTHROUGH);
@@ -84,8 +101,71 @@ CActiveAESettings::~CActiveAESettings()
   m_instance = nullptr;
 }
 
+bool CActiveAESettings::OnSettingChanging(const std::shared_ptr<const CSetting>& setting)
+{
+  if (setting->GetId() != CSettings::SETTING_AUDIOOUTPUT_BINAURALHRTF)
+    return true;
+
+  const std::string path = std::static_pointer_cast<const CSettingString>(setting)->GetValue();
+  const COmniphonyHrtf::Result result = COmniphonyHrtf::Stage(path);
+
+  // Clearing the setting is how the listener goes back to the engine's own
+  // measurements, and cannot fail; say nothing and let the empty control speak.
+  if (path.empty())
+    return true;
+
+  // 60681 rather than the setting's own label, which carries the dash that
+  // marks it as one of the binaural children and reads badly as a heading.
+  CGUIDialogOK::ShowAndGetInput(CVariant{60681}, CVariant{COmniphonyHrtf::Explain(result)});
+  return result == COmniphonyHrtf::Result::Ok;
+}
+
+void CActiveAESettings::OnHrtfModeChanged(int mode)
+{
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+
+  if (mode == HRTF_BUILTIN)
+  {
+    // Going back is what discards the copy, so the profile holds a file only
+    // while a personal one is selected. Emptying the control matters as much:
+    // a name left behind describes a file no longer in use, and the browser
+    // would refuse to reopen on it.
+    COmniphonyHrtf::Clear();
+    settings->SetString(CSettings::SETTING_AUDIOOUTPUT_BINAURALHRTF, "");
+    return;
+  }
+
+  // Nothing to ask for if a file is already staged - the listener is switching
+  // back to one they chose earlier in this same visit.
+  if (COmniphonyHrtf::IsPersonal())
+    return;
+
+  // "Personal" with no file is not a state worth keeping, so ask for the file
+  // now rather than leaving a mode that describes nothing. SetString runs the
+  // check in OnSettingChanging above, which reports the outcome and refuses a
+  // file it cannot use; either way, no file means back to the built-in set.
+  std::string path;
+  VECSOURCES shares;
+  CServiceBroker::GetMediaManager().GetLocalDrives(shares);
+  CServiceBroker::GetMediaManager().GetNetworkLocations(shares);
+
+  const bool chosen =
+      CGUIDialogFileBrowser::ShowAndGetFile(shares, "*.sofa", g_localizeStrings.Get(60681), path);
+
+  if (!chosen || path.empty() ||
+      !settings->SetString(CSettings::SETTING_AUDIOOUTPUT_BINAURALHRTF, path))
+    settings->SetInt(CSettings::SETTING_AUDIOOUTPUT_BINAURALHRTFMODE, HRTF_BUILTIN);
+}
+
 void CActiveAESettings::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
 {
+  if (setting->GetId() == CSettings::SETTING_AUDIOOUTPUT_BINAURALHRTFMODE)
+  {
+    // Deliberately outside the lock below: this opens a dialog and writes
+    // settings, which re-enters this class.
+    OnHrtfModeChanged(std::static_pointer_cast<const CSettingInt>(setting)->GetValue());
+  }
+
   std::unique_lock<CCriticalSection> lock(m_cs);
 
   // Handle Bluetooth codec changes

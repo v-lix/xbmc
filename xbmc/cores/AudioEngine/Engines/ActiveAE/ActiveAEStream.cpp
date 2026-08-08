@@ -752,6 +752,11 @@ bool CActiveAEStreamBuffers::DoesNormalize()
   return m_resampleBuffers->DoesNormalize();
 }
 
+bool CActiveAEStreamBuffers::IsBinaural()
+{
+  return m_resampleBuffers->IsBinaural();
+}
+
 void CActiveAEStreamBuffers::ForceResampler(bool force)
 {
   m_resampleBuffers->ForceResampler(force);

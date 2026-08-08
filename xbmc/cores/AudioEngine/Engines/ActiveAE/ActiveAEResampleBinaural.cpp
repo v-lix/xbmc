@@ -11,18 +11,22 @@
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/AEResampleFactory.h"
 #include "cores/AudioEngine/Omniphony/OmniphonyConfig.h"
+#include "cores/AudioEngine/Omniphony/OmniphonyHrtf.h"
 #include "cores/AudioEngine/Utils/AEChannelInfo.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 #include "cores/DataCacheCore.h"
+#include "guilib/LocalizeStrings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/log.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 
 extern "C"
 {
+#include <libavutil/channel_layout.h>
 #include <libavutil/samplefmt.h>
 }
 
@@ -128,9 +132,9 @@ bool CActiveAEResampleBinaural::ShouldUse(const SampleConfig& dstConfig,
     return false;
 
   // Passthrough means an amplifier is doing the decoding, so the listener is on
-  // speakers - no headphone DAC accepts a bitstream. The setting is hidden in
-  // that case, and this keeps the hidden setting from staying in effect.
-  // Deliberately mirrors how CActiveAE::LoadSettings resolves passthrough.
+  // speakers - no headphone DAC accepts a bitstream. The setting is greyed out
+  // in that case, and this keeps a switch the listener cannot reach from
+  // staying in effect. Mirrors how CActiveAE::LoadSettings resolves passthrough.
   return settings->GetInt(CSettings::SETTING_AUDIOOUTPUT_CONFIG) == AE_CONFIG_FIXED ||
          !settings->GetBool(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH);
 }
@@ -139,6 +143,12 @@ void CActiveAEResampleBinaural::ReportActive(bool active)
 {
   s_active.store(active, std::memory_order_relaxed);
   CServiceBroker::GetDataCacheCore().SetOmniphonyOutput(active ? "Binaural" : "");
+  // Which head the render is using. Read from the staged file rather than the
+  // setting, because a file only reaches the profile once it has been checked
+  // - so its presence is the same question the engine will answer. Worded from
+  // the setting's own options, so the two never disagree in any language.
+  CServiceBroker::GetDataCacheCore().SetOmniphonySofa(
+      active ? g_localizeStrings.Get(COmniphonyHrtf::IsPersonal() ? 60678 : 60669) : std::string());
 }
 
 void CActiveAEResampleBinaural::Republish()
@@ -179,7 +189,28 @@ bool CActiveAEResampleBinaural::Init(SampleConfig dstConfig,
   m_dst = dstConfig;
   m_inner = CAEResampleFactory::Create();
   if (!m_inner)
+  {
+    // Nothing to delegate to and nothing to render with. Bypass anyway, so
+    // that the object is never left in a state where Resample() would reach
+    // for an engine it does not have.
+    m_bypass = true;
     return false;
+  }
+
+  m_lfeIndex = -1;
+  m_lfeGain = 1.0f;
+  {
+    AVChannelLayout layout{};
+    if (av_channel_layout_from_mask(&layout, srcConfig.channel_layout) >= 0)
+    {
+      m_lfeIndex = av_channel_layout_index_from_channel(&layout, AV_CHAN_LOW_FREQUENCY);
+      av_channel_layout_uninit(&layout);
+    }
+    const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+    if (settings)
+      m_lfeGain =
+          std::clamp(settings->GetInt(CSettings::SETTING_AUDIOOUTPUT_BINAURALLFE), 0, 300) / 100.0f;
+  }
 
   // Cleared up front so that every path out of here that ends in the ordinary
   // downmix - a missing engine, a session that will not start, an unexpected
@@ -346,6 +377,14 @@ void CActiveAEResampleBinaural::Interleave(uint8_t** src, int src_samples)
       std::memset(out, 0, total * sizeof(float));
       break;
   }
+
+  // The LFE is the one channel the engine does not place: it goes to both ears
+  // as it is. Everything the listener can do to its level has to happen here.
+  if (m_lfeIndex >= 0 && m_lfeIndex < channels && m_lfeGain != 1.0f)
+  {
+    for (int s = 0; s < src_samples; ++s)
+      out[s * channels + m_lfeIndex] *= m_lfeGain;
+  }
 }
 
 int CActiveAEResampleBinaural::Resample(
@@ -370,9 +409,11 @@ int CActiveAEResampleBinaural::Resample(
 
     if (ret > 0)
     {
-      // Output would not fit and nothing was written. Grow for next time and
-      // drop this block rather than re-feeding, which the engine does not
-      // support. In practice this has never been observed to fire.
+      // Output would not fit and nothing was written. The ABI invites a retry
+      // with a larger buffer, but does not say whether the packet was consumed
+      // first, and feeding it twice would be worse than losing it: grow for
+      // next time and drop this block. In practice this has never been
+      // observed to fire.
       m_render.resize(m_render.size() * 2);
       CLog::Log(LOGWARNING, "Omniphony: render buffer grown to {} floats, one block dropped",
                 m_render.size());

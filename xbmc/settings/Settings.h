@@ -399,6 +399,13 @@ public:
   static constexpr auto SETTING_VIDEOSCREEN_DITHERDEPTH = "videoscreen.ditherdepth";
   static constexpr auto SETTING_AUDIOOUTPUT_AUDIODEVICE = "audiooutput.audiodevice";
   static constexpr auto SETTING_AUDIOOUTPUT_BINAURAL = "audiooutput.binaural";
+  static constexpr auto SETTING_AUDIOOUTPUT_BINAURALDISTANCE = "audiooutput.binauraldistance";
+  static constexpr auto SETTING_AUDIOOUTPUT_BINAURALHRTF = "audiooutput.binauralhrtf";
+  static constexpr auto SETTING_AUDIOOUTPUT_BINAURALHRTFMODE = "audiooutput.binauralhrtfmode";
+  static constexpr auto SETTING_AUDIOOUTPUT_BINAURALLFE = "audiooutput.binaurallfe";
+  static constexpr auto SETTING_AUDIOOUTPUT_BINAURALLEVEL = "audiooutput.binaurallevel";
+  static constexpr auto SETTING_AUDIOOUTPUT_BINAURALREVERB = "audiooutput.binauralreverb";
+  static constexpr auto SETTING_AUDIOOUTPUT_BINAURALROOM = "audiooutput.binauralroom";
   static constexpr auto SETTING_AUDIOOUTPUT_BTCODEC = "audiooutput.btcodec";
   static constexpr auto SETTING_AUDIOOUTPUT_BTVOLUMEBOOST = "audiooutput.btvolumeboost";
   static constexpr auto SETTING_AUDIOOUTPUT_CHANNELS = "audiooutput.channels";

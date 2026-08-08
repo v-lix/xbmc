@@ -218,9 +218,12 @@ void CActiveAEBufferPoolResample::ChangeResampler()
   // same conversion done differently. Everything else, and every other pool
   // using this class, keeps the stock resampler.
   m_binaural = m_allowBinaural && CActiveAEResampleBinaural::ShouldUse(dstConfig, srcConfig);
+  CActiveAEResampleBinaural* binaural = nullptr;
   if (m_binaural)
   {
-    m_resampler = std::make_unique<CActiveAEResampleBinaural>();
+    auto render = std::make_unique<CActiveAEResampleBinaural>();
+    binaural = render.get();
+    m_resampler = std::move(render);
   }
   else
   {
@@ -238,6 +241,14 @@ void CActiveAEBufferPoolResample::ChangeResampler()
   m_resampler->Init(dstConfig, srcConfig, m_stereoUpmix, m_normalize, m_centerMixLevel,
                     m_surroundMixLevel, m_remap ? &m_format.m_channelLayout : nullptr,
                     m_resampleQuality, m_forceResampler, m_mixSubLevel);
+
+  // Being chosen is not the same as rendering: Init falls back to the ordinary
+  // downmix when the engine is missing or will not start. m_binaural stays the
+  // decision, so ConfigureResampler keeps comparing like with like; what the
+  // pool actually became is tracked separately, because that is what decides
+  // whether the mixer runs its limiter, and limiting a matrix downmix would
+  // buy the per-sample path for audio that never needed it.
+  m_binauralActive = binaural && binaural->IsRendering();
 
   m_changeResampler = false;
 }
@@ -506,6 +517,11 @@ void CActiveAEBufferPoolResample::FillBuffer()
 bool CActiveAEBufferPoolResample::DoesNormalize() const
 {
   return m_normalize;
+}
+
+bool CActiveAEBufferPoolResample::IsBinaural() const
+{
+  return m_binauralActive;
 }
 
 void CActiveAEBufferPoolResample::ForceResampler(bool force)

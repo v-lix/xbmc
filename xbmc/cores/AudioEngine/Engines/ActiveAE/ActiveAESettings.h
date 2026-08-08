@@ -31,7 +31,29 @@ public:
   CActiveAESettings(CActiveAE &ae);
   ~CActiveAESettings() override;
 
+  /*!
+   * \brief Vet a personal HRTF file before it is accepted.
+   *
+   * The only setting this refuses. A SOFA file is opaque to the person
+   * choosing it - the extension says nothing about whether the engine can use
+   * what is inside - and the engine's reader will take a file it half
+   * understands and render noise rather than failing. So the file is copied
+   * into the profile and checked here, and a selection that does not survive
+   * that is rejected outright with the reason on screen, leaving whatever was
+   * chosen before still in place.
+   */
+  bool OnSettingChanging(const std::shared_ptr<const CSetting>& setting) override;
+
   void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
+
+  /*!
+   * \brief Keep the HRTF mode and the file it names describing the same thing.
+   *
+   * Choosing the built-in set discards the staged copy and empties the file
+   * control; choosing a personal one with nothing staged asks for the file
+   * there and then, and falls back to built-in if none is given.
+   */
+  static void OnHrtfModeChanged(int mode);
 
   static void SettingOptionsAudioDevicesFiller(const std::shared_ptr<const CSetting>& setting,
                                                std::vector<StringSettingOption>& list,

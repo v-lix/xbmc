@@ -113,6 +113,7 @@ public:
   double GetRR();
   void FillBuffer();
   bool DoesNormalize();
+  bool IsBinaural();
   void ForceResampler(bool force);
   bool HasWork();
   std::unique_ptr<CActiveAEBufferPool> GetResampleBuffers();
