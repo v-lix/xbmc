@@ -923,15 +923,37 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
       // processing). Kodi captures PTS via V4L2 DQBUF *before* the DI stage,
       // so the frame appears on screen ~240ms later than Kodi's sync expects.
       // Shift the video start timestamp forward to delay audio accordingly.
+      //
+      // For VC-1 the demuxer flag is required as well, because di0/frame_format
+      // is not a reliable interlace oracle there. It prints "interlace" whenever
+      // the DI's cur_prog_flag is clear, and that flag is reset to 0 and only
+      // refreshed on a source change, so a progressive stream that misses the
+      // refresh reads back as interlaced for the rest of the playback. Observed
+      // on progressive VC-1: the decoder emits VIDTYPE_PROGRESSIVE while the
+      // node still says "interlace", and the resulting half-second shift put
+      // audio that far ahead of the picture. Restricted to VC-1 on purpose -
+      // that is where the mismatch is evidenced, and for every other codec a
+      // runtime-detected interlace verdict still compensates as before.
+      const bool isVc1 =
+          (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
+
       double diCompensation = 0;
       if (m_processInfo.GetVideoInterlaced() && m_processInfo.IsVideoHwDecoder() &&
           CSysfsPath{"/sys/class/deinterlace/di0/frame_format"}.Exists())
       {
-        constexpr int DI_PIPELINE_FIELDS = 12;
-        diCompensation = DI_PIPELINE_FIELDS * DVD_TIME_BASE / m_fFrameRate;
-        CLog::Log(LOGDEBUG, "CVideoPlayerVideo - DI pipeline latency compensation: "
-                  "{:.0f}ms ({} fields at {:.1f}Hz)",
-                  diCompensation / (DVD_TIME_BASE / 1000), DI_PIPELINE_FIELDS, m_fFrameRate);
+        if (!isVc1 || (m_hints.codecOptions & CODEC_INTERLACED))
+        {
+          constexpr int DI_PIPELINE_FIELDS = 12;
+          diCompensation = DI_PIPELINE_FIELDS * DVD_TIME_BASE / m_fFrameRate;
+          CLog::Log(LOGDEBUG, "CVideoPlayerVideo - DI pipeline latency compensation: "
+                    "{:.0f}ms ({} fields at {:.1f}Hz)",
+                    diCompensation / (DVD_TIME_BASE / 1000), DI_PIPELINE_FIELDS, m_fFrameRate);
+        }
+        else
+        {
+          CLog::Log(LOGDEBUG, "CVideoPlayerVideo - DI pipeline latency compensation skipped: "
+                    "VC-1 interlace came from vfmt only, demuxer says progressive");
+        }
       }
 
       msg.timestamp = hasTimestamp ? (pts + m_renderManager.GetDelay() * 1000 + diCompensation) : DVD_NOPTS_VALUE;
