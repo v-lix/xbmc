@@ -2181,10 +2181,24 @@ bool CAMLCodec::OpenDecoder()
   // DEC_CONTROL_FLAG_DISABLE_FAST_POC
   CSysfsPath("/sys/module/amvdec_h264/parameters/dec_control", 4);
 
-  // workaround to fix slow framerate for VC1 progressive (force interlace!)
-  // Only needed for SoCs up to SC2; newer SoCs use ge2d copy which doesn't need this
-  if (am_private->video_format == VFORMAT_VC1 && aml_get_cpufamily_id() <= AML_SC2)
-    CSysfsPath("/sys/class/deinterlace/di0/debug", "di_debug_flag0x10000");
+  // VC-1 used to force the deinterlacer on here (di_debug_flag0x10000), because
+  // the decoder tags progressive VC-1 as VIDTYPE_PROGRESSIVE|VIDTYPE_VIU_FIELD
+  // and nothing else in the pipeline consumed field-format buffers - without the
+  // DI the stream barely presented frames at all. The DI recombined them, at the
+  // cost of pipeline latency that lands after the frame is timestamped and shows
+  // up as a fixed audio-ahead-of-video offset on VC-1 hardware decode.
+  //
+  // amvdec_vc1 now does a ge2d canvas copy in vvc1_vf_get() and hands over a
+  // normal progressive canvas, which is what newer SoCs always did and what the
+  // old comment here referred to. The DI is no longer needed, so it is no longer
+  // forced on and its latency is no longer paid.
+  //
+  // This depends on the matching media_modules build. Against a kernel whose
+  // amvdec_vc1 lacks the ge2d copy, VC-1 falls back to roughly one frame every
+  // two to three seconds - that symptom means the two halves are out of step,
+  // not that VC-1 decoding is broken. CloseDecoder still clears the flag for
+  // VC-1 streams, so a value left set by an older build is cleared on the next
+  // VC-1 close.
 
   switch(am_private->video_format)
   {
