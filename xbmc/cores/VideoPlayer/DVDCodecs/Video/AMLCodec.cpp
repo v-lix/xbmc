@@ -2089,11 +2089,30 @@ bool CAMLCodec::OpenDecoder()
   // coreelec.amlogic.vc1_repair_timestamps controls the timestamps alone, and
   // turning it off keeps the decoder's own values for a stream whose timing is
   // sound.
+  // Interlaced VC-1 is excluded from both. The decoder emits it at field
+  // cadence - a 1080i29.97 stream measures 16/17ms between frames, not 33 -
+  // and its uneven steps are legitimate field pairs rather than the decode
+  // order problem these two exist to solve. Reordering shuffles field pairs by
+  // timestamp, and laying a frame-rate chain over field-rate output is not a
+  // repair. Both reporters who saw slow motion after these landed were on
+  // interlaced VC-1: 1080i29.97 and 1080i25.
+  //
+  // A guard for this existed already, `GetVideoFps() == 25.0f &&
+  // GetVideoInterlaced()`, but it never fired: the demuxer doubles the rate for
+  // interlaced content (fps:30000/1001 becomes fps:60000/1001i) and Kodi keeps
+  // the doubled value, so a 1080i25 stream reports 50.0 and 1080i29.97 reports
+  // 59.94. Nothing reports 25.0. Take the demuxer's own flag instead, which is
+  // set once at open and cannot drift.
   const bool isVc1 = (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
-  m_reorderFrames = isVc1;
-  m_repairTimestamps = isVc1 && CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
-                                    CSettings::SETTING_COREELEC_AMLOGIC_VC1_REPAIR_TIMESTAMPS);
-  if (isVc1)
+  const bool isInterlaced = (m_hints.codecOptions & CODEC_INTERLACED) == CODEC_INTERLACED;
+  m_reorderFrames = isVc1 && !isInterlaced;
+  m_repairTimestamps = m_reorderFrames &&
+                       CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+                           CSettings::SETTING_COREELEC_AMLOGIC_VC1_REPAIR_TIMESTAMPS);
+  if (isVc1 && isInterlaced)
+    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: interlaced, left as the "
+                       "decoder gave it");
+  else if (isVc1)
     CLog::Log(LOGINFO,
               "CAMLCodec::OpenDecoder - VC-1 frame timing: reordering to display order (window {} "
               "frames), timestamps {}",
@@ -2977,9 +2996,9 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
       // left is to stop trusting what the decoder says the time is and lay a
       // clean chain over them instead.
       //
-      // 25Hz interlaced is excluded: its uneven steps are legitimate field
-      // pairs rather than bad timing. Trickplay is excluded too - its jumps
-      // are real. Pause is NOT: pausing flushes the decoder, which re-decodes
+      // Interlaced VC-1 never reaches here - it is excluded at open, see
+      // OpenDecoder. Trickplay is excluded too, its jumps are real. Pause is
+      // NOT: pausing flushes the decoder, which re-decodes
       // several seconds from the preceding keyframe, and all of that arrives
       // while the speed is still PAUSE. Letting those through unrepaired left
       // whichever frame landed last as the anchor for the rebuilt chain, which
@@ -2989,8 +3008,6 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
       // A step of four frames or more in either direction is a genuine
       // discontinuity, not reordering noise. Those keep the decoder's value so
       // a seek re-anchors the chain rather than being smoothed over.
-      const bool is_vc1_25hz_interlaced = (m_processInfo.GetVideoFps() == 25.0f) &&
-                                           m_processInfo.GetVideoInterlaced();
       const bool repair_speed = (m_speed == DVD_PLAYSPEED_NORMAL) ||
                                 (m_speed == DVD_PLAYSPEED_PAUSE);
 
@@ -3004,7 +3021,6 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
       const double step_frames = step / rate_duration;
 
       if (repair_speed &&
-          !is_vc1_25hz_interlaced &&
           (step_frames > -4.0) && (step_frames < 4.0))
       {
         m_cur_pts = m_last_pts + rate_duration;
