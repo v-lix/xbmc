@@ -141,6 +141,11 @@ private:
   };
   std::deque<DecodedFrame> m_reorderQueue;
   bool m_reorderFrames = false;
+  // Replace the decoder's timestamps on the reordered output with a clean
+  // chain at the nominal rate (coreelec.amlogic.vc1_repair_timestamps). The
+  // two are independent: reordering fixes which frame goes out next, this
+  // fixes what time it claims to be.
+  bool m_repairTimestamps = false;
   // Recently output (display-order) pts, for corrupt-splice detection: a pts
   // that steps backwards onto a value already output is a broken splice
   // (duplicate GOP / out-of-place keyframe), not a legal reorder.

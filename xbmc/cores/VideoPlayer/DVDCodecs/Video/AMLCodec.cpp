@@ -2076,22 +2076,29 @@ bool CAMLCodec::OpenDecoder()
     hints.width, hints.height, hints.codec, hints.codec_tag, hints.bitdepth);
   // Codecs whose AML decoder hands frames over in decode order need the
   // display-order window; H.264/HEVC come out already ordered.
-  // Two strategies, see coreelec.amlogic.vc1_repair_timestamps. On (default):
-  // discard the decoder's out-of-order timestamps and rebuild the timeline at
-  // the stream's nominal rate in GetPicture. Off: keep those timestamps and
-  // instead hold a short window of frames, releasing them lowest-first. The
-  // reordering path is only correct while the timestamps themselves are
-  // trustworthy, and on this decoder they are not - it is the repair that puts
-  // VC-1 back in sync, which is why it is the default.
+  // The AML VC-1 decoder gets both of these wrong, and they are separate
+  // problems that need separate answers. It emits frames in decode order, so a
+  // short window is held and the lowest pts released first - without that, B
+  // frames reach the screen out of sequence and motion stutters. And its
+  // timestamps are not trustworthy, so once the frames are in the right order
+  // their timestamps are replaced with a clean chain at the nominal rate -
+  // without that, VC-1 drifts out of sync in a way seeking cannot fix.
+  //
+  // Doing only one of the two just swaps one fault for the other, which is
+  // what earlier builds did in both directions. Reordering always applies;
+  // coreelec.amlogic.vc1_repair_timestamps controls the timestamps alone, and
+  // turning it off keeps the decoder's own values for a stream whose timing is
+  // sound.
   const bool isVc1 = (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
-  m_reorderFrames = isVc1 && !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
-                                 CSettings::SETTING_COREELEC_AMLOGIC_VC1_REPAIR_TIMESTAMPS);
+  m_reorderFrames = isVc1;
+  m_repairTimestamps = isVc1 && CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+                                    CSettings::SETTING_COREELEC_AMLOGIC_VC1_REPAIR_TIMESTAMPS);
   if (isVc1)
-    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: {}",
-              m_reorderFrames
-                  ? StringUtils::Format("reordering to display order (window {} frames)",
-                                        REORDER_WINDOW)
-                  : "repairing timestamps, timeline rebuilt at the nominal rate");
+    CLog::Log(LOGINFO,
+              "CAMLCodec::OpenDecoder - VC-1 frame timing: reordering to display order (window {} "
+              "frames), timestamps {}",
+              REORDER_WINDOW,
+              m_repairTimestamps ? "rebuilt at the nominal rate" : "kept as the decoder gave them");
 
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder hints.fpsrate({:d}), hints.fpsscale({:d}), video_rate({:d})",
     hints.fpsrate, hints.fpsscale, am_private->video_rate);
@@ -2964,53 +2971,45 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     {
       videoPicture.iDuration = rate_duration;
     }
-    else if (is_vc1 && !m_reorderFrames)
+    else if (is_vc1 && m_repairTimestamps)
     {
-      // VC-1 without reordering (the decoder gave us no usable order to work
-      // with): fall back to the old behaviour of flattening a reversal to the
-      // nominal rate. 25Hz interlaced is excluded - its out-of-order pts are
-      // legitimate field pairs.
+      // The frames are already in display order by this point, so all that is
+      // left is to stop trusting what the decoder says the time is and lay a
+      // clean chain over them instead.
+      //
+      // 25Hz interlaced is excluded: its uneven steps are legitimate field
+      // pairs rather than bad timing. Trickplay is excluded too - its jumps
+      // are real. Pause is NOT: pausing flushes the decoder, which re-decodes
+      // several seconds from the preceding keyframe, and all of that arrives
+      // while the speed is still PAUSE. Letting those through unrepaired left
+      // whichever frame landed last as the anchor for the rebuilt chain, which
+      // put the timeline one to three frames adrift for good once playback
+      // resumed - seeking cleared it only because the flush re-anchors.
+      //
+      // A step of four frames or more in either direction is a genuine
+      // discontinuity, not reordering noise. Those keep the decoder's value so
+      // a seek re-anchors the chain rather than being smoothed over.
       const bool is_vc1_25hz_interlaced = (m_processInfo.GetVideoFps() == 25.0f) &&
                                            m_processInfo.GetVideoInterlaced();
-      const double duration_ratio = picture_duration / rate_duration;
-
-      // Repair while paused as well as while playing. Pausing flushes the
-      // decoder, which re-decodes several seconds from the preceding keyframe,
-      // and all of that arrives with m_speed at PAUSE. Repairing only at normal
-      // speed let every one of those frames through with its raw decode-order
-      // timestamp: they were emitted out of order, and whichever one happened
-      // to be last became the anchor the timeline was rebuilt from once
-      // playback resumed, leaving it one to three frames adrift for good. A
-      // seek cleared it because the flush resets m_last_pts and the chain
-      // re-anchors on a real timestamp. Trickplay still keeps the raw values -
-      // its pts jumps are legitimate, and the ratio test below ignores gaps of
-      // four frames or more anyway.
       const bool repair_speed = (m_speed == DVD_PLAYSPEED_NORMAL) ||
                                 (m_speed == DVD_PLAYSPEED_PAUSE);
 
+      // Signed step, computed either side of the reversal: both timestamps are
+      // unsigned, so picture_duration wraps to ~1.8e19 on a backwards step
+      // rather than going negative, and comparing that against a threshold
+      // would put every reversal in the discontinuity bucket.
+      const double step = pts_reversal
+                              ? -static_cast<double>(m_last_pts - m_cur_pts)
+                              : static_cast<double>(m_cur_pts - m_last_pts);
+      const double step_frames = step / rate_duration;
+
       if (repair_speed &&
           !is_vc1_25hz_interlaced &&
-          (m_cur_pts < m_last_pts))
+          (step_frames > -4.0) && (step_frames < 4.0))
       {
         m_cur_pts = m_last_pts + rate_duration;
-        videoPicture.iDuration = rate_duration;
       }
-      else if (repair_speed &&
-               ((duration_ratio < 0.2) || ((duration_ratio > 1.5) && (duration_ratio < 4.0))))
-      {
-        // A forward gap that is not a whole number of frames is the other half
-        // of the same problem: the decode-order sequence steps forward several
-        // frames before stepping back. Flatten those to the nominal rate too,
-        // otherwise only the backwards halves get repaired and the timeline
-        // still drifts. Gaps of four frames or more are left alone - those are
-        // real discontinuities, not reordering.
-        m_cur_pts = m_last_pts + rate_duration;
-        videoPicture.iDuration = rate_duration;
-      }
-      else
-      {
-        videoPicture.iDuration = rate_duration;
-      }
+      videoPicture.iDuration = rate_duration;
     }
     else if (pts_reversal)
     {
