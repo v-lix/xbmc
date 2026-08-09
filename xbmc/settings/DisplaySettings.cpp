@@ -654,11 +654,24 @@ void CDisplaySettings::ApplyCalibrations()
         if (m_resolutions[res].iSubtitles > m_resolutions[res].iHeight * 3 / 2)
           m_resolutions[res].iSubtitles = m_resolutions[res].iHeight * 3 / 2;
 
-        m_resolutions[res].fPixelRatio = itCal->fPixelRatio;
-        if (m_resolutions[res].fPixelRatio < 0.5f)
-          m_resolutions[res].fPixelRatio = 0.5f;
-        if (m_resolutions[res].fPixelRatio > 2.0f)
-          m_resolutions[res].fPixelRatio = 2.0f;
+        // A stored ratio of exactly 1.0 for a 720-wide SD CEA raster is a
+        // stale snapshot from builds that hardcoded square pixels for every
+        // mode (pre ba1c3dd80e); those rasters are anamorphic per CEA-861, so
+        // restoring the snapshot would undo the computed ratio and bring the
+        // letterbox-then-stretch distortion back on upgraded systems. Keep
+        // the computed value; the next settings save migrates the store.
+        const bool staleSdSquareRatio =
+            itCal->fPixelRatio == 1.0f && m_resolutions[res].fPixelRatio != 1.0f &&
+            m_resolutions[res].iScreenWidth == 720 &&
+            (m_resolutions[res].iScreenHeight == 480 || m_resolutions[res].iScreenHeight == 576);
+        if (!staleSdSquareRatio)
+        {
+          m_resolutions[res].fPixelRatio = itCal->fPixelRatio;
+          if (m_resolutions[res].fPixelRatio < 0.5f)
+            m_resolutions[res].fPixelRatio = 0.5f;
+          if (m_resolutions[res].fPixelRatio > 2.0f)
+            m_resolutions[res].fPixelRatio = 2.0f;
+        }
         break;
       }
     }
