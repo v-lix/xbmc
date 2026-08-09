@@ -2089,29 +2089,59 @@ bool CAMLCodec::OpenDecoder()
   // coreelec.amlogic.vc1_repair_timestamps controls the timestamps alone, and
   // turning it off keeps the decoder's own values for a stream whose timing is
   // sound.
-  // Interlaced VC-1 is excluded from both. The decoder emits it at field
-  // cadence - a 1080i29.97 stream measures 16/17ms between frames, not 33 -
-  // and its uneven steps are legitimate field pairs rather than the decode
-  // order problem these two exist to solve. Reordering shuffles field pairs by
-  // timestamp, and laying a frame-rate chain over field-rate output is not a
-  // repair. Both reporters who saw slow motion after these landed were on
-  // interlaced VC-1: 1080i29.97 and 1080i25.
+  // Both of these assume the decoder hands over whole frames. For interlaced
+  // VC-1 that depends on which branch amvdec_vc1 takes, which is what its
+  // force_frameint parameter selects: with it clear the decoder emits fields,
+  // and reordering field pairs by timestamp or laying a frame-rate chain over
+  // field-rate output makes things worse rather than better - that combination
+  // is what produced slow motion and silence on 1080i25 and 1080i29.97. With
+  // it set the decoder emits frames from the same path progressive VC-1 uses,
+  // carrying the same decode order and the same unreliable timestamps, so it
+  // wants exactly the same treatment.
   //
-  // A guard for this existed already, `GetVideoFps() == 25.0f &&
-  // GetVideoInterlaced()`, but it never fired: the demuxer doubles the rate for
-  // interlaced content (fps:30000/1001 becomes fps:60000/1001i) and Kodi keeps
-  // the doubled value, so a 1080i25 stream reports 50.0 and 1080i29.97 reports
-  // 59.94. Nothing reports 25.0. Take the demuxer's own flag instead, which is
-  // set once at open and cannot drift.
+  // So ask for frames. The parameter belongs to amvdec_vc1 itself and is only
+  // consulted in its interlaced branch, so setting it cannot reach progressive
+  // VC-1 or any other codec, and having set it here we know which branch the
+  // decoder took rather than having to infer it. Inferring is not possible in
+  // any case: the demuxer's interlace flag cannot see the decoder's choice, and
+  // the earlier guard here - `GetVideoFps() == 25.0f && GetVideoInterlaced()` -
+  // never fired at all, because the demuxer doubles the rate for interlaced
+  // content (fps:30000/1001 becomes fps:60000/1001i) and Kodi keeps the doubled
+  // value, so 1080i25 reports 50.0 and 1080i29.97 reports 59.94. Nothing ever
+  // reports 25.0.
+  //
+  // An older amvdec_vc1 has no such parameter. That build still emits fields,
+  // and its field output is exactly what must not be reordered or rebuilt, so
+  // a missing node leaves both switched off.
+  // The setting turns the whole of this off together, so it stays a usable A/B
+  // against an untouched decoder. It also means the parameter is not rewritten
+  // behind the back of anyone testing the field branch by hand.
   const bool isVc1 = (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
   const bool isInterlaced = (m_hints.codecOptions & CODEC_INTERLACED) == CODEC_INTERLACED;
-  m_reorderFrames = isVc1 && !isInterlaced;
-  m_repairTimestamps = m_reorderFrames &&
-                       CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
-                           CSettings::SETTING_COREELEC_AMLOGIC_VC1_REPAIR_TIMESTAMPS);
-  if (isVc1 && isInterlaced)
-    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: interlaced, left as the "
-                       "decoder gave it");
+  const bool repairWanted = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+      CSettings::SETTING_COREELEC_AMLOGIC_VC1_REPAIR_TIMESTAMPS);
+
+  bool decoderEmitsFrames = false;
+  if (isVc1 && isInterlaced && repairWanted)
+  {
+    CSysfsPath forceFrameint{"/sys/module/amvdec_vc1/parameters/force_frameint"};
+    if (forceFrameint.Exists())
+    {
+      forceFrameint.Set(1);
+      decoderEmitsFrames = true;
+    }
+    else
+    {
+      CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - interlaced VC-1 but amvdec_vc1 has no "
+                         "force_frameint; leaving the decoder's field output alone");
+    }
+  }
+
+  m_reorderFrames = isVc1 && repairWanted && (!isInterlaced || decoderEmitsFrames);
+  m_repairTimestamps = m_reorderFrames;
+  if (isVc1 && !m_reorderFrames)
+    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: decoder is emitting fields, "
+                       "left as it gave them");
   else if (isVc1)
     CLog::Log(LOGINFO,
               "CAMLCodec::OpenDecoder - VC-1 frame timing: reordering to display order (window {} "
