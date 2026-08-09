@@ -2137,15 +2137,18 @@ bool CAMLCodec::OpenDecoder()
 
   m_reorderFrames = isVc1 && repairWanted && (!isInterlaced || decoderEmitsFrames);
   m_repairTimestamps = m_reorderFrames;
-  if (isVc1 && !m_reorderFrames)
+  if (isVc1 && !repairWanted)
+    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: repair disabled by setting, "
+                       "decoder output untouched");
+  else if (isVc1 && !m_reorderFrames)
     CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: decoder is emitting fields, "
                        "left as it gave them");
   else if (isVc1)
     CLog::Log(LOGINFO,
               "CAMLCodec::OpenDecoder - VC-1 frame timing: reordering to display order (window "
-              "from {} frames, grown to what the stream needs, max {}), timestamps {}",
-              REORDER_WINDOW_MIN, REORDER_WINDOW_MAX,
-              m_repairTimestamps ? "rebuilt at the nominal rate" : "kept as the decoder gave them");
+              "from {} frames, grown to what the stream needs, max {}), timestamps rebuilt at the "
+              "nominal rate",
+              REORDER_WINDOW_MIN, REORDER_WINDOW_MAX);
 
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder hints.fpsrate({:d}), hints.fpsscale({:d}), video_rate({:d})",
     hints.fpsrate, hints.fpsscale, am_private->video_rate);
