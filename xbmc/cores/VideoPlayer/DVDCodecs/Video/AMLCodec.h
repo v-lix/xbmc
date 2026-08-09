@@ -58,6 +58,14 @@ struct pq_ctrl_s {
 #define AMVECM_IOC_S_PQ_CTRL  _IOW(_VE_CM, 0x69, struct vpp_pq_ctrl_s)
 #define AMVECM_IOC_G_PQ_CTRL  _IOR(_VE_CM, 0x6a, struct vpp_pq_ctrl_s)
 
+// How many decoded frames to hold before releasing the lowest timestamp.
+// Streams differ: some reorder by one or two frame times, others by four, so
+// the depth is learned from what the stream actually does rather than fixed at
+// a value that is either too shallow for the deep ones or too costly for the
+// rest. Each held frame is a frame of latency in the video path.
+static constexpr size_t REORDER_WINDOW_MIN = 2;
+static constexpr size_t REORDER_WINDOW_MAX = 8;
+
 class CAMLCodec
 {
 public:
@@ -141,6 +149,12 @@ private:
   };
   std::deque<DecodedFrame> m_reorderQueue;
   bool m_reorderFrames = false;
+  // Learned reorder depth: how many frames must be held before the lowest
+  // timestamp is certainly known. Grows to whatever the stream turns out to
+  // need and never shrinks within a playback, so a title that reorders deeply
+  // only in places is covered once it has shown itself.
+  size_t m_reorderDepth = REORDER_WINDOW_MIN;
+  uint64_t m_reorderMaxPts = 0;
   // Replace the decoder's timestamps on the reordered output with a clean
   // chain at the nominal rate (coreelec.amlogic.vc1_repair_timestamps). The
   // two are independent: reordering fixes which frame goes out next, this

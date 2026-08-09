@@ -245,10 +245,6 @@ public:
 #define MODE_3D_OUT_LR          0x00020000
 
 #define PTS_FREQ        90000
-// How many decoded frames to hold before releasing the lowest pts. Two covers
-// every reversal seen in the field (VC-1 reorders by one or two frame times);
-// the cost is that many frames of extra latency in the video path.
-static constexpr size_t REORDER_WINDOW = 2;
 
 #define UNIT_FREQ       96000
 #define AV_SYNC_THRESH  PTS_FREQ*30
@@ -1933,6 +1929,8 @@ bool CAMLCodec::OpenDecoder()
   m_last_pts = DVD_NOPTS_VALUE;
   m_prev_last_pts = DVD_NOPTS_VALUE;
   m_reorderQueue.clear();
+  m_reorderDepth = REORDER_WINDOW_MIN;
+  m_reorderMaxPts = 0;
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
   m_dst_rect.SetRect(0, 0, 0, 0);
@@ -2144,9 +2142,9 @@ bool CAMLCodec::OpenDecoder()
                        "left as it gave them");
   else if (isVc1)
     CLog::Log(LOGINFO,
-              "CAMLCodec::OpenDecoder - VC-1 frame timing: reordering to display order (window {} "
-              "frames), timestamps {}",
-              REORDER_WINDOW,
+              "CAMLCodec::OpenDecoder - VC-1 frame timing: reordering to display order (window "
+              "from {} frames, grown to what the stream needs, max {}), timestamps {}",
+              REORDER_WINDOW_MIN, REORDER_WINDOW_MAX,
               m_repairTimestamps ? "rebuilt at the nominal rate" : "kept as the decoder gave them");
 
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder hints.fpsrate({:d}), hints.fpsscale({:d}), video_rate({:d})",
@@ -2556,6 +2554,8 @@ void CAMLCodec::Reset()
   m_last_pts = DVD_NOPTS_VALUE;
   m_prev_last_pts = DVD_NOPTS_VALUE;
   m_reorderQueue.clear();
+  m_reorderDepth = REORDER_WINDOW_MIN;
+  m_reorderMaxPts = 0;
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
   m_state = 0;
@@ -2850,6 +2850,47 @@ int CAMLCodec::DequeueBuffer()
     CLog::Log(LOGDEBUG, LOGAVTIMING, "CAMLCodec::DequeueBuffer: pts:{:.3f} idx:{:d}",
   			static_cast<double>(pts) /  DVD_TIME_BASE, vbuf.index);
 
+    // Learn how deeply this stream reorders. A frame arriving behind the
+    // newest timestamp seen is that many frame times out of order, and the
+    // window has to be one deeper than that before releasing the lowest is
+    // safe. One title reorders by two frame times, another by four; holding
+    // the worst case for everything would cost latency no stream but the
+    // deepest needs. Absurd distances are discontinuities, not reordering.
+    if (m_reorderFrames && m_reorderMaxPts != 0)
+    {
+      const double frameDuration =
+          static_cast<double>(am_private->video_rate * DVD_TIME_BASE) / UNIT_FREQ;
+      if (frameDuration > 0.0)
+      {
+        // Both directions say the same thing. A frame behind the newest
+        // timestamp seen is that far out of order. A jump past it by more than
+        // one frame means the frames in between have not arrived yet and are
+        // still to come, which needs just as deep a window - and on the title
+        // that prompted this the deep passage opens with forward jumps, so
+        // learning from reversals alone would miss its first seconds.
+        const size_t distance =
+            pts < m_reorderMaxPts
+                ? static_cast<size_t>(static_cast<double>(m_reorderMaxPts - pts) / frameDuration +
+                                      0.5)
+                : static_cast<size_t>(static_cast<double>(pts - m_reorderMaxPts) / frameDuration +
+                                      0.5);
+        // Only a distance a window could actually resolve is reordering. This
+        // material also contains genuine discontinuities - jumps of twelve,
+        // twenty, thirty frames - and a loose bound lets those train the depth
+        // straight to the maximum, which is not adaptation, just a large fixed
+        // window arrived at by accident.
+        if (distance >= 2 && distance <= REORDER_WINDOW_MAX && distance + 1 > m_reorderDepth)
+        {
+          m_reorderDepth = std::min(distance + 1, REORDER_WINDOW_MAX);
+          CLog::Log(LOGDEBUG, LOGVIDEO,
+                    "CAMLCodec::DequeueBuffer: stream reorders by {} frames, holding {}", distance,
+                    m_reorderDepth);
+        }
+      }
+    }
+    if (pts > m_reorderMaxPts || m_reorderMaxPts == 0)
+      m_reorderMaxPts = pts;
+
     // The pts history advances in DISPLAY order, which is decided when a frame
     // leaves the reorder queue, not here.
     m_reorderQueue.push_back({pts, vbuf.index});
@@ -2926,7 +2967,7 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     // a software decoder does before handing a frame over.
     if (m_reorderFrames)
     {
-      if (m_reorderQueue.size() <= REORDER_WINDOW)
+      if (m_reorderQueue.size() <= m_reorderDepth)
         return CDVDVideoCodec::VC_BUFFER; // need more frames to order them
 
       auto oldest = std::min_element(m_reorderQueue.begin(), m_reorderQueue.end(),
@@ -3108,6 +3149,8 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     if (m_no_data_since_reset)
     {
       m_reorderQueue.clear();
+      m_reorderDepth = REORDER_WINDOW_MIN;
+      m_reorderMaxPts = 0;
       return CDVDVideoCodec::VC_EOF;
     }
 
