@@ -2152,11 +2152,24 @@ bool CAMLCodec::OpenDecoder()
     }
   }
 
-  m_reorderFrames = isVc1 && repairWanted && (!isInterlaced || decoderEmitsFrames);
-  m_repairTimestamps = m_reorderFrames;
+  // Progressive gets both: reorder by timestamp, then rebuild the timeline.
+  // Interlaced on the frame branch gets the rebuild ONLY. Its frames arrive in
+  // display order already - field pictures are coded in the order they are
+  // shown - and its timestamps carry the same unreliability as the rest of
+  // this decoder, so sorting by them actively scrambles correct frames. That
+  // was found by eye, not by log: once the rebuild rewrites timestamps the
+  // output looks identical either way, and the same tester ranked no-reorder
+  // over a two-frame window over a six-frame window on the same title, worse
+  // the deeper the window. The timestamps are the one thing this decoder is
+  // known to get wrong; they are not an ordering key here.
+  m_reorderFrames = isVc1 && repairWanted && !isInterlaced;
+  m_repairTimestamps = isVc1 && repairWanted && (!isInterlaced || decoderEmitsFrames);
   if (isVc1 && !repairWanted)
     CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: repair disabled by setting, "
                        "decoder output untouched");
+  else if (isVc1 && isInterlaced && m_repairTimestamps)
+    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: interlaced on the frame "
+                       "branch, timeline rebuilt at the nominal rate, order left as it arrives");
   else if (isVc1 && !m_reorderFrames)
     CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: decoder is emitting fields, "
                        "left as it gave them");
