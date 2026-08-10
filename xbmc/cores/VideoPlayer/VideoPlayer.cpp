@@ -1382,6 +1382,7 @@ void CVideoPlayer::Prepare()
   m_processInfo->SetTempo(1.0);
   m_processInfo->SetFrameAdvance(false);
   m_State.Clear();
+  m_chapterSeekTarget = 0;
   m_CurrentVideo.hint.Clear();
   m_CurrentAudio.hint.Clear();
   m_CurrentSubtitle.hint.Clear();
@@ -3447,6 +3448,9 @@ void CVideoPlayer::HandleMessages()
         SetCaching(CACHESTATE_FLUSH);
       }
 
+      // A time seek moves playback away from any pending chapter target.
+      m_chapterSeekTarget = 0;
+
       double start = DVD_NOPTS_VALUE;
 
       double time = msg.GetTime();
@@ -4011,15 +4015,26 @@ void CVideoPlayer::Seek(bool bPlus, bool bLargeStep, bool bChapterOverride)
 
   if (bLargeStep && bChapterOverride && GetChapter() > 0 && GetChapterCount() > 1)
   {
+    // Step from the still-pending chapter target when playback hasn't caught
+    // up with it yet (see m_chapterSeekTarget), otherwise from the clock's
+    // current chapter as before.
+    const int pending = m_chapterSeekTarget;
     if (!bPlus)
     {
-      SeekChapter(GetPreviousChapter());
+      if (pending > GetChapter())
+        SeekChapter(pending - 1);
+      else
+        SeekChapter(GetPreviousChapter());
       return;
     }
-    else if (GetChapter() < GetChapterCount())
+    else
     {
-      SeekChapter(GetChapter() + 1);
-      return;
+      const int chapter = std::max(GetChapter(), pending);
+      if (chapter < GetChapterCount())
+      {
+        SeekChapter(chapter + 1);
+        return;
+      }
     }
   }
 
@@ -5692,6 +5707,9 @@ int CVideoPlayer::SeekChapter(int iChapter)
       iChapter = 0;
     if (iChapter > GetChapterCount())
       return 0;
+
+    // Remember the target: the demuxer clamps requests below 1 to chapter 1.
+    m_chapterSeekTarget = std::max(iChapter, 1);
 
     // Seek to the chapter.
     m_messenger.Put(std::make_shared<CDVDMsgPlayerSeekChapter>(iChapter));

@@ -561,6 +561,13 @@ protected:
   double m_offset_pts;
   double m_demuxSeekBasePts{DVD_NOPTS_VALUE};
 
+  // Last chapter requested via SeekChapter(). Chapter seeks land on the
+  // keyframe before the chapter mark, so the clock-derived m_State.chapter
+  // stays one behind until playback crosses the mark; stepping from it would
+  // re-seek the same chapter on every rapid press. 0 = none pending; cleared
+  // by time seeks.
+  std::atomic<int> m_chapterSeekTarget{0};
+
   CDVDMessageQueue m_messenger;
   std::unique_ptr<CJobQueue> m_outboundEvents;
 
