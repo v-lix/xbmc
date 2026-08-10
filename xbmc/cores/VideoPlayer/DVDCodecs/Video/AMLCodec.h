@@ -58,13 +58,18 @@ struct pq_ctrl_s {
 #define AMVECM_IOC_S_PQ_CTRL  _IOW(_VE_CM, 0x69, struct vpp_pq_ctrl_s)
 #define AMVECM_IOC_G_PQ_CTRL  _IOR(_VE_CM, 0x6a, struct vpp_pq_ctrl_s)
 
-// How many decoded frames to hold before releasing the lowest timestamp.
-// Streams differ: some reorder by one or two frame times, others by four, so
-// the depth is learned from what the stream actually does rather than fixed at
-// a value that is either too shallow for the deep ones or too costly for the
-// rest. Each held frame is a frame of latency in the video path.
+// How many decoded frames to hold before releasing the lowest timestamp. The
+// depth is learned from the stream, but its ceiling comes from the codec, not
+// from the timestamps: VC-1 permits a single B frame between references and no
+// B pyramids, so a picture can genuinely arrive at most a frame or two early -
+// which is exactly what every healthy capture shows. Larger apparent distances
+// are broken timestamps, not reordering (they erupt in the burst drained after
+// a delivery stall, when the pts lookup misattributes wildly - excursions of
+// sixteen frames and more), and a window that grows to chase them ends up
+// sorting correct frames by garbage keys. Each held frame is also a frame of
+// latency in the video path.
 static constexpr size_t REORDER_WINDOW_MIN = 2;
-static constexpr size_t REORDER_WINDOW_MAX = 8;
+static constexpr size_t REORDER_WINDOW_MAX = 4;
 
 class CAMLCodec
 {
@@ -158,6 +163,9 @@ private:
   // only in places is covered once it has shown itself.
   size_t m_reorderDepth = REORDER_WINDOW_MIN;
   uint64_t m_reorderMaxPts = 0;
+  // Consecutive timeline-rebuild steps outside the true-reorder band; a run
+  // long enough means the timeline really moved and the chain re-anchors.
+  size_t m_repairExcursionRun = 0;
   // Replace the decoder's timestamps on the reordered output with a clean
   // chain at the nominal rate (coreelec.amlogic.vc1_repair_timestamps). The
   // two are independent: reordering fixes which frame goes out next, this

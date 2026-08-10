@@ -1948,6 +1948,7 @@ bool CAMLCodec::OpenDecoder()
   m_reorderQueue.clear();
   m_reorderDepth = REORDER_WINDOW_MIN;
   m_reorderMaxPts = 0;
+  m_repairExcursionRun = 0;
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
   m_dst_rect.SetRect(0, 0, 0, 0);
@@ -2589,6 +2590,7 @@ void CAMLCodec::Reset()
   m_reorderQueue.clear();
   m_reorderDepth = REORDER_WINDOW_MIN;
   m_reorderMaxPts = 0;
+  m_repairExcursionRun = 0;
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
   m_state = 0;
@@ -2907,12 +2909,11 @@ int CAMLCodec::DequeueBuffer()
                                       0.5)
                 : static_cast<size_t>(static_cast<double>(pts - m_reorderMaxPts) / frameDuration +
                                       0.5);
-        // Only a distance a window could actually resolve is reordering. This
-        // material also contains genuine discontinuities - jumps of twelve,
-        // twenty, thirty frames - and a loose bound lets those train the depth
-        // straight to the maximum, which is not adaptation, just a large fixed
-        // window arrived at by accident.
-        if (distance >= 2 && distance <= REORDER_WINDOW_MAX && distance + 1 > m_reorderDepth)
+        // Only a distance the codec can actually produce is reordering - see
+        // the constants for why that ceiling is low. Anything larger is a
+        // broken timestamp, and training the depth on those is how a window
+        // ends up sorting correct frames by garbage keys.
+        if (distance >= 2 && distance < REORDER_WINDOW_MAX && distance + 1 > m_reorderDepth)
         {
           m_reorderDepth = std::min(distance + 1, REORDER_WINDOW_MAX);
           CLog::Log(LOGDEBUG, LOGVIDEO,
@@ -3109,9 +3110,12 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
       // put the timeline one to three frames adrift for good once playback
       // resumed - seeking cleared it only because the flush re-anchors.
       //
-      // A step of four frames or more in either direction is a genuine
-      // discontinuity, not reordering noise. Those keep the decoder's value so
-      // a seek re-anchors the chain rather than being smoothed over.
+      // Only a step too large to be timestamp debris re-anchors the chain.
+      // Post-stall burst drains produce excursions of four to twenty frames in
+      // both directions - broken lookups, not seeks - and letting those keep
+      // the decoder's value leaked them straight to the screen as raw gaps and
+      // reversals. A real seek jumps by hundreds of frames at the least, so it
+      // still escapes the bound and re-anchors as before.
       const bool repair_speed = (m_speed == DVD_PLAYSPEED_NORMAL) ||
                                 (m_speed == DVD_PLAYSPEED_PAUSE);
 
@@ -3124,10 +3128,30 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
                               : static_cast<double>(m_cur_pts - m_last_pts);
       const double step_frames = step / rate_duration;
 
+      // Debris oscillates - a negative excursion is followed by a positive
+      // one, netting back onto the true timeline, with clean steps in
+      // between. A real shift moves every subsequent frame the same way. So a
+      // large step is flattened, but only for so long: a run of consecutive
+      // out-of-band steps means the timeline itself moved, and the chain
+      // re-anchors on the decoder's value rather than running offset forever.
+      constexpr double TRUE_REORDER_FRAMES = 4.0;
+      constexpr double REANCHOR_FRAMES = 32.0;
+      constexpr size_t EXCURSION_RUN_LIMIT = 8;
+      if (step_frames > -TRUE_REORDER_FRAMES && step_frames < TRUE_REORDER_FRAMES)
+        m_repairExcursionRun = 0;
+      else
+        m_repairExcursionRun++;
+
       if (repair_speed &&
-          (step_frames > -4.0) && (step_frames < 4.0))
+          (step_frames > -REANCHOR_FRAMES) && (step_frames < REANCHOR_FRAMES) &&
+          m_repairExcursionRun <= EXCURSION_RUN_LIMIT)
       {
         m_cur_pts = m_last_pts + rate_duration;
+      }
+      else
+      {
+        // Re-anchored on the decoder's value - the chain re-bases here.
+        m_repairExcursionRun = 0;
       }
       videoPicture.iDuration = rate_duration;
     }
@@ -3184,6 +3208,7 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
       m_reorderQueue.clear();
       m_reorderDepth = REORDER_WINDOW_MIN;
       m_reorderMaxPts = 0;
+      m_repairExcursionRun = 0;
       return CDVDVideoCodec::VC_EOF;
     }
 
