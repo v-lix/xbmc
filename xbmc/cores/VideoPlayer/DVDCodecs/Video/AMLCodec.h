@@ -91,6 +91,9 @@ public:
   static float  OMXPtsToSeconds(int omxpts);
   static int    OMXDurationToNs(int duration);
   int           GetAmlDuration() const;
+  // Time a picture spends waiting in the reorder queue before it is handed
+  // over. Zero when frames are passed on as they arrive.
+  double        GetOutputLatency() const;
   int           ReleaseFrame(const uint32_t index, bool bDrop = false);
 
   static int    PollFrame();

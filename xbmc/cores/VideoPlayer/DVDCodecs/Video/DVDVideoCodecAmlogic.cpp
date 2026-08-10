@@ -789,6 +789,11 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
   return data_added;
 }
 
+double CDVDVideoCodecAmlogic::GetOutputLatency()
+{
+  return m_Codec ? m_Codec->GetOutputLatency() : 0.0;
+}
+
 void CDVDVideoCodecAmlogic::Reset(void)
 {
   if ((aml_get_cpufamily_id() != AML_G12B) && (m_hints.dovi_el_type == DOVIELType::TYPE_FEL) && (m_dataCacheCore.GetSpeed() == 1.0f))

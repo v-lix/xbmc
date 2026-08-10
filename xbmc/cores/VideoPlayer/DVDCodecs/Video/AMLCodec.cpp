@@ -1862,6 +1862,23 @@ int CAMLCodec::GetAmlDuration() const
   return am_private ? (am_private->video_rate * PTS_FREQ) / UNIT_FREQ : 0;
 };
 
+double CAMLCodec::GetOutputLatency() const
+{
+  // The queue holds m_reorderDepth pictures back and releases the lowest
+  // timestamp once one more has arrived, so a picture waits that many frame
+  // times before it is handed over. Reported so the player can place the clock
+  // against when the picture actually reaches the screen; without it the video
+  // start looks earlier than it is by exactly this amount, and audio ends up
+  // ahead by the same. It grows with what the stream turns out to need, so it
+  // has to be asked for rather than assumed.
+  if (!m_reorderFrames || !am_private || am_private->video_rate <= 0)
+    return 0.0;
+
+  const double frameDuration =
+      static_cast<double>(am_private->video_rate * DVD_TIME_BASE) / UNIT_FREQ;
+  return static_cast<double>(m_reorderDepth) * frameDuration;
+}
+
 std::string CAMLCodec::intToFourCCString(unsigned int value) 
 {
   char bytes[4];
