@@ -916,17 +916,6 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
       msg.cachetime = DVD_MSEC_TO_TIME(50); //! @todo implement
       msg.cachetotal = DVD_MSEC_TO_TIME(100); //! @todo implement
 
-      // A codec that reorders its output holds pictures back until it knows
-      // which one comes next, and the master clock is placed at
-      // starttime - cachetotal, so a depth the player does not know about puts
-      // the clock that far ahead of where the picture actually appears - video
-      // late, audio seemingly early, by exactly the amount held. The hardcoded
-      // figures above have never accounted for it because until now nothing
-      // here reordered. Ask the codec instead of guessing: the depth varies by
-      // stream, and reports of audio drifting ahead tracked it exactly.
-      if (m_pVideoCodec)
-        msg.cachetotal += m_pVideoCodec->GetOutputLatency();
-
       // Amlogic hardware deinterlace pipeline latency compensation.
       // When interlaced content is decoded by AML hardware, the VFM pipeline
       // includes a deinterlace module (di0) that buffers multiple fields before

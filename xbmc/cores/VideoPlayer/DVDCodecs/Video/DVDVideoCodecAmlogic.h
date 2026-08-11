@@ -82,7 +82,6 @@ public:
   virtual void SetCodecControl(int flags) override;
   virtual void Abort() override;
   virtual const char* GetName(void) override { return (const char*)m_pFormatName; }
-  double GetOutputLatency() override;
   virtual bool SupportsExtention() { return true; }
 
   // ISettingCallback
