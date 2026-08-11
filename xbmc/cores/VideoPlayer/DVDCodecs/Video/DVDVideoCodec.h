@@ -204,18 +204,6 @@ public:
   virtual unsigned GetAllowedReferences() { return 0; }
 
   /**
-   * How long a decoded picture is held inside the codec before it is handed
-   * over, in DVD time units. A codec that reorders output has to keep a window
-   * of frames back until it knows which comes next, and that delay is real: the
-   * picture reaches the screen this much later than its timestamp alone would
-   * suggest. The player adds it to the video pipeline depth it reports when
-   * starting, so the master clock is placed against where the picture actually
-   * appears rather than where the codec first saw it. Codecs that hand pictures
-   * over as they finish them return zero.
-   */
-  virtual double GetOutputLatency() { return 0.0; }
-
-  /**
    * For calculation of dropping requirements player asks for some information.
    * - pts : right after decoder, used to detect gaps (dropped frames in decoder)
    * - droppedFrames : indicates if decoder has dropped a frame

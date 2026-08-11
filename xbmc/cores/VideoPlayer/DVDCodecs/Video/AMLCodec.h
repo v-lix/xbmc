@@ -58,19 +58,6 @@ struct pq_ctrl_s {
 #define AMVECM_IOC_S_PQ_CTRL  _IOW(_VE_CM, 0x69, struct vpp_pq_ctrl_s)
 #define AMVECM_IOC_G_PQ_CTRL  _IOR(_VE_CM, 0x6a, struct vpp_pq_ctrl_s)
 
-// How many decoded frames to hold before releasing the lowest timestamp. The
-// depth is learned from the stream, but its ceiling comes from the codec, not
-// from the timestamps: VC-1 permits a single B frame between references and no
-// B pyramids, so a picture can genuinely arrive at most a frame or two early -
-// which is exactly what every healthy capture shows. Larger apparent distances
-// are broken timestamps, not reordering (they erupt in the burst drained after
-// a delivery stall, when the pts lookup misattributes wildly - excursions of
-// sixteen frames and more), and a window that grows to chase them ends up
-// sorting correct frames by garbage keys. Each held frame is also a frame of
-// latency in the video path.
-static constexpr size_t REORDER_WINDOW_MIN = 2;
-static constexpr size_t REORDER_WINDOW_MAX = 4;
-
 class CAMLCodec
 {
 public:
@@ -96,9 +83,6 @@ public:
   static float  OMXPtsToSeconds(int omxpts);
   static int    OMXDurationToNs(int duration);
   int           GetAmlDuration() const;
-  // Time a picture spends waiting in the reorder queue before it is handed
-  // over. Zero when frames are passed on as they arrive.
-  double        GetOutputLatency() const;
   int           ReleaseFrame(const uint32_t index, bool bDrop = false);
 
   static int    PollFrame();
@@ -147,29 +131,20 @@ private:
   uint64_t         m_last_pts;
   uint64_t         m_prev_last_pts; // pts before m_last_pts (excursion detection)
 
-  // Display-order reordering: the decoder hands frames over in decode order
-  // for codecs with B-frames (VC-1 notably), so a short window of decoded
-  // frames is held and emitted lowest-pts-first.
+  // Decoded frames queued between DequeueBuffer and GetPicture, handed over
+  // in the order the decoder delivered them.
   struct DecodedFrame
   {
     uint64_t pts;
     uint32_t index;
   };
   std::deque<DecodedFrame> m_reorderQueue;
-  bool m_reorderFrames = false;
-  // Learned reorder depth: how many frames must be held before the lowest
-  // timestamp is certainly known. Grows to whatever the stream turns out to
-  // need and never shrinks within a playback, so a title that reorders deeply
-  // only in places is covered once it has shown itself.
-  size_t m_reorderDepth = REORDER_WINDOW_MIN;
-  uint64_t m_reorderMaxPts = 0;
   // Consecutive timeline-rebuild steps outside the true-reorder band; a run
   // long enough means the timeline really moved and the chain re-anchors.
   size_t m_repairExcursionRun = 0;
-  // Replace the decoder's timestamps on the reordered output with a clean
-  // chain at the nominal rate (coreelec.amlogic.vc1_repair_timestamps). The
-  // two are independent: reordering fixes which frame goes out next, this
-  // fixes what time it claims to be.
+  // Replace the decoder's timestamps with a clean chain at the nominal rate
+  // (coreelec.amlogic.vc1_repair_timestamps) - they are not trustworthy, see
+  // OpenDecoder.
   bool m_repairTimestamps = false;
   // Recently output (display-order) pts, for corrupt-splice detection: a pts
   // that steps backwards onto a value already output is a broken splice

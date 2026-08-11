@@ -1862,22 +1862,6 @@ int CAMLCodec::GetAmlDuration() const
   return am_private ? (am_private->video_rate * PTS_FREQ) / UNIT_FREQ : 0;
 };
 
-double CAMLCodec::GetOutputLatency() const
-{
-  // The queue holds m_reorderDepth pictures back and releases the lowest
-  // timestamp once one more has arrived, so a picture waits that many frame
-  // times before it is handed over. Reported so the player can place the clock
-  // against when the picture actually reaches the screen; without it the video
-  // start looks earlier than it is by exactly this amount, and audio ends up
-  // ahead by the same. It grows with what the stream turns out to need, so it
-  // has to be asked for rather than assumed.
-  if (!m_reorderFrames || !am_private || am_private->video_rate <= 0)
-    return 0.0;
-
-  const double frameDuration =
-      static_cast<double>(am_private->video_rate * DVD_TIME_BASE) / UNIT_FREQ;
-  return static_cast<double>(m_reorderDepth) * frameDuration;
-}
 
 std::string CAMLCodec::intToFourCCString(unsigned int value) 
 {
@@ -1946,8 +1930,6 @@ bool CAMLCodec::OpenDecoder()
   m_last_pts = DVD_NOPTS_VALUE;
   m_prev_last_pts = DVD_NOPTS_VALUE;
   m_reorderQueue.clear();
-  m_reorderDepth = REORDER_WINDOW_MIN;
-  m_reorderMaxPts = 0;
   m_repairExcursionRun = 0;
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
@@ -2090,47 +2072,27 @@ bool CAMLCodec::OpenDecoder()
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder "
     "hints.width({:d}), hints.height({:d}), hints.codec({:d}), hints.codec_tag({:d}), hints.bitdepth({:d})",
     hints.width, hints.height, hints.codec, hints.codec_tag, hints.bitdepth);
-  // Codecs whose AML decoder hands frames over in decode order need the
-  // display-order window; H.264/HEVC come out already ordered.
-  // The AML VC-1 decoder gets both of these wrong, and they are separate
-  // problems that need separate answers. It emits frames in decode order, so a
-  // short window is held and the lowest pts released first - without that, B
-  // frames reach the screen out of sequence and motion stutters. And its
-  // timestamps are not trustworthy, so once the frames are in the right order
-  // their timestamps are replaced with a clean chain at the nominal rate -
-  // without that, VC-1 drifts out of sync in a way seeking cannot fix.
+  // The AML VC-1 decoder's timestamps are not trustworthy - wrong enough to
+  // hold a steady A/V desync, and after a delivery stall wrong by ten frames
+  // and more in either direction. The repair replaces them with a clean chain
+  // at the stream's nominal rate in GetPicture; without it VC-1 drifts out of
+  // sync in a way seeking cannot fix. Frames are passed on in the order the
+  // decoder delivers them. A window that re-sorted them by timestamp was
+  // tried and reverted: with timestamps this unreliable the sort scrambles
+  // correct frames, and it showed up as periodic hitching on titles that play
+  // cleanly without it.
   //
-  // Doing only one of the two just swaps one fault for the other, which is
-  // what earlier builds did in both directions. Reordering always applies;
-  // coreelec.amlogic.vc1_repair_timestamps controls the timestamps alone, and
-  // turning it off keeps the decoder's own values for a stream whose timing is
-  // sound.
-  // Both of these assume the decoder hands over whole frames. For interlaced
-  // VC-1 that depends on which branch amvdec_vc1 takes, which is what its
-  // force_frameint parameter selects: with it clear the decoder emits fields,
-  // and reordering field pairs by timestamp or laying a frame-rate chain over
-  // field-rate output makes things worse rather than better - that combination
-  // is what produced slow motion and silence on 1080i25 and 1080i29.97. With
-  // it set the decoder emits frames from the same path progressive VC-1 uses,
-  // carrying the same decode order and the same unreliable timestamps, so it
-  // wants exactly the same treatment.
+  // Interlaced VC-1 needs one extra step first. The decoder's field output is
+  // unusable downstream (slow motion, lost audio), so amvdec_vc1 is asked for
+  // whole frames via its force_frameint parameter - its own parameter, read
+  // only in its interlaced branch, so nothing else can be affected. The
+  // demuxer's flag decides, because the old rate-based guard here compared
+  // GetVideoFps() against 25.0 while the demuxer doubles interlaced rates
+  // (1080i25 reports 50.0), so it never fired. An older amvdec_vc1 without
+  // the parameter still emits fields, and those must not be touched at all.
   //
-  // So ask for frames. The parameter belongs to amvdec_vc1 itself and is only
-  // consulted in its interlaced branch, so setting it cannot reach progressive
-  // VC-1 or any other codec, and having set it here we know which branch the
-  // decoder took rather than having to infer it. Inferring is not possible in
-  // any case: the demuxer's interlace flag cannot see the decoder's choice, and
-  // the earlier guard here - `GetVideoFps() == 25.0f && GetVideoInterlaced()` -
-  // never fired at all, because the demuxer doubles the rate for interlaced
-  // content (fps:30000/1001 becomes fps:60000/1001i) and Kodi keeps the doubled
-  // value, so 1080i25 reports 50.0 and 1080i29.97 reports 59.94. Nothing ever
-  // reports 25.0.
-  //
-  // An older amvdec_vc1 has no such parameter. That build still emits fields,
-  // and its field output is exactly what must not be reordered or rebuilt, so
-  // a missing node leaves both switched off.
-  // The setting turns the whole of this off together, so it stays a usable A/B
-  // against an untouched decoder. It also means the parameter is not rewritten
+  // The setting turns the whole of this off together, so it stays a usable
+  // A/B against an untouched decoder, and the parameter is not rewritten
   // behind the back of anyone testing the field branch by hand.
   const bool isVc1 = (m_hints.codec == AV_CODEC_ID_VC1 || m_hints.codec == AV_CODEC_ID_WMV3);
   const bool isInterlaced = (m_hints.codecOptions & CODEC_INTERLACED) == CODEC_INTERLACED;
@@ -2153,33 +2115,15 @@ bool CAMLCodec::OpenDecoder()
     }
   }
 
-  // Progressive gets both: reorder by timestamp, then rebuild the timeline.
-  // Interlaced on the frame branch gets the rebuild ONLY. Its frames arrive in
-  // display order already - field pictures are coded in the order they are
-  // shown - and its timestamps carry the same unreliability as the rest of
-  // this decoder, so sorting by them actively scrambles correct frames. That
-  // was found by eye, not by log: once the rebuild rewrites timestamps the
-  // output looks identical either way, and the same tester ranked no-reorder
-  // over a two-frame window over a six-frame window on the same title, worse
-  // the deeper the window. The timestamps are the one thing this decoder is
-  // known to get wrong; they are not an ordering key here.
-  m_reorderFrames = isVc1 && repairWanted && !isInterlaced;
   m_repairTimestamps = isVc1 && repairWanted && (!isInterlaced || decoderEmitsFrames);
-  if (isVc1 && !repairWanted)
-    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: repair disabled by setting, "
-                       "decoder output untouched");
-  else if (isVc1 && isInterlaced && m_repairTimestamps)
-    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: interlaced on the frame "
-                       "branch, timeline rebuilt at the nominal rate, order left as it arrives");
-  else if (isVc1 && !m_reorderFrames)
-    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: decoder is emitting fields, "
-                       "left as it gave them");
-  else if (isVc1)
-    CLog::Log(LOGINFO,
-              "CAMLCodec::OpenDecoder - VC-1 frame timing: reordering to display order (window "
-              "from {} frames, grown to what the stream needs, max {}), timestamps rebuilt at the "
-              "nominal rate",
-              REORDER_WINDOW_MIN, REORDER_WINDOW_MAX);
+  if (isVc1)
+    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder - VC-1 frame timing: {}",
+              !repairWanted ? "repair disabled by setting, decoder output untouched"
+              : !m_repairTimestamps
+                  ? "decoder is emitting fields, left as it gave them"
+                  : isInterlaced
+                        ? "interlaced on the frame branch, timeline rebuilt at the nominal rate"
+                        : "timeline rebuilt at the nominal rate");
 
   CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder hints.fpsrate({:d}), hints.fpsscale({:d}), video_rate({:d})",
     hints.fpsrate, hints.fpsscale, am_private->video_rate);
@@ -2588,8 +2532,6 @@ void CAMLCodec::Reset()
   m_last_pts = DVD_NOPTS_VALUE;
   m_prev_last_pts = DVD_NOPTS_VALUE;
   m_reorderQueue.clear();
-  m_reorderDepth = REORDER_WINDOW_MIN;
-  m_reorderMaxPts = 0;
   m_repairExcursionRun = 0;
   m_outPtsRingPos = 0;
   m_outPtsRingCount = 0;
@@ -2885,48 +2827,8 @@ int CAMLCodec::DequeueBuffer()
     CLog::Log(LOGDEBUG, LOGAVTIMING, "CAMLCodec::DequeueBuffer: pts:{:.3f} idx:{:d}",
   			static_cast<double>(pts) /  DVD_TIME_BASE, vbuf.index);
 
-    // Learn how deeply this stream reorders. A frame arriving behind the
-    // newest timestamp seen is that many frame times out of order, and the
-    // window has to be one deeper than that before releasing the lowest is
-    // safe. One title reorders by two frame times, another by four; holding
-    // the worst case for everything would cost latency no stream but the
-    // deepest needs. Absurd distances are discontinuities, not reordering.
-    if (m_reorderFrames && m_reorderMaxPts != 0)
-    {
-      const double frameDuration =
-          static_cast<double>(am_private->video_rate * DVD_TIME_BASE) / UNIT_FREQ;
-      if (frameDuration > 0.0)
-      {
-        // Both directions say the same thing. A frame behind the newest
-        // timestamp seen is that far out of order. A jump past it by more than
-        // one frame means the frames in between have not arrived yet and are
-        // still to come, which needs just as deep a window - and on the title
-        // that prompted this the deep passage opens with forward jumps, so
-        // learning from reversals alone would miss its first seconds.
-        const size_t distance =
-            pts < m_reorderMaxPts
-                ? static_cast<size_t>(static_cast<double>(m_reorderMaxPts - pts) / frameDuration +
-                                      0.5)
-                : static_cast<size_t>(static_cast<double>(pts - m_reorderMaxPts) / frameDuration +
-                                      0.5);
-        // Only a distance the codec can actually produce is reordering - see
-        // the constants for why that ceiling is low. Anything larger is a
-        // broken timestamp, and training the depth on those is how a window
-        // ends up sorting correct frames by garbage keys.
-        if (distance >= 2 && distance < REORDER_WINDOW_MAX && distance + 1 > m_reorderDepth)
-        {
-          m_reorderDepth = std::min(distance + 1, REORDER_WINDOW_MAX);
-          CLog::Log(LOGDEBUG, LOGVIDEO,
-                    "CAMLCodec::DequeueBuffer: stream reorders by {} frames, holding {}", distance,
-                    m_reorderDepth);
-        }
-      }
-    }
-    if (pts > m_reorderMaxPts || m_reorderMaxPts == 0)
-      m_reorderMaxPts = pts;
-
-    // The pts history advances in DISPLAY order, which is decided when a frame
-    // leaves the reorder queue, not here.
+    // The pts history advances when a frame is handed over in GetPicture,
+    // not here.
     m_reorderQueue.push_back({pts, vbuf.index});
   }
   else if (ret != EAGAIN)
@@ -2990,37 +2892,15 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
   // around the minimum threshold while the decoder still has output frames ready.
   if (m_buffer_level_ready && ((ret = DequeueBuffer()) == 0))
   {
-    // Emit in display order. The decoder hands frames over in decode order
-    // whenever the stream uses B-frames - VC-1 does so constantly, roughly
-    // every third frame arriving one or two frame times early (measured: 367
-    // reversals in a capture, clustered at exactly 1 and 2 frame durations).
-    // Presenting that order as-is misplaces those frames against the audio,
-    // which is what the old VC-1 workaround tried to paper over by rewriting
-    // their timestamps to the nominal rate. Hold a short window instead and
-    // release the lowest pts once the window is full, which is the same thing
-    // a software decoder does before handing a frame over.
-    if (m_reorderFrames)
-    {
-      if (m_reorderQueue.size() <= m_reorderDepth)
-        return CDVDVideoCodec::VC_BUFFER; // need more frames to order them
-
-      auto oldest = std::min_element(m_reorderQueue.begin(), m_reorderQueue.end(),
-                                     [](const DecodedFrame& a, const DecodedFrame& b)
-                                     { return a.pts < b.pts; });
-      m_prev_last_pts = m_last_pts;
-      m_last_pts = m_cur_pts;
-      m_cur_pts = oldest->pts;
-      m_bufferIndex = oldest->index;
-      m_reorderQueue.erase(oldest);
-    }
-    else
-    {
-      m_prev_last_pts = m_last_pts;
-      m_last_pts = m_cur_pts;
-      m_cur_pts = m_reorderQueue.front().pts;
-      m_bufferIndex = m_reorderQueue.front().index;
-      m_reorderQueue.pop_front();
-    }
+    // Hand frames over in the order the decoder delivers them. Re-sorting by
+    // timestamp was tried and reverted: the timestamps are the unreliable part
+    // (see OpenDecoder), and sorting correct frames by garbage keys showed up
+    // as periodic hitching.
+    m_prev_last_pts = m_last_pts;
+    m_last_pts = m_cur_pts;
+    m_cur_pts = m_reorderQueue.front().pts;
+    m_bufferIndex = m_reorderQueue.front().index;
+    m_reorderQueue.pop_front();
 
     videoPicture.iFlags = 0;
 
@@ -3206,8 +3086,6 @@ CDVDVideoCodec::VCReturn CAMLCodec::GetPicture(VideoPicture& videoPicture)
     if (m_no_data_since_reset)
     {
       m_reorderQueue.clear();
-      m_reorderDepth = REORDER_WINDOW_MIN;
-      m_reorderMaxPts = 0;
       m_repairExcursionRun = 0;
       return CDVDVideoCodec::VC_EOF;
     }
