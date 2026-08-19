@@ -426,7 +426,8 @@ void CGUIDialogFileBrowser::Update(const std::string &strDirectory)
   if (m_Directory->GetPath().empty() && m_addNetworkShareEnabled &&
      (CServiceBroker::GetSettingsComponent()->GetProfileManager()->GetMasterProfile().getLockMode() == LOCK_MODE_EVERYONE ||
       CServiceBroker::GetSettingsComponent()->GetProfileManager()->IsMasterProfile() || g_passwordManager.bMasterUser))
-  { // we are in the virtual directory - add the "Add Network Location" item
+  { // don't have a profile lock in place
+    // add the "Add Network Location" item
     CFileItemPtr pItem(new CFileItem(g_localizeStrings.Get(1032)));
     pItem->SetPath("net://");
     pItem->m_bIsFolder = true;
@@ -555,8 +556,11 @@ void CGUIDialogFileBrowser::OnClick(int iItem)
   else if (!m_browsingForFolders)
   {
     m_selectedPath = pItem->GetPath();
-    m_bConfirmed = true;
-    Close();
+    if (!m_allowFolderSelection)
+    {
+      m_bConfirmed = true;
+      Close();
+    }
   }
 }
 
@@ -920,22 +924,22 @@ void CGUIDialogFileBrowser::OnAddNetworkLocation()
   std::string path;
   if (CGUIDialogNetworkSetup::ShowAndGetNetworkAddress(path))
   {
-    // verify the path by doing a GetDirectory.
-    CFileItemList items;
-    if (CDirectory::GetDirectory(path, items, "", DIR_FLAG_NO_FILE_DIRS | DIR_FLAG_ALLOW_PROMPT) || CGUIDialogYesNo::ShowAndGetInput(CVariant{1001}, CVariant{1002}))
-    { // add the network location to the shares list
+    if (CDirectory::GetDirectory(path, *m_vecItems, "", DIR_FLAG_ALLOW_PROMPT))
+    {
       CMediaSource share;
-      share.strPath = path; //setPath(path);
+      share.strPath = path;
       CURL url(path);
       share.strName = url.GetWithoutUserDetails();
       URIUtils::RemoveSlashAtEnd(share.strName);
       m_shares.push_back(share);
-      // add to our location manager...
       CServiceBroker::GetMediaManager().AddNetworkLocation(path);
     }
+    else
+    {
+      HELPERS::ShowOKDialogText(CVariant{1001}, CVariant{1002});
+    }
   }
-  m_rootDir.SetSources(m_shares);
-  Update(m_vecItems->GetPath());
+  Update("");
 }
 
 void CGUIDialogFileBrowser::OnAddMediaSource()
@@ -1007,7 +1011,7 @@ bool CGUIDialogFileBrowser::OnPopupMenu(int iItem)
 
       for (unsigned int i=0;i<m_shares.size();++i)
       {
-        if (URIUtils::CompareWithoutSlashAtEnd(m_shares[i].strPath, m_selectedPath) && !m_shares[i].m_ignore) // getPath().Equals(m_selectedPath))
+        if (URIUtils::CompareWithoutSlashAtEnd(m_shares[i].strPath, m_selectedPath) && !m_shares[i].m_ignore) // getPath().Equals(strOldPath))
         {
           m_shares.erase(m_shares.begin()+i);
           break;
@@ -1049,5 +1053,4 @@ CGUIControl *CGUIDialogFileBrowser::GetFirstFocusableControl(int id)
     id = m_viewControl.GetCurrentControl();
   return CGUIWindow::GetFirstFocusableControl(id);
 }
-
 
