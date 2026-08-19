@@ -14,6 +14,7 @@
 #include "dbwrappers/dataset.h"
 #include "filesystem/File.h"
 #include "filesystem/StackDirectory.h"
+#include "guilib/LocalizeStrings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/StreamDetails.h"
@@ -421,7 +422,7 @@ bool CHdrScanJob::DoWork()
     return false;
   }
 
-  SetTitle("Scan HDR information");
+  SetTitle(g_localizeStrings.Get(102));
 
   for (std::size_t index = 0; index < candidates.size(); ++index)
   {
