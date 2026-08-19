@@ -62,6 +62,8 @@ CGUIDialogFileBrowser::CGUIDialogFileBrowser()
   m_browsingForFolders = 0;
   m_browsingForImages = false;
   m_useFileDirectories = false;
+  m_allowFolderSelection = false;
+  m_selectedPathIsFolder = false;
   m_addNetworkShareEnabled = false;
   m_singleList = false;
   m_thumbLoader.SetObserver(this);
@@ -478,9 +480,15 @@ void CGUIDialogFileBrowser::FrameMove()
     // if we are browsing for folders, and not in the root directory, then we use the parent path,
     // else we use the current file's path
     if (m_browsingForFolders && !m_Directory->IsVirtualDirectoryRoot())
+    {
       m_selectedPath = m_Directory->GetPath();
+      m_selectedPathIsFolder = true;
+    }
     else
+    {
       m_selectedPath = (*m_vecItems)[item]->GetPath();
+      m_selectedPathIsFolder = (*m_vecItems)[item]->m_bIsFolder;
+    }
     if (m_selectedPath == "net://")
     {
       SET_CONTROL_LABEL(CONTROL_LABEL_PATH, g_localizeStrings.Get(1032)); // "Add Network Location..."
@@ -492,7 +500,8 @@ void CGUIDialogFileBrowser::FrameMove()
       std::string safePath = url.GetWithoutUserDetails();
       SET_CONTROL_LABEL(CONTROL_LABEL_PATH, safePath);
     }
-    if ((!m_browsingForFolders && (*m_vecItems)[item]->m_bIsFolder) || ((*m_vecItems)[item]->GetPath() == "image://Browse"))
+    if ((!m_browsingForFolders && !m_allowFolderSelection && (*m_vecItems)[item]->m_bIsFolder) ||
+        ((*m_vecItems)[item]->GetPath() == "image://Browse"))
     {
       CONTROL_DISABLE(CONTROL_OK);
     }
@@ -553,6 +562,7 @@ void CGUIDialogFileBrowser::OnClick(int iItem)
   else if (!m_browsingForFolders)
   {
     m_selectedPath = pItem->GetPath();
+    m_selectedPathIsFolder = false;
     m_bConfirmed = true;
     Close();
   }
@@ -683,6 +693,34 @@ bool CGUIDialogFileBrowser::ShowAndGetDirectory(const VECSOURCES &shares, const 
   }
 
   return ShowAndGetFile(shares, "/", heading, path);
+}
+
+bool CGUIDialogFileBrowser::ShowAndGetFileOrDirectory(const VECSOURCES &shares, const std::string &mask, const std::string &heading, std::string &path, bool &isDirectory, bool useThumbs /* = false */, bool useFileDirectories /* = false */)
+{
+  CGUIDialogFileBrowser* const browser{GetUniqueBrowserInstance()};
+  if (!browser)
+    return false;
+
+  browser->m_useFileDirectories = useFileDirectories;
+  browser->m_allowFolderSelection = true;
+  browser->m_browsingForImages = useThumbs;
+  browser->SetHeading(heading);
+  browser->SetSources(shares);
+  browser->m_browsingForFolders = 0;
+  browser->m_rootDir.SetMask(mask);
+  browser->m_selectedPath = path;
+  browser->m_addNetworkShareEnabled = false;
+  browser->Open();
+
+  const bool confirmed{browser->IsConfirmed()};
+  if (confirmed)
+  {
+    path = browser->m_selectedPath;
+    isDirectory = browser->m_selectedPathIsFolder;
+  }
+
+  CServiceBroker::GetGUI()->GetWindowManager().Delete(browser->GetID());
+  return confirmed;
 }
 
 bool CGUIDialogFileBrowser::ShowAndGetFile(const VECSOURCES &shares, const std::string &mask, const std::string &heading, std::string &path, bool useThumbs /* = false */, bool useFileDirectories /* = false */)

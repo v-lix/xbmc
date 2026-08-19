@@ -18,21 +18,28 @@
 #include "messaging/helpers/DialogHelper.h"
 #include "messaging/helpers/DialogOKHelper.h"
 #include "music/MusicLibraryQueue.h"
+#include "settings/MediaSourceSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "settings/dialogs/GUIDialogLibExportSettings.h"
 #include "settings/lib/Setting.h"
 #include "storage/MediaManager.h"
+#include "utils/FileExtensionProvider.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 #include "utils/XBMCTinyXML.h"
 #include "utils/XMLUtils.h"
 #include "utils/log.h"
+#include "video/HdrScanJob.h"
 #include "video/VideoDatabase.h"
 #include "video/VideoLibraryQueue.h"
 
+#include <cstddef>
 #include <limits.h>
 #include <mutex>
 #include <string>
+#include <utility>
+#include <vector>
 
 using namespace KODI;
 using namespace KODI::MESSAGING;
@@ -364,6 +371,77 @@ void CMediaSettings::OnSettingAction(const std::shared_ptr<const CSetting>& sett
       videodatabase.ImportFromXML(path);
       videodatabase.Close();
     }
+  }
+  else if (settingId == CSettings::SETTING_MYVIDEOS_HDRSCAN)
+  {
+    if (CVideoLibraryQueue::GetInstance().IsRunning())
+    {
+      HELPERS::ShowOKDialogText(CVariant{37007}, CVariant{37010});
+      return;
+    }
+
+    VECSOURCES shares;
+    if (const VECSOURCES* videoSources = CMediaSourceSettings::GetInstance().GetSources("video"))
+      shares = *videoSources;
+    CServiceBroker::GetMediaManager().GetLocalDrives(shares);
+    CServiceBroker::GetMediaManager().GetNetworkLocations(shares);
+    CServiceBroker::GetMediaManager().GetRemovableDrives(shares);
+
+    std::string scope;
+    bool scopeIsFolder = false;
+    const std::string heading =
+        StringUtils::Format(g_localizeStrings.Get(13401), g_localizeStrings.Get(36912));
+    if (!CGUIDialogFileBrowser::ShowAndGetFileOrDirectory(
+            shares, CServiceBroker::GetFileExtensionProvider().GetVideoExtensions(), heading, scope,
+            scopeIsFolder))
+      return;
+
+    // Search once here rather than again inside the job, so the library is walked a single time
+    // and an empty result can be reported before any progress dialog appears.
+    CHdrScanJob::Collection collection = CHdrScanJob::Collect(scope, scopeIsFolder);
+    if (collection.cancelled)
+      return;
+
+    if (!collection.queried)
+    {
+      HELPERS::ShowOKDialogText(CVariant{37007}, CVariant{257});
+      return;
+    }
+
+    if (collection.candidates.empty())
+    {
+      HELPERS::ShowOKDialogText(CVariant{37007}, CVariant{37013});
+      return;
+    }
+
+    bool updateNfo = false;
+    if (collection.hasNfoFiles)
+    {
+      const DialogResponse nfoChoice =
+          HELPERS::ShowYesNoDialogText(CVariant{37011}, CVariant{37012});
+      if (nfoChoice == DialogResponse::CHOICE_CANCELLED)
+        return;
+      updateNfo = nfoChoice == DialogResponse::CHOICE_YES;
+    }
+
+    const std::size_t candidateCount = collection.candidates.size();
+    CHdrScanJob job(std::move(collection.candidates), updateNfo);
+    job.DoModal();
+
+    if (job.GetDatabaseUpdatedCount() > 0)
+      CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::VideoLibrary, "OnRefresh");
+
+    // Individual failures are only logged, since naming them here could mean a dialog listing
+    // hundreds of paths - the summary says how many there were and where to find them.
+    std::string summary = StringUtils::Format(
+        g_localizeStrings.Get(37017), job.GetScannedCount(), candidateCount,
+        job.GetDatabaseUpdatedCount(), job.GetNfoUpdatedCount(), job.GetFailureCount());
+    if (job.WasCancelled())
+      summary = g_localizeStrings.Get(37019) + "[CR]" + summary;
+    if (job.GetFailureCount() > 0)
+      summary += "[CR]" + g_localizeStrings.Get(37018);
+
+    HELPERS::ShowOKDialogText(CVariant{37007}, CVariant{summary});
   }
 }
 

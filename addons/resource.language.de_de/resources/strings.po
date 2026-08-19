@@ -16670,6 +16670,34 @@ msgctxt "#37006"
 msgid "Decode a frame of each HDR10 video while scanning to find out whether it also carries HDR10+ dynamic metadata. Dolby Vision files are always examined, because the enhancement layer type cannot be determined any other way. Leaving this off avoids a decode per HDR10 file, which is noticeable on network storage."
 msgstr "Beim Scannen ein Einzelbild jedes HDR10-Videos dekodieren, um festzustellen, ob es zusätzlich dynamische HDR10+-Metadaten enthält. Dolby-Vision-Dateien werden immer untersucht, da sich der Typ des Enhancement Layers nicht anders bestimmen lässt. Bleibt diese Option aus, entfällt das Dekodieren pro HDR10-Datei, was sich bei Netzwerkspeicher deutlich bemerkbar macht."
 
+msgctxt "#37007"
+msgid "Rescan HDR metadata"
+msgstr "HDR-Metadaten neu einlesen"
+
+msgctxt "#37008"
+msgid "Re-read the Dolby Vision and HDR10+ details of a chosen file or folder. Library entries scanned by an older version carry no Dolby Vision profile and are filled in. HDR10 entries are examined again on every run while HDR10+ detection is enabled, because nothing records that a file has already been checked for HDR10+."
+msgstr "Die Dolby-Vision- und HDR10+-Details einer gewählten Datei oder eines Ordners neu einlesen. Von einer älteren Version eingelesene Bibliothekseinträge enthalten kein Dolby-Vision-Profil und werden ergänzt. HDR10-Einträge werden bei aktivierter HDR10+-Erkennung bei jedem Durchlauf erneut untersucht, da nicht vermerkt wird, ob eine Datei bereits auf HDR10+ geprüft wurde."
+
+msgctxt "#37009"
+msgid "HDR metadata"
+msgstr "HDR-Metadaten"
+
+msgctxt "#37010"
+msgid "The video library is busy. Wait for the running task to finish and try again."
+msgstr "Die Videobibliothek ist beschäftigt. Bitte warten, bis die laufende Aufgabe beendet ist, und es erneut versuchen."
+
+msgctxt "#37011"
+msgid "Update NFO files?"
+msgstr "NFO-Dateien aktualisieren?"
+
+msgctxt "#37012"
+msgid "Matching NFO files were found. Update the HDR entries in them as well? All other information in those files is left unchanged."
+msgstr "Passende NFO-Dateien wurden gefunden. Sollen auch deren HDR-Einträge aktualisiert werden? Alle übrigen Informationen in diesen Dateien bleiben unverändert."
+
+msgctxt "#37013"
+msgid "No entries needed updating."
+msgstr "Keine Einträge mussten aktualisiert werden."
+
 msgctxt "#37014"
 msgid "Last used profile"
 msgstr "Zuletzt verwendetes Profil"
@@ -16681,6 +16709,18 @@ msgstr "Inhalt anzeigen"
 msgctxt "#37016"
 msgid "Select this option if your receiver is capable of decoding Dolby Digital Plus (EAC3) streams."
 msgstr "Diese Option wählen, wenn der Receiver das Decodieren von Dolby-Digital-Plus-(EAC3)-Streams unterstützt."
+
+msgctxt "#37017"
+msgid "Scanned {0:d} of {1:d} entries.[CR]Library entries updated: {2:d}[CR]NFO files updated: {3:d}[CR]Failed: {4:d}"
+msgstr "{0:d} von {1:d} Einträgen eingelesen.[CR]Aktualisierte Bibliothekseinträge: {2:d}[CR]Aktualisierte NFO-Dateien: {3:d}[CR]Fehlgeschlagen: {4:d}"
+
+msgctxt "#37018"
+msgid "The names of the files that could not be updated are listed in kodi.log."
+msgstr "Die Namen der Dateien, die nicht aktualisiert werden konnten, stehen in kodi.log."
+
+msgctxt "#37019"
+msgid "The scan was stopped before it finished. Entries that were already updated have been kept."
+msgstr "Der Vorgang wurde vorzeitig beendet. Bereits aktualisierte Einträge bleiben erhalten."
 
 msgctxt "#37021"
 msgid "Set GUI resolution limit"

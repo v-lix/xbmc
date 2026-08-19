@@ -22341,7 +22341,42 @@ msgctxt "#37006"
 msgid "Decode a frame of each HDR10 video while scanning to find out whether it also carries HDR10+ dynamic metadata. Dolby Vision files are always examined, because the enhancement layer type cannot be determined any other way. Leaving this off avoids a decode per HDR10 file, which is noticeable on network storage."
 msgstr ""
 
-#empty strings from id 37007 to 37013
+#: system/settings/settings.xml
+msgctxt "#37007"
+msgid "Rescan HDR metadata"
+msgstr ""
+
+#. Description of setting with label #37007 "Rescan HDR metadata"
+#: system/settings/settings.xml
+msgctxt "#37008"
+msgid "Re-read the Dolby Vision and HDR10+ details of a chosen file or folder. Library entries scanned by an older version carry no Dolby Vision profile and are filled in. HDR10 entries are examined again on every run while HDR10+ detection is enabled, because nothing records that a file has already been checked for HDR10+."
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#37009"
+msgid "HDR metadata"
+msgstr ""
+
+#: xbmc/settings/MediaSettings.cpp
+msgctxt "#37010"
+msgid "The video library is busy. Wait for the running task to finish and try again."
+msgstr ""
+
+#: xbmc/settings/MediaSettings.cpp
+msgctxt "#37011"
+msgid "Update NFO files?"
+msgstr ""
+
+#: xbmc/settings/MediaSettings.cpp
+msgctxt "#37012"
+msgid "Matching NFO files were found. Update the HDR entries in them as well? All other information in those files is left unchanged."
+msgstr ""
+
+#: xbmc/settings/MediaSettings.cpp
+msgctxt "#37013"
+msgid "No entries needed updating."
+msgstr ""
+
 
 #: xbmc/GUIInfoManager.cpp
 msgctxt "#37014"
@@ -22364,7 +22399,25 @@ msgctxt "#37016"
 msgid "Select this option if your receiver is capable of decoding Dolby Digital Plus (EAC3) streams."
 msgstr ""
 
-#empty strings from id 37017 to 37020
+#. Summary shown when the "Rescan HDR metadata" action has finished
+#: xbmc/settings/MediaSettings.cpp
+msgctxt "#37017"
+msgid "Scanned {0:d} of {1:d} entries.[CR]Library entries updated: {2:d}[CR]NFO files updated: {3:d}[CR]Failed: {4:d}"
+msgstr ""
+
+#. Added to the summary of the "Rescan HDR metadata" action when entries failed
+#: xbmc/settings/MediaSettings.cpp
+msgctxt "#37018"
+msgid "The names of the files that could not be updated are listed in kodi.log."
+msgstr ""
+
+#. Added to the summary of the "Rescan HDR metadata" action when the user stopped it
+#: xbmc/settings/MediaSettings.cpp
+msgctxt "#37019"
+msgid "The scan was stopped before it finished. Entries that were already updated have been kept."
+msgstr ""
+
+#empty string with id 37020
 
 #: system/settings/android.xml
 #: system/settings/gbm.xml

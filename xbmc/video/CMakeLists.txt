@@ -1,6 +1,7 @@
 set(SOURCES Bookmark.cpp
             ContextMenus.cpp
             GUIViewStateVideo.cpp
+            HdrScanJob.cpp
             PlayerController.cpp
             Teletext.cpp
             VideoChapterImageFileLoader.cpp
@@ -21,6 +22,7 @@ set(HEADERS Bookmark.h
             ContextMenus.h
             Episode.h
             GUIViewStateVideo.h
+            HdrScanJob.h
             PlayerController.h
             Teletext.h
             TeletextDefines.h

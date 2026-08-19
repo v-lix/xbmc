@@ -589,6 +589,7 @@ void CSettings::InitializeISettingCallbacks()
   settingSet.insert(CSettings::SETTING_VIDEOLIBRARY_IMPORT);
   settingSet.insert(CSettings::SETTING_VIDEOLIBRARY_EXPORT);
   settingSet.insert(CSettings::SETTING_VIDEOLIBRARY_SHOWUNWATCHEDPLOTS);
+  settingSet.insert(CSettings::SETTING_MYVIDEOS_HDRSCAN);
   GetSettingsManager()->RegisterCallback(&CMediaSettings::GetInstance(), settingSet);
 
   settingSet.clear();

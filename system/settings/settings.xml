@@ -1512,6 +1512,12 @@
           <control type="toggle" />
         </setting>
       </group>
+      <group id="5" label="37009">
+        <setting id="myvideos.hdrscan" type="action" label="37007" help="37008">
+          <level>2</level>
+          <control type="button" format="action" />
+        </setting>
+      </group>
     </category>
     <category id="music" label="14216" help="38108">
       <group id="1" label="39121">
