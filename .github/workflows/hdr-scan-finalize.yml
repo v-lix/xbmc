@@ -1,0 +1,80 @@
+name: Finalize HDR scan layout
+
+on:
+  push:
+    branches:
+      - hdr-scan
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hdr-scan
+          fetch-depth: 0
+      - name: Apply final HDR scan layout
+        shell: python
+        run: |
+          from pathlib import Path
+
+          settings_path = Path("system/settings/settings.xml")
+          settings = settings_path.read_text()
+          group = '''      <group id="5" label="20474">
+        <setting id="myvideos.hdrscan" type="action" label="102">
+          <level>2</level>
+          <control type="button" format="action" />
+        </setting>
+      </group>
+'''
+          marker = '''      </group>
+    </category>
+    <category id="music" label="14216" help="38108">'''
+          if 'setting id="myvideos.hdrscan"' not in settings:
+              if marker not in settings:
+                  raise SystemExit("Media > Videos insertion point not found")
+              settings = settings.replace(
+                  marker,
+                  '      </group>\n' + group + '    </category>\n    <category id="music" label="14216" help="38108">',
+                  1,
+              )
+              settings_path.write_text(settings)
+
+          browser_path = Path("xbmc/dialogs/GUIDialogFileBrowser.cpp")
+          browser = browser_path.read_text()
+          old = '''  else if (!m_browsingForFolders)
+  {
+    m_selectedPath = pItem->GetPath();
+    m_bConfirmed = true;
+    Close();
+  }
+'''
+          new = '''  else if (!m_browsingForFolders)
+  {
+    m_selectedPath = pItem->GetPath();
+    if (!m_allowFolderSelection)
+    {
+      m_bConfirmed = true;
+      Close();
+    }
+  }
+'''
+          if old in browser:
+              browser_path.write_text(browser.replace(old, new, 1))
+          elif new not in browser:
+              raise SystemExit("File browser selection block not found")
+      - name: Remove overlay and temporary workflow
+        run: |
+          git rm -f system/settings/appliance.xml
+          git rm -f .github/workflows/hdr-scan-finalize.yml
+      - name: Commit final layout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add system/settings/settings.xml xbmc/dialogs/GUIDialogFileBrowser.cpp
+          git commit -m "temp: finalize hdr scan layout"
+          git push origin HEAD:hdr-scan
