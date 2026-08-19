@@ -62,6 +62,7 @@ CGUIDialogFileBrowser::CGUIDialogFileBrowser()
   m_browsingForFolders = 0;
   m_browsingForImages = false;
   m_useFileDirectories = false;
+  m_allowFolderSelection = false;
   m_addNetworkShareEnabled = false;
   m_singleList = false;
   m_thumbLoader.SetObserver(this);
@@ -492,7 +493,8 @@ void CGUIDialogFileBrowser::FrameMove()
       std::string safePath = url.GetWithoutUserDetails();
       SET_CONTROL_LABEL(CONTROL_LABEL_PATH, safePath);
     }
-    if ((!m_browsingForFolders && (*m_vecItems)[item]->m_bIsFolder) || ((*m_vecItems)[item]->GetPath() == "image://Browse"))
+    if ((!m_browsingForFolders && !m_allowFolderSelection && (*m_vecItems)[item]->m_bIsFolder) ||
+        ((*m_vecItems)[item]->GetPath() == "image://Browse"))
     {
       CONTROL_DISABLE(CONTROL_OK);
     }
@@ -683,6 +685,35 @@ bool CGUIDialogFileBrowser::ShowAndGetDirectory(const VECSOURCES &shares, const 
   }
 
   return ShowAndGetFile(shares, "/", heading, path);
+}
+
+bool CGUIDialogFileBrowser::ShowAndGetFileOrDirectory(const VECSOURCES &shares, const std::string &mask, const std::string &heading, std::string &path, bool &isDirectory, bool useThumbs /* = false */, bool useFileDirectories /* = false */)
+{
+  CGUIDialogFileBrowser* const browser{GetUniqueBrowserInstance()};
+  if (!browser)
+    return false;
+
+  browser->m_useFileDirectories = useFileDirectories;
+  browser->m_allowFolderSelection = true;
+  browser->m_browsingForImages = useThumbs;
+  browser->SetHeading(heading);
+  browser->SetSources(shares);
+  browser->m_browsingForFolders = 0;
+  browser->m_rootDir.SetMask(mask);
+  browser->m_selectedPath = path;
+  browser->m_addNetworkShareEnabled = false;
+  browser->Open();
+
+  const bool confirmed{browser->IsConfirmed()};
+  if (confirmed)
+  {
+    path = browser->m_selectedPath;
+    const CFileItemPtr item = browser->GetCurrentListItem();
+    isDirectory = item && item->m_bIsFolder;
+  }
+
+  CServiceBroker::GetGUI()->GetWindowManager().Delete(browser->GetID());
+  return confirmed;
 }
 
 bool CGUIDialogFileBrowser::ShowAndGetFile(const VECSOURCES &shares, const std::string &mask, const std::string &heading, std::string &path, bool useThumbs /* = false */, bool useFileDirectories /* = false */)
