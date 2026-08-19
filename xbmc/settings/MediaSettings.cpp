@@ -386,14 +386,6 @@ void CMediaSettings::OnSettingAction(const std::shared_ptr<const CSetting>& sett
       return;
     }
 
-    const DialogResponse target = HELPERS::ShowYesNoDialogText(
-        CVariant{"Scan HDR information"},
-        CVariant{"Choose whether to scan a single video file or a folder."}, CVariant{"Folder"},
-        CVariant{"File"});
-    if (target == DialogResponse::CHOICE_CANCELLED)
-      return;
-
-    const bool scopeIsFolder = target == DialogResponse::CHOICE_NO;
     VECSOURCES shares;
     if (const VECSOURCES* videoSources = CMediaSourceSettings::GetInstance().GetSources("video"))
       shares = *videoSources;
@@ -402,28 +394,19 @@ void CMediaSettings::OnSettingAction(const std::shared_ptr<const CSetting>& sett
     CServiceBroker::GetMediaManager().GetRemovableDrives(shares);
 
     std::string scope;
-    bool selected = false;
-    if (scopeIsFolder)
-    {
-      selected = CGUIDialogFileBrowser::ShowAndGetDirectory(shares, "Select folder to scan", scope);
-    }
-    else
-    {
-      selected = CGUIDialogFileBrowser::ShowAndGetFile(
-          shares, CServiceBroker::GetFileExtensionProvider().GetVideoExtensions(),
-          "Select video file to scan", scope);
-    }
-
-    if (!selected)
+    bool scopeIsFolder = false;
+    const std::string heading =
+        StringUtils::Format(g_localizeStrings.Get(13401), g_localizeStrings.Get(36912));
+    if (!CGUIDialogFileBrowser::ShowAndGetFileOrDirectory(
+            shares, CServiceBroker::GetFileExtensionProvider().GetVideoExtensions(), heading, scope,
+            scopeIsFolder))
       return;
 
     bool updateNfo = false;
     if (CHdrScanJob::HasNfoFiles(scope, scopeIsFolder))
     {
       const DialogResponse nfoChoice = HELPERS::ShowYesNoDialogText(
-          CVariant{"Update NFO files?"},
-          CVariant{"Existing NFO files were found. Update them with the detected HDR information?"},
-          CVariant{"Leave NFOs alone"}, CVariant{"Update NFOs"});
+          CVariant{g_localizeStrings.Get(38309)}, CVariant{g_localizeStrings.Get(38311)});
       if (nfoChoice == DialogResponse::CHOICE_CANCELLED)
         return;
       updateNfo = nfoChoice == DialogResponse::CHOICE_YES;
@@ -435,24 +418,8 @@ void CMediaSettings::OnSettingAction(const std::shared_ptr<const CSetting>& sett
     if (job.GetDatabaseUpdatedCount() > 0)
       CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::VideoLibrary, "OnRefresh");
 
-    std::string result;
-    if (job.GetScannedCount() == 0 && job.GetFailureCount() == 0)
-    {
-      result = "No matching HDR library entries were found in the selected scope.";
-    }
-    else
-    {
-      result = StringUtils::Format(
-          "Scanned {} file(s), updated {} database entries, and updated {} NFO file(s).",
-          job.GetScannedCount(), job.GetDatabaseUpdatedCount(), job.GetNfoUpdatedCount());
-      if (job.GetFailureCount() > 0)
-        result += StringUtils::Format(" {} item(s) could not be updated.", job.GetFailureCount());
-    }
-
-    if (job.WasCancelled())
-      result = "HDR scan cancelled. " + result;
-
-    HELPERS::ShowOKDialogText(CVariant{"HDR scan"}, CVariant{result});
+    if (!job.WasCancelled() && job.GetScannedCount() == 0 && job.GetFailureCount() == 0)
+      HELPERS::ShowOKDialogText(CVariant{102}, CVariant{284});
   }
 }
 
