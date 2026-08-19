@@ -35,6 +35,7 @@ public:
   void SetHeading(const std::string &heading);
 
   static bool ShowAndGetDirectory(const VECSOURCES &shares, const std::string &heading, std::string &path, bool bWriteOnly=false);
+  static bool ShowAndGetFileOrDirectory(const VECSOURCES &shares, const std::string &mask, const std::string &heading, std::string &path, bool &isDirectory, bool useThumbs = false, bool useFileDirectories = false);
   static bool ShowAndGetFile(const VECSOURCES &shares, const std::string &mask, const std::string &heading, std::string &path, bool useThumbs = false, bool useFileDirectories = false);
   static bool ShowAndGetFile(const std::string &directory, const std::string &mask, const std::string &heading, std::string &path, bool useThumbs = false, bool useFileDirectories = false, bool singleList = false);
   static bool ShowAndGetSource(std::string &path, bool allowNetworkShares, VECSOURCES* additionalShare = NULL, const std::string& strType="");
@@ -79,6 +80,7 @@ protected:
   std::string m_addSourceType;
   bool m_browsingForImages;
   bool m_useFileDirectories;
+  bool m_allowFolderSelection;
   bool m_singleList;              // if true, we have no shares or anything
   bool m_multipleSelection;
   std::vector<std::string> m_markedPath;
