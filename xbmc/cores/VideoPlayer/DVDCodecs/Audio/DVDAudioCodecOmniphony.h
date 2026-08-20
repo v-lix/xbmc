@@ -141,6 +141,11 @@ private:
     //! \brief Status text the helper reported, drained by the caller for the log.
     std::vector<std::string> TakeMessages();
 
+    // ---- TEMPORARY DIAGNOSTIC - DELETE WITH THE [temp] LOGGING IN GetData
+    //! \brief The rendering process, so its CPU time can be sampled.
+    pid_t Pid() const { return m_pid; }
+    // ---- END TEMPORARY DIAGNOSTIC
+
   private:
     void Process() override;
     bool ParseFrames();
@@ -333,6 +338,27 @@ private:
   bool m_priming{true};
   int m_primeFrames{0};
   XbmcThreads::EndTime<> m_primeDeadline;
+
+  // ---- TEMPORARY DIAGNOSTIC - the Phase 5 measurements. Grep [temp] to find
+  // every part of it, and delete them together once the figures are recorded.
+  double m_rendered{0.0}; //!< audio handed to the player, in DVD time
+  unsigned int m_limitedFrames{0}; //!< over the interval, then reset
+  float m_deepestGain{1.0f};
+  std::chrono::steady_clock::time_point m_tempSince;
+  XbmcThreads::EndTime<> m_tempReport;
+  double m_helperCpu{-1.0}; //!< the helper's CPU seconds at the last sample
+  double m_helperCoresPeak{0.0}; //!< worst interval, in fractions of one core
+  double m_helperCoreSeconds{0.0}; //!< integrated, so the mean can be stated
+  double m_sampledSeconds{0.0}; //!< wall time those two cover
+  bool m_wasDry{false}; //!< bank empty at the previous call
+  unsigned int m_dryMoments{0}; //!< times it went empty, not times we noticed
+  unsigned int m_dryAtLastReport{0}; //!< so each line can state its own interval
+  int m_bankFloorFrames{0}; //!< shallowest the bank got over the interval
+  unsigned int m_seeks{0};
+  double m_worstSeekMs{0.0};
+  std::chrono::steady_clock::time_point m_seekAt;
+  bool m_seekPending{false};
+  // ---- END TEMPORARY DIAGNOSTIC
 
   AEAudioFormat m_format;
   //! Replaced by UpdateName() during Open(), which is before anything can ask.

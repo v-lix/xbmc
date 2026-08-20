@@ -28,6 +28,8 @@
 #include <cerrno>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <signal.h>
 
@@ -147,6 +149,76 @@ constexpr int OMNI_PRIME_FRAMES_SEEK = static_cast<int>(OMNI_OUT_RATE) * 15 / 10
 //! The longest priming may hold playback. A helper that cannot fill the bank in
 //! this long is not going to, and silence is worse than starting short.
 constexpr unsigned int OMNI_PRIME_TIMEOUT_MS = 2500;
+
+// ---- TEMPORARY DIAGNOSTIC - the Phase 5 measurements. Grep [temp].
+
+//! How often the running figures are reported.
+//!
+//! One second: the sampling is two clock reads and one 512-byte procfs read,
+//! so the cost is irrelevant either way, and the thing being measured moves
+//! at about that speed. Five seconds averaged a seek and its recovery into
+//! one number and left every spike unattributable to what caused it.
+constexpr unsigned int OMNI_TEMP_INTERVAL_S = 1;
+
+/*!
+ * \brief CPU seconds a process has used, or a negative number if unreadable.
+ *
+ * The render happens in the helper's own process, so its cost cannot be read
+ * from any counter on this side - which is why the reserve depth was pressed
+ * into service as a proxy, and why that did not work. This is the real figure.
+ *
+ * One 512-byte read of a procfs file, taken once every few seconds. That is
+ * affordable on the thread that also feeds the sink; per block it would not be.
+ */
+double ProcessCpuSeconds(pid_t pid)
+{
+  if (pid <= 0)
+    return -1.0;
+
+  char path[64];
+  std::snprintf(path, sizeof(path), "/proc/%d/stat", static_cast<int>(pid));
+  const int fd = open(path, O_RDONLY | O_CLOEXEC);
+  if (fd < 0)
+    return -1.0;
+  char buf[512];
+  const ssize_t got = read(fd, buf, sizeof(buf) - 1);
+  close(fd);
+  if (got <= 0)
+    return -1.0;
+  buf[got] = '\0';
+
+  // The second field is the executable name in parentheses and may contain
+  // spaces and parentheses of its own, so the fields only become unambiguous
+  // after the last ')'. The single-letter run state follows it.
+  const char* cursor = std::strrchr(buf, ')');
+  if (!cursor)
+    return -1.0;
+  ++cursor;
+  while (*cursor == ' ')
+    ++cursor;
+  if (*cursor)
+    ++cursor; // the run state
+
+  // Then twelve numbers, of which the last two are utime and stime.
+  long long fields[12] = {};
+  int count = 0;
+  while (count < 12 && *cursor)
+  {
+    char* end = nullptr;
+    const long long value = std::strtoll(cursor, &end, 10);
+    if (end == cursor)
+      break;
+    fields[count++] = value;
+    cursor = end;
+  }
+  if (count < 12)
+    return -1.0;
+
+  const long hz = sysconf(_SC_CLK_TCK);
+  return hz > 0 ? static_cast<double>(fields[10] + fields[11]) / hz : -1.0;
+}
+
+// ---- END TEMPORARY DIAGNOSTIC
 
 /*!
  * \brief How long the render mode stays open to what the stream turns out to be.
@@ -1297,6 +1369,20 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
 
 void CDVDAudioCodecOmniphony::Dispose()
 {
+  // ---- TEMPORARY DIAGNOSTIC - the Phase 5 measurements. Grep [temp].
+  // One line for the whole playback, which is what "over a whole film" means.
+  // Written before the helper is torn down, while its figures still exist.
+  if (m_helper && m_sampledSeconds > 0.0)
+  {
+    CLog::Log(LOGINFO,
+              "CDVDAudioCodecOmniphony: [temp] playback over: {:.0f}s of audio, helper "
+              "{:.3f} core mean / {:.3f} peak, {} dry moments, {} seeks, slowest first "
+              "audio {:.0f}ms",
+              m_rendered / DVD_TIME_BASE, m_helperCoreSeconds / m_sampledSeconds, m_helperCoresPeak,
+              m_dryMoments, m_seeks, m_worstSeekMs);
+  }
+  // ---- END TEMPORARY DIAGNOSTIC
+
   if (m_helper)
   {
     m_helper->Send(OP_CLOSE, nullptr, 0);
@@ -1624,10 +1710,30 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
     CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: primed {}ms of render{}",
               GetBufferSize() * 1000 / static_cast<int>(OMNI_OUT_RATE),
               m_primeDeadline.IsTimePast() ? " (gave up waiting for more)" : "");
+    // [temp] The clock starts here, so this is where the interval starts too.
+    m_tempSince = std::chrono::steady_clock::now();
+    m_tempReport.Set(std::chrono::seconds(OMNI_TEMP_INTERVAL_S));
+    m_helperCpu = m_helper ? ProcessCpuSeconds(m_helper->Pid()) : -1.0;
+    m_dryAtLastReport = m_dryMoments;
+    m_bankFloorFrames = GetBufferSize();
   }
 
   if (m_out.frames.empty())
+  {
+    // [temp] Count the edge, not every call: the player asks repeatedly while
+    // the bank is empty, and one dry moment is one dropout, not twenty.
+    if (!m_wasDry && !m_priming)
+    {
+      m_wasDry = true;
+      m_dryMoments++;
+      m_bankFloorFrames = 0;
+    }
     return;
+  }
+  m_wasDry = false;
+  // [temp] The depth that matters is the lowest the bank got, not whatever it
+  // happened to hold when the interval expired.
+  m_bankFloorFrames = std::min(m_bankFloorFrames, GetBufferSize());
 
   const uint32_t frames = m_out.frames.front();
   const size_t samples = static_cast<size_t>(frames) * OMNI_OUT_CHANNELS;
@@ -1642,6 +1748,18 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
   frame.planes = 1;
   frame.bits_per_sample = CAEUtil::DataFormatToBits(m_format.m_dataFormat);
   frame.duration = (static_cast<double>(frames) * DVD_TIME_BASE) / OMNI_OUT_RATE;
+
+  // [temp] The first audio after a seek, which is the seek's real cost: the
+  // helper has to reset, decode again from the new position, and re-prime.
+  if (m_seekPending)
+  {
+    m_seekPending = false;
+    const double ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - m_seekAt)
+            .count();
+    m_worstSeekMs = std::max(m_worstSeekMs, ms);
+    CLog::Log(LOGINFO, "CDVDAudioCodecOmniphony: [temp] first audio {:.0f}ms after the seek", ms);
+  }
 
   /*
    * Copied out of the bank rather than pointed at inside it.
@@ -1676,6 +1794,8 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
     {
       block[at] *= gain;
       block[at + 1] *= gain;
+      m_limitedFrames++; // [temp]
+      m_deepestGain = std::min(m_deepestGain, gain); // [temp]
     }
   }
   frame.data[0] = reinterpret_cast<uint8_t*>(block);
@@ -1703,6 +1823,52 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
     m_out.pcm.erase(m_out.pcm.begin(), m_out.pcm.begin() + m_pcmConsumed);
     m_pcmConsumed = 0;
   }
+
+  // ---- TEMPORARY DIAGNOSTIC - the Phase 5 measurements. Grep [temp].
+  //
+  // What the render actually costs while a film is playing, which is the one
+  // figure Phase 5 never got. Not the throughput of the pump thread: that
+  // sleeps once the bank is full, so it reads about one times realtime no
+  // matter what the render costs, which is why every log so far has shown
+  // 0.97 to 1.02 whatever else was happening.
+  //
+  // Once every OMNI_TEMP_INTERVAL_S seconds: two clock reads, one procfs read
+  // and one log line. Per second of film that is a fifth of a line.
+  m_rendered += frame.duration;
+  if (m_tempReport.IsTimePast())
+  {
+    const auto now = std::chrono::steady_clock::now();
+    const double wall = std::chrono::duration<double>(now - m_tempSince).count();
+    const double cpu = m_helper ? ProcessCpuSeconds(m_helper->Pid()) : -1.0;
+
+    double cores = -1.0;
+    if (cpu >= 0.0 && m_helperCpu >= 0.0 && wall > 0.0)
+    {
+      cores = (cpu - m_helperCpu) / wall;
+      m_helperCoresPeak = std::max(m_helperCoresPeak, cores);
+      m_helperCoreSeconds += cores * wall;
+      m_sampledSeconds += wall;
+    }
+    m_helperCpu = cpu;
+
+    // Everything here is what happened during this interval, not since the
+    // film started: a running total has to be differenced by hand before it
+    // says anything, and the rate is the whole point.
+    CLog::Log(LOGINFO,
+              "CDVDAudioCodecOmniphony: [temp] helper {:.3f} core, bank {}ms low / {}ms now, "
+              "{} dry, limited {} frames, deepest gain {:.3f}",
+              cores, m_bankFloorFrames * 1000 / static_cast<int>(OMNI_OUT_RATE),
+              GetBufferSize() * 1000 / static_cast<int>(OMNI_OUT_RATE),
+              m_dryMoments - m_dryAtLastReport, m_limitedFrames, m_deepestGain);
+
+    m_dryAtLastReport = m_dryMoments;
+    m_bankFloorFrames = GetBufferSize();
+    m_limitedFrames = 0;
+    m_deepestGain = 1.0f;
+    m_tempSince = now;
+    m_tempReport.Set(std::chrono::seconds(OMNI_TEMP_INTERVAL_S));
+  }
+  // ---- END TEMPORARY DIAGNOSTIC
 }
 
 void CDVDAudioCodecOmniphony::Reset()
@@ -1712,6 +1878,11 @@ void CDVDAudioCodecOmniphony::Reset()
     m_fallback->Reset();
     return;
   }
+
+  // [temp] Start the clock on the seek; GetData stops it on the first block.
+  m_seekAt = std::chrono::steady_clock::now();
+  m_seekPending = true;
+  m_seeks++;
 
   m_parser.Reset();
   m_backlog.clear();
