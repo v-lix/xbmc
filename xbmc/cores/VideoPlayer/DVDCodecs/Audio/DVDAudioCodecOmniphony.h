@@ -61,7 +61,7 @@ public:
   void Reset() override;
   AEAudioFormat GetFormat() override;
   //! Once the software decoder has taken over it is the one doing the work, and
-  //! saying otherwise puts "omniphony" on screen over a plain downmix.
+  //! saying otherwise puts "om-truehd" on screen over a plain downmix.
   std::string GetName() override { return m_fallback ? m_fallback->GetName() : m_codecName; }
   int GetBufferSize() override;
 
@@ -213,6 +213,24 @@ private:
   void StartPriming(int frames);
   void FallBack(const char* why);
   void UpdateName();
+  /*!
+   * \brief Put what is being rendered on the player process screen.
+   *
+   * Called only from GetData, and only once a block has actually been handed
+   * over, which is later than it looks and deliberately so. Opening a codec
+   * destroys the one it replaces - CVideoPlayerAudio assigns over the
+   * unique_ptr that holds it - so a codec that published from Open() would be
+   * wiped by the outgoing codec's Dispose() a moment later. Publishing from
+   * the first block handed out puts this after that teardown in every path,
+   * including an audio track change part-way through a film.
+   */
+  void PublishRenderInfo();
+  //! \brief Take the three omniphony rows off the screen, because nothing is
+  //! being rendered any more.
+  void ClearRenderInfo();
+  //! \brief What the engine was handed, worded for the screen. Empty until the
+  //! first frame has been decoded, which is the earliest it can be truthful.
+  std::string InputDescription() const;
   bool WriteConfig(const std::string& bridge) const;
   static std::string HelperPath();
   static std::string ConfigPath();
@@ -317,7 +335,8 @@ private:
   XbmcThreads::EndTime<> m_primeDeadline;
 
   AEAudioFormat m_format;
-  std::string m_codecName{"omniphony"};
+  //! Replaced by UpdateName() during Open(), which is before anything can ask.
+  std::string m_codecName{"om"};
 
   /*!
    * \brief Our own copy of the stream hints.
@@ -349,7 +368,52 @@ private:
    * reports. This only disables the switch.
    */
   bool m_modeForced{false};
+  //! \brief How long the mode decision stays open - see OMNI_MODE_WINDOW_MS.
+  XbmcThreads::EndTime<> m_modeWindow;
+  /*!
+   * \brief Objects in the last frame the engine reported on, or -1 for none yet.
+   *
+   * Tracked rather than latched, because the ABI says the object state is live
+   * and "must not be latched": a report of zero means the frame just rendered
+   * carried no object metadata, not that the soundtrack has none. Only a report
+   * that actually carries objects reaches this.
+   */
   int m_objectCount{-1};
+
+  /*!
+   * \brief The bed the objects sit over, as the engine labelled it.
+   *
+   * Comma separated and in render order - usually just "LFE", since a Dolby
+   * Atmos presentation hands the renderer every other bed channel as an object
+   * of its own. Empty for a soundtrack with no bed, and empty for an engine too
+   * old to export orender_bed_layout; both mean "say nothing about a bed"
+   * rather than "there is none", which is why the screen simply omits the
+   * clause instead of writing one.
+   */
+  std::string m_bed;
+
+  /*!
+   * \brief Which head model this stream opened with, worded for the screen.
+   *
+   * Read from what is staged in the profile rather than from the setting, and
+   * read after staging, so a personal file that was refused reports the
+   * built-in set - which is what the listener is actually hearing.
+   */
+  std::string m_sofa;
+
+  //! \brief Something the screen shows has changed and the cached wording below
+  //! has not been rebuilt for it yet. See PublishRenderInfo.
+  bool m_infoDirty{false};
+
+  /*!
+   * \brief The three rows as they are to appear, rebuilt only when they change.
+   *
+   * Held rather than rebuilt per block because they are re-published per block:
+   * ActiveAE empties the whole audio player info when it reconfigures, so a row
+   * written once does not stay written. PublishRenderInfo carries the argument.
+   */
+  std::string m_input;
+  std::string m_render;
 
   /*!
    * \brief When the helper dies mid-stream, decode continues here.

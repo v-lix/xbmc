@@ -149,6 +149,21 @@ constexpr int OMNI_PRIME_FRAMES_SEEK = static_cast<int>(OMNI_OUT_RATE) * 15 / 10
 constexpr unsigned int OMNI_PRIME_TIMEOUT_MS = 2500;
 
 /*!
+ * \brief How long the render mode stays open to what the stream turns out to be.
+ *
+ * The object count is only truthful once a frame has been rendered, and after a
+ * mid-film resume the first frames are often bed-only - so the count that
+ * decides between per-object rendering and the virtual layout can arrive a
+ * little after the stream starts. This is how long we keep listening for it.
+ *
+ * Generous against that delay and mean against the alternative: a restart costs
+ * the reserve and a re-prime, and changes the imaging audibly, so it has to
+ * land while the film is still starting rather than an hour in. Past this the
+ * mode is settled for good and a late count is logged instead of acted on.
+ */
+constexpr unsigned int OMNI_MODE_WINDOW_MS = 5000;
+
+/*!
  * \brief Level the render is asked for, in dB, before the downmix correction.
  *
  * Before the correction is the whole of the point: this is not the gain the
@@ -1055,18 +1070,106 @@ bool CDVDAudioCodecOmniphony::AwaitRoom()
 
 void CDVDAudioCodecOmniphony::UpdateName()
 {
-  // This is the whole of the reporting: CVideoPlayerAudio hands GetName() to
-  // CProcessInfo::SetAudioDecoderName, which reaches the player.process
-  // infolabel, so naming the live mode here puts it on screen without any new
-  // plumbing.
-  const char* mode = m_mode == RenderMode::Cascade ? "cascade-12" : "direct";
-  // CodecId answers nullptr for anything unsupported. Open() refuses those, so
-  // this cannot be reached with one - but concatenating a null pointer onto a
+  /*
+   * CVideoPlayerAudio hands GetName() to CProcessInfo::SetAudioDecoderName,
+   * which is what Player.Process(audiodecoder) shows. It answers the one
+   * question that label asks - which decoder is running - and nothing else:
+   * what the stream turned out to carry and how it is being rendered are
+   * separate facts with infolabels of their own, and crowding them into this
+   * one produced names like "omniphony-truehd-direct-15obj" that no other
+   * decoder in Kodi resembles.
+   *
+   * The suffix is the ffmpeg decoder's own name rather than a table of our
+   * own, so that "om-dca" and "ff-dca" are provably the same stream decoded
+   * two ways. Taking it from ffmpeg is what makes that true by construction:
+   * a table here would be a second spelling to keep in step, and it is the
+   * decoder name rather than the codec name that differs (DTS decodes as
+   * "dca"), which is exactly the sort of detail a hand-written table gets
+   * wrong.
+   */
+  const AVCodec* decoder = m_hints ? avcodec_find_decoder(m_hints->codec) : nullptr;
+  // Open() refuses anything CodecId does not know, so the fallbacks below
+  // cannot be reached in practice - but concatenating a null pointer onto a
   // std::string is undefined, which is too sharp an edge to leave unguarded.
-  const char* codec = m_hints ? CodecId(m_hints->codec) : nullptr;
-  m_codecName = std::string("omniphony-") + (codec ? codec : "?") + "-" + mode;
-  if (m_objectCount > 0)
-    m_codecName += "-" + std::to_string(m_objectCount) + "obj";
+  const char* codec = decoder ? decoder->name : (m_hints ? CodecId(m_hints->codec) : nullptr);
+  m_codecName = std::string("om-") + (codec ? codec : "?");
+}
+
+std::string CDVDAudioCodecOmniphony::InputDescription() const
+{
+  /*
+   * Objects, or nothing at all. Below zero means the helper has not reported
+   * yet and zero means the soundtrack carries no objects, and neither has an
+   * answer worth printing:
+   *
+   *  - The count is only truthful once a frame has been decoded, so before that
+   *    anything said here would be a guess about the film that just started.
+   *  - For channel-based audio there is no layout to report. CAEStreamInfo
+   *    carries one unsigned int of channel information and it is a count, not a
+   *    map - which is why the passthrough codec builds its on-screen layout by
+   *    appending AE_CH_RAW once per channel and the screen reads "RAW, RAW,
+   *    RAW...". Printing "6 Channels" here would add nothing that
+   *    Player.Process(audiochannels) does not already say better.
+   *
+   * Empty rather than a placeholder so a skin can test IsEmpty and fall back to
+   * its own layout label. This row exists to say what the object renderer was
+   * handed; when it was handed no objects, it has nothing to say.
+   */
+  if (m_objectCount <= 0)
+    return {};
+
+  // English, not a localised string, because the whole player process screen is
+  // English: it sits beside "om-truehd", "48000" and "RAW, RAW, RAW", and not
+  // one of the Player.Process labels in CPlayerGUIInfo is translated. A
+  // translated word here would be the only one on the panel.
+  std::string input = std::to_string(m_objectCount);
+  input += m_objectCount == 1 ? " Object" : " Objects";
+  if (!m_bed.empty())
+  {
+    // "15 Objects + LFE". The helper packs the bed without spaces so that it
+    // cannot be mistaken for the end of the status line; they go back in here.
+    std::string bed = m_bed;
+    StringUtils::Replace(bed, ",", ", ");
+    input += " + " + bed;
+  }
+  return input;
+}
+
+void CDVDAudioCodecOmniphony::PublishRenderInfo()
+{
+  // Building the strings is the part worth avoiding, and it only has to happen
+  // when something changed: the open, the object count arriving, a switch to
+  // the virtual layout.
+  if (m_infoDirty)
+  {
+    m_infoDirty = false;
+    m_input = InputDescription();
+    m_render = m_mode == RenderMode::Cascade ? "Cascade 12" : "Direct";
+  }
+
+  /*
+   * Writing them, though, happens on every block, because something else
+   * empties them behind our back.
+   *
+   * CDataCacheCore::ResetAudioCache() assigns a default-constructed struct over
+   * the whole of the audio player info, and ActiveAE calls it from Configure()
+   * whenever the internal format changes - which is exactly what opening this
+   * stream does. The order is fixed and unfavourable: this codec hands over its
+   * first block and publishes, the player then opens the sink with that block's
+   * format, ActiveAE reconfigures and wipes, and only afterwards - once the
+   * sink is three quarters full - does CVideoPlayerAudio publish the decoder
+   * name and channel count. So the stock fields come back and anything
+   * published once, earlier, does not.
+   *
+   * Re-publishing each block is the cheap half of the fix and the honest one:
+   * it heals from that reset without this codec having to know when it
+   * happened, and from any other wipe nobody has found yet. Three short string
+   * assignments under an uncontended lock, thirty or so times a second, against
+   * a render that costs a third of a core.
+   */
+  m_processInfo.SetOmniphonyInput(m_input);
+  m_processInfo.SetOmniphonyRender(m_render);
+  m_processInfo.SetOmniphonySofa(m_sofa);
 }
 
 bool CDVDAudioCodecOmniphony::ReopenAs(RenderMode mode)
@@ -1092,7 +1195,9 @@ bool CDVDAudioCodecOmniphony::ReopenAs(RenderMode mode)
   if (!StartHelper(*m_hints))
     return false;
 
-  UpdateName();
+  // The name does not change with the mode any more - Player.Process(omniphony.render)
+  // carries that now - but the screen still has to be told the mode moved.
+  m_infoDirty = true;
   return true;
 }
 
@@ -1105,7 +1210,9 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
   m_mode = RenderMode::Direct;
   m_modeSettled = false;
   m_modeForced = false;
+  m_modeWindow.Set(std::chrono::milliseconds(OMNI_MODE_WINDOW_MS));
   m_objectCount = -1;
+  m_bed.clear();
   m_parser.Reset();
   m_backlog.clear();
   DropRendered();
@@ -1154,6 +1261,21 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
                 ActiveAE::COmniphonyHrtf::Explain(result));
   }
 
+  /*
+   * After the staging above, and read from the profile rather than from the
+   * setting that drove it. The two agree except when a chosen file was refused,
+   * and then the profile is right: the render falls back to the engine's own
+   * measurements, so "Built-in" is what the listener is hearing.
+   *
+   * These two words match the setting's own option labels 39326 and 39327, but
+   * they are written out rather than taken from them. The setting is
+   * translated and this screen is not, and a label that changed language while
+   * everything around it stayed English would look like a bug rather than a
+   * courtesy.
+   */
+  m_sofa = ActiveAE::COmniphonyHrtf::IsPersonal() ? "Personal" : "Built-in";
+  m_infoDirty = true;
+
   if (!StartHelper(hints))
     return false;
 
@@ -1192,6 +1314,25 @@ void CDVDAudioCodecOmniphony::Dispose()
   m_dataSize = 0;
   m_backlog.clear();
   DropRendered();
+
+  // Nothing is being rendered any more, so the three omniphony rows go away.
+  // Safe to do unconditionally even when this teardown is the one caused by a
+  // replacement codec opening: PublishRenderInfo waits for a block to be handed
+  // out, and the replacement cannot have handed one out before this runs.
+  ClearRenderInfo();
+}
+
+void CDVDAudioCodecOmniphony::ClearRenderInfo()
+{
+  // The cached copies as well as the screen, so that a later publish cannot put
+  // back a description of a render that has stopped.
+  m_infoDirty = false;
+  m_input.clear();
+  m_render.clear();
+  m_sofa.clear();
+  m_processInfo.SetOmniphonyInput({});
+  m_processInfo.SetOmniphonyRender({});
+  m_processInfo.SetOmniphonySofa({});
 }
 
 void CDVDAudioCodecOmniphony::FallBack(const char* why)
@@ -1333,18 +1474,85 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
   {
     CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: helper: {}", msg);
 
-    // "stream objects=N spatial=S channels=C", sent once the first frame has
-    // been rendered - the earliest the count can be truthful, because the
-    // engine derives it from what it just decoded.
+    // "stream objects=N spatial=S channels=C bed=L,R,LFE", sent whenever what
+    // the engine is being handed changes. Not once: the ABI is explicit that
+    // the object state is "a live, observable fact about the stream" that "may
+    // flip in either direction mid-stream and must not be latched", and
+    // orender_object_count reports the last rendered frame rather than the
+    // stream. Reading only the first report is what made a resumed film show
+    // nothing - see below.
     const size_t at = msg.find("objects=");
-    if (at == std::string::npos || m_modeSettled)
+    if (at == std::string::npos)
       continue;
 
-    m_objectCount = std::atoi(msg.c_str() + at + 8);
-    m_modeSettled = true;
-    UpdateName();
+    const int objects = std::atoi(msg.c_str() + at + 8);
 
-    if (!m_modeForced && m_mode == RenderMode::Direct && m_objectCount > OBJECT_LIMIT_FOR_DIRECT)
+    /*
+     * Zero is not "this soundtrack has no objects". It is "the frame just
+     * rendered carried no object metadata", which the engine supports
+     * deliberately - bed-only and pre-metadata frames render through the
+     * channel path - and which is exactly what the first frames after a
+     * mid-film resume tend to be. Treating that first zero as the answer left
+     * the label empty for the rest of the film.
+     *
+     * So a zero report is not evidence of anything and is passed over, for the
+     * render mode as much as for the screen. A soundtrack that genuinely
+     * carries no objects reports zero forever, m_objectCount stays -1, and
+     * InputDescription says nothing - which is the same outcome by a route
+     * that cannot be confused with "we asked too early".
+     */
+    if (objects <= 0)
+      continue;
+
+    m_objectCount = objects;
+
+    // Last on the line and free of spaces by construction, so the rest of the
+    // line is the whole value. Absent from an older helper, which is why its
+    // absence leaves m_bed empty rather than being treated as a broken message:
+    // the object count on its own is still worth showing.
+    const size_t bedAt = msg.find("bed=");
+    if (bedAt != std::string::npos)
+    {
+      m_bed = msg.substr(bedAt + 4);
+      StringUtils::Trim(m_bed);
+    }
+
+    m_infoDirty = true;
+
+    // Everything above updates for the life of the stream. Everything below
+    // happens once, because it is a different kind of decision.
+    if (m_modeSettled)
+      continue;
+
+    /*
+     * The mode is chosen from the first report that actually carries objects,
+     * and only while the film is still starting.
+     *
+     * Both halves matter. Choosing from the first report of any kind is what
+     * this used to do, and on a resume that report is a zero - so a stream
+     * needing the virtual layout would have stayed on direct rendering.
+     * Choosing without a deadline is the opposite mistake: now that reports
+     * arrive whenever the count changes, a soundtrack that reveals more objects
+     * an hour in could restart the helper mid-film, which drops the reserve and
+     * re-primes, and the imaging would audibly change. The window is generous
+     * enough for a resume to settle and short enough that a restart inside it
+     * is still part of starting up.
+     */
+    if (m_modeWindow.IsTimePast())
+    {
+      m_modeSettled = true;
+      if (!m_modeForced && m_mode == RenderMode::Direct && objects > OBJECT_LIMIT_FOR_DIRECT)
+        CLog::Log(LOGWARNING,
+                  "CDVDAudioCodecOmniphony: {} objects is more than direct rendering can carry, "
+                  "but the stream only said so {}ms in - staying on direct rather than restarting "
+                  "the render mid-film",
+                  objects, OMNI_MODE_WINDOW_MS);
+      continue;
+    }
+
+    m_modeSettled = true;
+
+    if (!m_modeForced && m_mode == RenderMode::Direct && objects > OBJECT_LIMIT_FOR_DIRECT)
     {
       // Still inside the opening blocks, so this is a restart at the start of
       // the stream rather than a switch part-way through a film. Settled first,
@@ -1374,9 +1582,21 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
     // multichannel downmix - which is exactly how this failure was first
     // described. The format is only true once ffmpeg has decoded something,
     // hence here rather than where the swap happens.
-    if (frame.nb_frames && !m_reportedFallback)
+    if (frame.nb_frames)
     {
-      m_reportedFallback = true;
+      if (!m_reportedFallback)
+      {
+        m_reportedFallback = true;
+        // Those three rows describe a binaural render that has stopped
+        // happening, and nothing else is going to take them down.
+        ClearRenderInfo();
+      }
+      // Every block, not once, and for the reason PublishRenderInfo gives:
+      // swapping to the software decoder changes the output format, so ActiveAE
+      // reconfigures and empties the whole audio player info - and this is
+      // mid-film, long past the one sync transition where CVideoPlayerAudio
+      // would have written the decoder name again. Published once, the screen
+      // would go blank shortly after the swap instead of naming ffmpeg.
       m_processInfo.SetAudioDecoderName(m_fallback->GetName());
       m_processInfo.SetAudioChannels(frame.format.m_channelLayout);
     }
@@ -1466,6 +1686,12 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
   frame.hasTimestamp = m_anchor != DVD_NOPTS_VALUE;
   frame.pts = frame.hasTimestamp ? m_anchor + static_cast<double>(m_out.enginePts.front())
                                  : static_cast<double>(DVD_NOPTS_VALUE);
+
+  // A block is on its way out, so this codec is unambiguously the one being
+  // heard - which is the condition PublishRenderInfo waits for. Every block
+  // rather than only on a change, because the screen is emptied behind us; see
+  // PublishRenderInfo.
+  PublishRenderInfo();
 
   m_pcmConsumed += samples;
   m_out.frames.erase(m_out.frames.begin());
