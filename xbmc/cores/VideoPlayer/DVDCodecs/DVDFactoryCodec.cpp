@@ -10,6 +10,7 @@
 
 #include "Audio/DVDAudioCodec.h"
 #include "Audio/DVDAudioCodecFFmpeg.h"
+#include "Audio/DVDAudioCodecOmniphony.h"
 #include "Audio/DVDAudioCodecPassthrough.h"
 #include "DVDStreamInfo.h"
 #include "Overlay/DVDOverlayCodec.h"
@@ -22,8 +23,11 @@
 #include "Video/AddonVideoCodec.h"
 #include "Video/DVDVideoCodec.h"
 #include "Video/DVDVideoCodecFFmpeg.h"
+#include "ServiceBroker.h"
 #include "addons/AddonProvider.h"
 #include "cores/VideoPlayer/DVDCodecs/DVDCodecs.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/StringUtils.h"
 #include "utils/log.h"
 
@@ -190,6 +194,28 @@ std::unique_ptr<CDVDAudioCodec> CDVDFactoryCodec::CreateAudioCodec(
     if (pCodec && pCodec->Open(hint, options))
     {
       return pCodec;
+    }
+  }
+
+  // Object audio rendered to headphones, decoded and rendered in a helper
+  // process. Tried ahead of passthrough, but only when passthrough is not
+  // actually going to happen: the two are mutually exclusive, and a listener
+  // with an amplifier decoding for them is on speakers, not headphones. That
+  // exclusion is enforced here rather than as a settings dependency, because
+  // whether passthrough really applies depends on the stream as well as on the
+  // setting - the same reason the branch below is guarded the same way.
+  //
+  // Open() also refuses unless the helper is installed beside kodi.bin, so on
+  // an image without it this costs one access() and falls through.
+  const bool passthroughWins = allowpassthrough && ptStreamType != CAEStreamInfo::STREAM_TYPE_NULL;
+  if (!passthroughWins && CServiceBroker::GetSettingsComponent() &&
+      CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+          CSettings::SETTING_AUDIOOUTPUT_OMNIPHONY))
+  {
+    auto omni = std::make_unique<CDVDAudioCodecOmniphony>(processInfo);
+    if (omni->Open(hint, options))
+    {
+      return omni;
     }
   }
 
