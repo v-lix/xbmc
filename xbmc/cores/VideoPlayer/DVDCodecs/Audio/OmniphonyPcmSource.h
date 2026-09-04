@@ -89,6 +89,17 @@ public:
    *
    * Call once the decoder has reached end of stream, and keep calling until it
    * returns false. \p pcm is cleared each time.
+   *
+   * \warning Nothing calls this yet, and that is not an oversight. Kodi has no
+   * end-of-stream signal for an audio codec: CDVDMsg::GENERAL_EOF exists and is
+   * handled, but nothing in the tree ever sends it; CDVDAudioCodecFFmpeg::m_eof
+   * is never set true; and PAPlayer returns READ_EOF the moment its demuxer
+   * runs dry, without asking the codec for a tail. Every Drain() in the player
+   * is the sink's, not a codec's. Giving this a caller means adding that signal
+   * to shared player code, which would change every codec's lifecycle and is a
+   * decision of its own. Until then the tail lost is the resampler's alone -
+   * well under a millisecond, and smaller than the decoder tail Kodi already
+   * discards on every track by the same omission.
    */
   bool Drain(std::vector<uint8_t>& pcm);
 

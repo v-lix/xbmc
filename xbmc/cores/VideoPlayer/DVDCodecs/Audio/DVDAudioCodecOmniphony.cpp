@@ -11,6 +11,7 @@
 #include "DVDAudioCodecFFmpeg.h"
 #include "DVDCodecs/DVDCodecs.h"
 #include "DVDStreamInfo.h"
+#include "OmniphonyPcmSource.h"
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/Omniphony/OmniphonyHrtf.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
@@ -101,6 +102,22 @@ constexpr int OMNI_BANK_FRAMES = static_cast<int>(OMNI_OUT_RATE) * 3 / 2;
  * fatal limit is never the one that arrives first.
  */
 constexpr size_t OMNI_FEED_QUEUE_MAX = OMNI_MAX_PENDING / 10;
+
+/*!
+ * \brief Sample-frames of decoded PCM in one write to the helper.
+ *
+ * The object path's write size chooses itself - one access unit, whatever that
+ * comes to. Decoded PCM has no such unit, so it needs a number, and this one is
+ * about 21 ms: 48 KB at twelve channels, comfortably under the helper's 1 MiB
+ * payload cap, and small enough that the feed budget is never spent inside a
+ * single write.
+ *
+ * Chunks need not fall on a sample-frame boundary and after a header they do
+ * not, since the header is fourteen bytes plus one per channel. The bridge
+ * parses a byte stream and buffers whatever is left over, so a split anywhere
+ * is the case it is built for.
+ */
+constexpr size_t OMNI_PCM_WRITE_FRAMES = 1024;
 
 /*!
  * \brief The most the pump thread will hold before it stops reading the helper.
@@ -942,8 +959,12 @@ const char* CDVDAudioCodecOmniphony::CodecId(AVCodecID codec)
 
 bool CDVDAudioCodecOmniphony::StartHelper(CDVDStreamInfo& hints)
 {
+  // Only the object path needs a codec name: it hands the bridge undecoded
+  // bitstream, so the bridge has to be told what the bytes are. The PCM bridge
+  // is told by the header instead, one label per channel, which is more than a
+  // codec name could say.
   const char* codec = CodecId(hints.codec);
-  if (!codec)
+  if (!m_pcm && !codec)
     return false;
 
   const std::string exe = HelperPath();
@@ -962,7 +983,7 @@ bool CDVDAudioCodecOmniphony::StartHelper(CDVDStreamInfo& hints)
   }
 
   const std::string dir = CSpecialProtocol::TranslatePath("special://xbmcbin/omniphony");
-  const std::string bridge = dir + "/libharletty_bridge.so";
+  const std::string bridge = dir + (m_pcm ? "/libpcm_bridge.so" : "/libharletty_bridge.so");
   if (!WriteConfig(bridge))
   {
     m_helper.reset();
@@ -970,9 +991,21 @@ bool CDVDAudioCodecOmniphony::StartHelper(CDVDStreamInfo& hints)
   }
 
   std::string open = "lib=" + dir + "/liborender.so\n" + "bridge=" + bridge + "\n" +
-                     "config=" + ConfigPath() + "\n" + "codec=" + codec + "\n";
+                     "config=" + ConfigPath() + "\n";
+  // Omitted rather than empty on the PCM path: the helper leaves the key null
+  // and the engine sniffs, which is what a bridge that is handed labelled PCM
+  // wants. An empty value would be a codec named "".
+  if (codec && !m_pcm)
+    open += "codec=" + std::string(codec) + "\n";
   if (m_mode == RenderMode::Cascade)
     open += "layout=" + LayoutPath() + "\n";
+
+  // A helper that has just started has been given nothing, has rendered
+  // nothing, and its bridge is waiting for a header - whichever bridge it is.
+  m_fed = false;
+  m_rendered = false;
+  m_headerSent = false;
+  m_staging.clear();
 
   const size_t before = m_out.frames.size();
   if (!m_helper->Send(OP_OPEN, open.data(), open.size()) || !m_helper->Collect(m_out, 0))
@@ -1033,6 +1066,10 @@ bool CDVDAudioCodecOmniphony::Collect(int timeoutMs)
   const size_t had = m_out.frames.size();
   if (!m_helper->Collect(m_out, timeoutMs))
     return false;
+  // Latched for the life of the helper rather than tracked, because what reads
+  // it asks whether this renderer has ever worked at all - see GetData.
+  if (m_out.frames.size() > had)
+    m_rendered = true;
   AnchorNewBlocks(had);
   return true;
 }
@@ -1088,9 +1125,10 @@ void CDVDAudioCodecOmniphony::UpdateName()
    * wrong.
    */
   const AVCodec* decoder = m_hints ? avcodec_find_decoder(m_hints->codec) : nullptr;
-  // Open() refuses anything CodecId does not know, so the fallbacks below
-  // cannot be reached in practice - but concatenating a null pointer onto a
-  // std::string is undefined, which is too sharp an edge to leave unguarded.
+  // Open() refuses anything ffmpeg has no decoder for - on the PCM path by
+  // failing to open one - so the fallbacks below cannot be reached in practice.
+  // They are here because concatenating a null pointer onto a std::string is
+  // undefined, which is too sharp an edge to leave unguarded.
   const char* codec = decoder ? decoder->name : (m_hints ? CodecId(m_hints->codec) : nullptr);
   m_codecName = std::string("om-") + (codec ? codec : "?");
 }
@@ -1203,8 +1241,26 @@ bool CDVDAudioCodecOmniphony::ReopenAs(RenderMode mode)
 
 bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& options)
 {
+  /*
+   * The routing, and the only place it happens.
+   *
+   * A codec the bridge can decode keeps the object path, byte for byte as it
+   * was. Anything else is decoded here and sent as labelled PCM - which is
+   * every codec ffmpeg has a decoder for, so the refusal below is ffmpeg's
+   * rather than ours, and a stream it cannot decode falls through to the
+   * factory's next candidate exactly as it did before.
+   *
+   * Phase 5 adds the second half of this test: with the objects child setting
+   * off, an Atmos stream comes down here too and has its decoded bed placed
+   * rather than its objects.
+   */
   if (!CodecId(hints.codec))
-    return false;
+  {
+    auto pcm = std::make_unique<COmniphonyPcmSource>(m_processInfo);
+    if (!pcm->Open(hints, options))
+      return false;
+    m_pcm = std::move(pcm);
+  }
 
   m_hints = std::make_unique<CDVDStreamInfo>(hints);
   m_mode = RenderMode::Direct;
@@ -1234,7 +1290,7 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
      * measured 0.430 against 0.470 - and the render has almost no margin over
      * realtime, so a listener whose sound breaks up has something to try.
      */
-    if (settings->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYCASCADE))
+    if (!m_pcm && settings->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYCASCADE))
     {
       m_mode = RenderMode::Cascade;
       m_modeForced = true;
@@ -1276,6 +1332,24 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
   m_sofa = ActiveAE::COmniphonyHrtf::IsPersonal() ? "Personal" : "Built-in";
   m_infoDirty = true;
 
+  /*
+   * A channel bed settles the mode at open, where an object stream cannot.
+   *
+   * The choice between the two modes is a choice about how many sources have to
+   * be convolved, and the object path has to wait for a rendered frame to learn
+   * that. Here it is known already and it is small: the widest layout this
+   * source accepts is 7.1.4, at twelve, which is what Cascade would reduce
+   * anything to anyway. So Direct is not merely affordable, it is the same
+   * work without the panning error - and settling it here means the mode
+   * window, the restart and the object-count reading are all skipped rather
+   * than left to decide nothing.
+   */
+  if (m_pcm)
+  {
+    m_mode = RenderMode::Direct;
+    m_modeSettled = true;
+  }
+
   if (!StartHelper(hints))
     return false;
 
@@ -1287,10 +1361,11 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
   UpdateName();
   // The mode is named here because nothing else in the log carries it: GetName
   // reaches the screen but never the log, so a log from the field could not be
-  // read for which mode it ran in.
-  CLog::Log(LOGINFO,
-            "CDVDAudioCodecOmniphony: rendering {} objects to headphones out of process, {}{}",
-            CodecId(hints.codec), m_mode == RenderMode::Cascade ? "cascade-12" : "direct",
+  // read for which mode it ran in. The codec name comes from UpdateName rather
+  // than from CodecId, which is null for everything the PCM path carries.
+  CLog::Log(LOGINFO, "CDVDAudioCodecOmniphony: rendering {} to headphones out of process, {}{}",
+            m_pcm ? m_codecName + " (decoded here)" : m_codecName + " objects",
+            m_mode == RenderMode::Cascade ? "cascade-12" : "direct",
             m_modeForced ? " (pinned by setting)" : "");
   return true;
 }
@@ -1303,11 +1378,17 @@ void CDVDAudioCodecOmniphony::Dispose()
     m_helper->Stop();
     m_helper.reset();
   }
+  if (m_pcm)
+  {
+    m_pcm->Dispose();
+    m_pcm.reset();
+  }
   if (m_fallback)
   {
     m_fallback->Dispose();
     m_fallback.reset();
   }
+  m_staging.clear();
   free(m_buffer);
   m_buffer = nullptr;
   m_bufferSize = 0;
@@ -1345,13 +1426,37 @@ void CDVDAudioCodecOmniphony::FallBack(const char* why)
 
   if (m_helper)
   {
+    // The helper's own account of what went wrong, which is otherwise lost:
+    // Stop() takes the pipe with it, and nothing else drains these. On a
+    // protocol disagreement this is the line that says which one.
+    for (const auto& msg : m_helper->TakeMessages())
+      CLog::Log(LOGERROR, "CDVDAudioCodecOmniphony: helper: {}", msg);
     m_helper->Stop();
     m_helper.reset();
   }
   DropRendered();
+  m_staging.clear();
   // After DropRendered, which arms it: the software decoder fills the sink at
   // its own pace and there is no render left here to bank.
   m_priming = false;
+
+  /*
+   * On the PCM path the replacement is already here, already open on this
+   * stream, and already holding the frame that provoked the switch.
+   *
+   * That is the whole reason this codec derives its source from
+   * CDVDAudioCodecFFmpeg rather than owning one. Handing it over costs no
+   * second decoder, no re-open, and - because COmniphonyPcmSource::GetData
+   * serves a retained frame before receiving another - not one frame of audio
+   * at the moment the listener is switched across. The caller must not offer
+   * the packet again if this decoder has already taken it; AddPcmData carries
+   * that argument.
+   */
+  if (m_pcm)
+  {
+    m_fallback = std::move(m_pcm);
+    return;
+  }
 
   // The player has no way to swap a codec on request, so the replacement lives
   // here. It is fed the demux packets, not our framed ones, because that is
@@ -1364,6 +1469,181 @@ void CDVDAudioCodecOmniphony::FallBack(const char* why)
     m_fallback = std::move(ffmpeg);
   else
     CLog::Log(LOGERROR, "CDVDAudioCodecOmniphony: the software decoder would not open either");
+}
+
+bool CDVDAudioCodecOmniphony::DrainStaging()
+{
+  if (m_staging.empty())
+    return true;
+
+  const size_t frame = m_pcm ? std::max<size_t>(m_pcm->FrameSize(), 1) : 1;
+  const size_t chunk = frame * OMNI_PCM_WRITE_FRAMES;
+
+  size_t sent = 0;
+  while (sent < m_staging.size())
+  {
+    /*
+     * The brake, and the only reason this can return with work left over.
+     *
+     * Sending regardless would not remove the limit, it would move it: the
+     * bytes would pile up in the helper's own input queue instead, where
+     * OMNI_MAX_PENDING is fatal rather than merely full. Left here they cost
+     * nothing and are sent as soon as the helper has taken what it has.
+     */
+    if (m_helper->Queued() > OMNI_FEED_QUEUE_MAX)
+      break;
+
+    const size_t len = std::min(chunk, m_staging.size() - sent);
+    if (!m_helper->Send(OP_FEED, m_staging.data() + sent, len))
+      return false;
+    m_fed = true;
+    sent += len;
+  }
+
+  if (sent == m_staging.size())
+    m_staging.clear();
+  else if (sent)
+    m_staging.erase(m_staging.begin(), m_staging.begin() + sent);
+  return true;
+}
+
+bool CDVDAudioCodecOmniphony::RestartBridge()
+{
+  CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: the stream changed shape - describing it again");
+
+  /*
+   * What is staged was converted for the geometry the bridge is about to stop
+   * expecting, so it cannot be sent: after the reset those bytes would be read
+   * as a header. The resampler's tail goes with it - Convert has already
+   * replaced the resampler by the time a new header appears, so there is
+   * nothing of the old one left to drain. That is a fraction of a millisecond
+   * at a change of stream geometry.
+   */
+  m_staging.clear();
+
+  // The bank goes for the same reason a seek's does: OP_RESET restarts the
+  // engine's sample counter, so every timestamp already banked describes a
+  // clock that will not exist a moment from now, and the anchor with them.
+  DropRendered();
+  m_headerSent = false;
+  return m_helper->Send(OP_RESET, nullptr, 0);
+}
+
+bool CDVDAudioCodecOmniphony::StagePcm()
+{
+  for (;;)
+  {
+    std::vector<uint8_t> pcm;
+    double pts = DVD_NOPTS_VALUE;
+    if (!m_pcm->Convert(pcm, pts))
+    {
+      // False means both "the decoder has nothing ready" and "this stream
+      // cannot be rendered", and only the second is an answer to anything.
+      return !m_pcm->Unsupported();
+    }
+
+    if (m_pcm->HeaderPending())
+    {
+      // A header when one has already gone out is the stream changing shape
+      // under us - a different layout, rate or sample format out of the same
+      // decoder. The bridge parses one header and then streams, so it has to be
+      // told to expect another before it can be given one.
+      if (m_headerSent && !RestartBridge())
+        return false;
+
+      const std::vector<uint8_t>& header = m_pcm->Header();
+      m_staging.insert(m_staging.end(), header.begin(), header.end());
+      m_pcm->TakeHeader();
+      m_headerSent = true;
+    }
+
+    /*
+     * The decoded frame's timestamp, not the packet's.
+     *
+     * A decoder answers later than it is asked - it holds packets while it has
+     * nothing to emit and emits several from one - so the packet timestamp
+     * reaching AddData describes input rather than the output about to be
+     * staged. The anchor pairs a demuxer timestamp with the engine's own clock
+     * and has to be exact, which is why m_anchor is taken once; taking it from
+     * the wrong end of the decoder would put the audio clock ahead of the
+     * picture by the decoder's latency for the rest of the film.
+     *
+     * The rest of the condition is the object path's, unchanged and for its
+     * reason: a demux timestamp only describes the block coming out when
+     * nothing is in flight between them, which is true once per stream and
+     * once per seek.
+     */
+    if (pts != DVD_NOPTS_VALUE && m_pendingPts == DVD_NOPTS_VALUE && m_anchor == DVD_NOPTS_VALUE)
+      m_pendingPts = pts;
+
+    m_staging.insert(m_staging.end(), pcm.begin(), pcm.end());
+  }
+}
+
+bool CDVDAudioCodecOmniphony::AddPcmData(const DemuxPacket& packet)
+{
+  /*
+   * The order of what follows is the whole of the no-replay contract.
+   *
+   * AddData's false means "this packet was not consumed, offer it again", and
+   * CVideoPlayerAudio does exactly that. On the object path the refusal is
+   * decided before the parser has touched anything, so it is always true. Here
+   * ffmpeg takes the packet the moment it is offered, and a refusal afterwards
+   * would have the player replay audio that was already decoded - not when
+   * something goes wrong, but on every bank-full event during ordinary
+   * playback. So everything that can refuse happens before the decoder is
+   * offered anything, and nothing after it is allowed to refuse.
+   */
+  if (!DrainStaging())
+  {
+    FallBack("the helper stopped accepting data");
+    return m_fallback ? m_fallback->AddData(packet) : false;
+  }
+
+  // Still holding audio the helper had no room for. Nothing of this packet has
+  // been touched, so refusing it here is the honest kind.
+  if (!m_staging.empty())
+    return false;
+
+  if (!m_priming && GetBufferSize() >= OMNI_BANK_FRAMES)
+    return false;
+
+  /*
+   * From here the packet is inside the decoder, so every exit reports whether
+   * ffmpeg took it and none of them re-offers it. That is safe even when the
+   * exit is a fallback, because on this path FallBack hands over this very
+   * decoder: whatever it swallowed, the fallback is holding.
+   */
+  const bool consumed = m_pcm->AddData(packet);
+
+  if (!StagePcm())
+  {
+    const bool refused = m_pcm->Unsupported();
+    FallBack(refused ? "this stream cannot be rendered binaurally"
+                     : "the helper stopped accepting data");
+    return consumed;
+  }
+
+  if (!DrainStaging())
+  {
+    FallBack("the helper stopped accepting data");
+    return consumed;
+  }
+
+  // Only if the helper has stopped taking what it is being sent - the brake for
+  // the case the bank cannot catch, see AwaitRoom.
+  if (!AwaitRoom())
+  {
+    FallBack("the helper died mid-stream");
+    return consumed;
+  }
+
+  // Logged and no more. There are no objects to count on this path, and no mode
+  // to choose from a count that will always be zero.
+  for (const auto& msg : m_helper->TakeMessages())
+    CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: helper: {}", msg);
+
+  return consumed;
 }
 
 bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
@@ -1380,6 +1660,11 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
     FallBack("the helper died mid-stream");
     return m_fallback ? m_fallback->AddData(packet) : false;
   }
+
+  // Everything above is common to both paths - the fallback, the bank, the
+  // clock. What a packet turns into is where they part.
+  if (m_pcm)
+    return AddPcmData(packet);
 
   /*
    * The bank is full - refuse the packet rather than wait for room.
@@ -1449,6 +1734,7 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
         FallBack("the helper stopped accepting data");
         return m_fallback ? m_fallback->AddData(packet) : false;
       }
+      m_fed = true;
     }
   }
 
@@ -1621,6 +1907,33 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
     if (GetBufferSize() < m_primeFrames && !m_primeDeadline.IsTimePast())
       return;
     m_priming = false;
+
+    /*
+     * Priming that expires with a partial bank is a renderer that is slow.
+     * Priming that expires with nothing at all, from a helper that has been
+     * given audio and has never handed a single block back, is a renderer that
+     * is not working - and without this that is silence for the length of the
+     * film, because the test below returns and the player waits for audio that
+     * is never coming.
+     *
+     * Both halves of that are load-bearing. A stream whose picture starts
+     * before its sound reaches this with nothing rendered too, and it is
+     * perfectly healthy - it has simply not been asked to render anything yet.
+     *
+     * It is the backstop for a disagreement neither side can report. The helper
+     * calls a rejected packet a decode error and carries on, which is right for
+     * a damaged file; a bridge refusing every packet it is given looks exactly
+     * the same from there, until you notice that nothing has ever come out. The
+     * helper now says so itself when it can (see its FEED handler), and this
+     * catches whatever it cannot - including an engine that accepts everything
+     * and renders nothing.
+     */
+    if (m_fed && !m_rendered && GetBufferSize() == 0)
+    {
+      FallBack("the renderer produced no audio at all");
+      return;
+    }
+
     CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: primed {}ms of render{}",
               GetBufferSize() * 1000 / static_cast<int>(OMNI_OUT_RATE),
               m_primeDeadline.IsTimePast() ? " (gave up waiting for more)" : "");
@@ -1715,6 +2028,17 @@ void CDVDAudioCodecOmniphony::Reset()
 
   m_parser.Reset();
   m_backlog.clear();
+
+  if (m_pcm)
+  {
+    // Flushes ffmpeg and drops the resampler, which re-arms the header: what
+    // that resampler is holding belongs to where the film used to be, and the
+    // bridge is about to be reset and will want describing again.
+    m_pcm->Reset();
+    m_staging.clear();
+    m_headerSent = false;
+  }
+
   DropRendered();
   StartPriming(OMNI_PRIME_FRAMES_SEEK);
   // A seek is a discontinuity: carrying the limiter's attack/hold/release
