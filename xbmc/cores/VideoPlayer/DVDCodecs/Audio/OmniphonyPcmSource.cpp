@@ -134,6 +134,21 @@ bool COmniphonyPcmSource::NativeLayout(uint64_t& mask, int& channels) const
   return true;
 }
 
+void COmniphonyPcmSource::OpenLayout(uint64_t& mask, int& channels) const
+{
+  mask = 0;
+  channels = 0;
+  if (!m_pCodecContext)
+    return;
+
+  const AVChannelLayout& layout = m_pCodecContext->ch_layout;
+  channels = layout.nb_channels > 0 ? layout.nb_channels : 0;
+  // The same union hazard NativeLayout guards: for any order but native this
+  // member is a pointer, not a mask. A count on its own is still worth having.
+  if (layout.order == AV_CHANNEL_ORDER_NATIVE)
+    mask = layout.u.mask;
+}
+
 void COmniphonyPcmSource::Retain(uint8_t* const* planes, int bytes)
 {
   // Only what the ordinary path could deliver anyway. A frame with more planes
@@ -173,6 +188,7 @@ void COmniphonyPcmSource::GiveUp(const char* why)
 
   m_unsupported = true;
   m_resampler.reset();
+  m_labels.clear();
   m_header.clear();
   m_headerPending = false;
   CLog::Log(LOGINFO, "COmniphonyPcmSource: not rendering this stream binaurally: {}", why);
@@ -234,6 +250,7 @@ bool COmniphonyPcmSource::Configure(uint64_t mask, int channels, AVSampleFormat 
     GiveUp("the stream header could not be built");
     return false;
   }
+  m_labels = std::move(labels);
 
   // Said once per geometry, not once per rebuild: every seek rebuilds this, and
   // a line per seek would bury the one that reports an actual format change.
@@ -287,7 +304,16 @@ bool COmniphonyPcmSource::Convert(std::vector<uint8_t>& pcm, double& pts)
   const AVSampleFormat fmt = m_pCodecContext->sample_fmt;
   const int rate = m_pCodecContext->sample_rate;
   if (rate <= 0)
+  {
+    // Giving up rather than returning empty-handed. A decoder that has produced
+    // a frame but reports no sample rate will go on reporting none, and simply
+    // returning false leaves the caller staging nothing for the rest of the
+    // film - no audio, and nothing that looks like a failure either. The frame
+    // is retained on the way out, like every other refusal here.
+    Retain(planes, bytes);
+    GiveUp("ffmpeg reports no sample rate for it");
     return false;
+  }
 
   // A mid-stream change of any of these is a different conversion. Rebuilding
   // re-arms the header too, which is what tells the caller to reset the bridge
@@ -323,6 +349,11 @@ bool COmniphonyPcmSource::Convert(std::vector<uint8_t>& pcm, double& pts)
   const int written = m_resampler->Resample(dst, dstFrames, planes, srcFrames, 1.0);
   if (written < 0)
   {
+    // Retained like the other refusals. The resampler consumed this frame's
+    // samples into output that is about to be thrown away, so the planes still
+    // hold everything the ordinary path needs to deliver it - and without this
+    // the listener loses a frame at the very moment they are switched across.
+    Retain(planes, bytes);
     GiveUp("the resampler failed mid-stream");
     pcm.clear();
     return false;
@@ -336,35 +367,5 @@ bool COmniphonyPcmSource::Convert(std::vector<uint8_t>& pcm, double& pts)
   if (bpts != AV_NOPTS_VALUE)
     pts = static_cast<double>(bpts) * DVD_TIME_BASE / AV_TIME_BASE;
 
-  return true;
-}
-
-bool COmniphonyPcmSource::Drain(std::vector<uint8_t>& pcm)
-{
-  pcm.clear();
-
-  if (m_unsupported || !m_resampler)
-    return false;
-
-  // Reported at the destination rate already: GetBufferedSamples rescales
-  // swr_get_delay by dst/src and rounds up, so this is an upper bound on what
-  // is still to come out.
-  const int pending = m_resampler->GetBufferedSamples();
-  if (pending <= 0)
-    return false;
-
-  pcm.resize(static_cast<size_t>(pending) * FrameSize());
-
-  // A null source with a zero count is swresample's own flush: it takes no new
-  // input and hands back what the filter still holds.
-  uint8_t* dst[1]{pcm.data()};
-  const int written = m_resampler->Resample(dst, pending, nullptr, 0, 1.0);
-  if (written <= 0)
-  {
-    pcm.clear();
-    return false;
-  }
-
-  pcm.resize(static_cast<size_t>(written) * FrameSize());
   return true;
 }

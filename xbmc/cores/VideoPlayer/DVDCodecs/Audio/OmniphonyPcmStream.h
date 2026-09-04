@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 /*!
@@ -93,6 +94,107 @@ constexpr int OMNI_PCM_MAX_CHANNELS = 64;
  *         in the wrong place is worse than one not spatialised at all.
  */
 bool OmniphonyPcmChannelLabels(uint64_t mask, int channels, std::vector<uint8_t>& labels);
+
+/*!
+ * \brief Name the labelled channels, for the player process screen.
+ *
+ * Produces the abbreviations Kodi already uses everywhere else -
+ * `FL, FR, FC, LFE, SL, SR` - in the order \p labels carries, which is the
+ * order the samples interleave. Reading the labels rather than the mask is
+ * deliberate: this row says what the renderer was handed, so it should be built
+ * from the same bytes the renderer was handed.
+ *
+ * The names match CAEChannelInfo::GetChName wherever both know a position, and
+ * the separator matches its operator std::string(). They are spelled out here
+ * rather than borrowed so this component keeps its one dependency, FFmpeg's
+ * channel constants; the renderer names five positions Kodi's enum does not
+ * (the wides, the surround-directs and the second LFE), so a translation table
+ * would have been needed in either direction.
+ *
+ * One channel of front centre is "Mono", because that is what a listener calls
+ * it. Any other single channel is named, since a lone LFE or a lone surround is
+ * not mono, it is one channel of something.
+ *
+ * \return the description, or empty if \p labels is empty or names a position
+ *         that does not exist - neither of which this codebase can produce, the
+ *         labels having come from OmniphonyPcmChannelLabels.
+ */
+std::string OmniphonyPcmDescribe(const std::vector<uint8_t>& labels);
+
+//! \brief How much quieter Kodi's own stereo fold is when it normalises.
+//! Measured for 5.1 to stereo against the unnormalised fold of the same
+//! material: 0.0999 against 0.2997 RMS, a factor of three.
+constexpr double OMNI_NORMALIZED_DOWNMIX_DB = 9.5;
+
+/*!
+ * \brief The channel count the binaural level setting is calibrated against.
+ *
+ * Six, so that 5.1 - the layout the -3 dB default was chosen against, and the
+ * one every profile in the field holds a number for - corrects by nothing. That
+ * anchoring is the whole reason the summing term could be added at all: it
+ * leaves 5.1 sounding exactly as it did and migrates nobody.
+ *
+ * \note The shape of the summing term is theory, not measurement. Incoherent
+ * summing predicts 10*log10(N/2) dB relative to stereo, which is what
+ * OmniphonyPcmLevelMatch inverts. Plan v2 measured +4.1 dB for six equal noise
+ * channels, close to the predicted 4.8 - but only +3.2 dB on a real 5.1 film
+ * balance, because a film's surrounds sit well below its fronts and the
+ * effective width is smaller than the channel count.
+ *
+ * That check by ear has since happened, and it went against the extrapolation:
+ * below the reference the term is no longer applied at all. What survives is
+ * the half that was measured - layouts at and above 5.1, where the ratio is an
+ * attenuation rather than a boost. Retuning that half is still this one
+ * constant, and moving it moves 5.1, which is the layout every profile in the
+ * field holds a number for.
+ */
+constexpr double OMNI_MATCH_REFERENCE_CHANNELS = 6.0;
+
+//! \brief The two corrections that keep one level setting meaning one loudness.
+struct OmniphonyLevelMatch
+{
+  //! \brief dB to subtract, so that this layout sits where the reference one
+  //! does. Named for Kodi's normalised fold, which is where the number came
+  //! from and what it still matches on any layout Kodi folds; a layout Kodi
+  //! leaves alone takes it too, because one level control has to mean one
+  //! loudness across a library - see OmniphonyPcmLevelMatch.
+  double downmixDb;
+  //! \brief dB to add for a layout wider than the reference, which sums more
+  //! sources into the two ears than the setting was calibrated against. Never
+  //! positive: narrower layouts are not boosted - see
+  //! OMNI_MATCH_REFERENCE_CHANNELS.
+  double summingDb;
+};
+
+/*!
+ * \brief Derive both corrections from the stream's own layout.
+ *
+ * This lives beside the wire format rather than in the codec because it is the
+ * same knowledge - what the channels of this stream are - and because keeping
+ * it free of Kodi's headers is what lets it be tested. Nothing here reaches the
+ * renderer; the result is a gain the codec writes into the engine's config.
+ *
+ * \param mask      the FFmpeg native layout mask, or 0 if only a count is known
+ * \param channels  the source channel count; 0 or less means nothing is known,
+ *                  and the reference layout's answer is returned so that a
+ *                  stream we cannot measure behaves as 5.1 always has
+ *
+ * \note Whether Kodi's own fold sums anything into the front pair still decides
+ * which branch a layout takes, because it is what tells a real fold from a
+ * pass-through: a source carrying only front left, front right and the
+ * low-frequency channels has nothing to sum, since swresample mixes LFE into
+ * the front pair only when a positive lfe_mix_level is set and
+ * CActiveAEResampleFFMPEG sets it only when the sublevel it is given is above
+ * zero. So stereo, mono and 2.1 are pass-throughs and a centre or a surround
+ * makes the fold real. What differs now is the answer rather than the test:
+ * a pass-through is given the reference correction outright instead of none,
+ * having no width of its own to scale by.
+ *
+ * \note The 9.5 dB itself is measured for 5.1 only. Narrower folds - quad, 3.0 -
+ * normalise by less, so they are corrected by more than they should be. That
+ * was true before this function existed and is unchanged by it.
+ */
+OmniphonyLevelMatch OmniphonyPcmLevelMatch(uint64_t mask, int channels);
 
 /*!
  * \brief Build the header that introduces a stream of \p labels channels.

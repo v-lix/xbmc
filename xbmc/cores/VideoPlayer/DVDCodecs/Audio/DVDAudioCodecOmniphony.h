@@ -229,6 +229,8 @@ private:
    * is why the bank and the anchor go too - the same reason a seek does.
    */
   bool RestartBridge();
+  //! \brief Re-arm the no-output backstop. Called wherever the bridge is reset.
+  void ArmRecovery();
   //! \brief Tie the engine's clock to the demuxer's, once, off the first block
   //! appended since \p before.
   void AnchorNewBlocks(size_t before);

@@ -13,6 +13,9 @@ extern "C"
 #include <libavutil/channel_layout.h>
 }
 
+#include <algorithm>
+#include <cmath>
+
 namespace
 {
 //! \brief The label values the renderer's bridge_api defines for fixed speaker
@@ -89,6 +92,45 @@ constexpr LabelMapping MAPPINGS[] = {
     {AV_CH_TOP_SIDE_RIGHT, OMNI_TSR},
 };
 
+/*!
+ * \brief What each label is called on screen, indexed by the label itself.
+ *
+ * Kodi's own abbreviations wherever its channel enum has the position, so a
+ * listener reading "FL, FR, FC, LFE, SL, SR" here sees the same words the
+ * audio settings and the rest of the process screen use. The five the enum
+ * does not name - the wides, the surround-directs and the second LFE - follow
+ * the same shape.
+ */
+constexpr const char* LABEL_NAMES[] = {
+    "FL", // OMNI_L
+    "FR", // OMNI_R
+    "FC", // OMNI_C
+    "LFE", // OMNI_LFE
+    "SL", // OMNI_LS
+    "SR", // OMNI_RS
+    "TFL", // OMNI_TFL
+    "TFR", // OMNI_TFR
+    "TSL", // OMNI_TSL
+    "TSR", // OMNI_TSR
+    "TBL", // OMNI_TBL
+    "TBR", // OMNI_TBR
+    "FLOC", // OMNI_LSC
+    "FROC", // OMNI_RSC
+    "BL", // OMNI_LB
+    "BR", // OMNI_RB
+    "BC", // OMNI_CB
+    "TC", // OMNI_TC
+    "SDL", // OMNI_LSD
+    "SDR", // OMNI_RSD
+    "WL", // OMNI_LW
+    "WR", // OMNI_RW
+    "TFC", // OMNI_TFC
+    "LFE2", // OMNI_LFE2
+};
+
+static_assert(sizeof(LABEL_NAMES) / sizeof(LABEL_NAMES[0]) == OMNI_LFE2 + 1,
+              "every label the wire format can carry needs a name");
+
 //! \brief The renderer position for one mask bit, or -1 if it has none.
 int LabelForBit(uint64_t bit)
 {
@@ -150,6 +192,90 @@ bool OmniphonyPcmChannelLabels(uint64_t mask, int channels, std::vector<uint8_t>
 
   labels.swap(mapped);
   return true;
+}
+
+std::string OmniphonyPcmDescribe(const std::vector<uint8_t>& labels)
+{
+  if (labels.empty())
+    return {};
+
+  // One front-centre channel is what everyone calls mono. A lone LFE or a lone
+  // surround is not, so the test is the label rather than the count.
+  if (labels.size() == 1 && labels[0] == OMNI_C)
+    return "Mono";
+
+  std::string out;
+  for (const uint8_t label : labels)
+  {
+    if (label >= sizeof(LABEL_NAMES) / sizeof(LABEL_NAMES[0]))
+      return {};
+    if (!out.empty())
+      out += ", ";
+    out += LABEL_NAMES[label];
+  }
+  return out;
+}
+
+OmniphonyLevelMatch OmniphonyPcmLevelMatch(uint64_t mask, int channels)
+{
+  OmniphonyLevelMatch match{OMNI_NORMALIZED_DOWNMIX_DB, 0.0};
+  if (channels <= 0)
+    return match;
+
+  // Everything a fold has to sum into the front pair. The front pair itself
+  // passes through, and the low-frequency channels are dropped rather than
+  // summed unless a listener has asked for them - see the header.
+  constexpr uint64_t PASSES_THROUGH =
+      AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT | AV_CH_LOW_FREQUENCY | AV_CH_LOW_FREQUENCY_2;
+
+  // Two conditions, and both are needed.
+  //
+  // There must be more channels than the two being folded into, which is Kodi's
+  // own test for whether it is folding at all - a mono source is widened to the
+  // pair rather than folded into it, and nothing is summed with anything.
+  //
+  // And what those extra channels are has to matter, which a count cannot say:
+  // 2.1 is three channels but its third is the LFE, dropped rather than summed,
+  // so the front pair comes through as it went in. With no mask there is only
+  // the count, and a count above two at least means something is folded, even
+  // if not what.
+  const bool folds = channels > 2 && (mask ? (mask & ~PASSES_THROUGH) != 0 : true);
+
+  /*
+   * A layout Kodi would not fold takes the reference correction unchanged,
+   * which is what `match` already holds.
+   *
+   * This is the half of the rule that changed after listening. Following Kodi
+   * exactly - no normalisation where Kodi normalises nothing - is defensible
+   * per stream and indefensible across a library: Kodi's own stereo output is
+   * 9.5 dB hotter than its own 5.1 fold, so inheriting that put a stereo album
+   * 14 dB above a 5.1 film at one setting, and mono 17 above it. One level
+   * control has to mean one loudness or it is not a level control, so an
+   * unfolded layout is brought to where the reference sits instead.
+   *
+   * What it costs is that turning binaural on makes a stereo track quieter
+   * than it was, where before it was left alone. That is the honest price of
+   * the choice, and it is the direction a listener can undo with the setting.
+   */
+  if (!folds)
+    return match;
+
+  match.downmixDb = OMNI_NORMALIZED_DOWNMIX_DB;
+
+  /*
+   * Never a boost, only an attenuation for layouts wider than the reference.
+   *
+   * The ratio itself is unchanged for anything at or above the reference, so
+   * 5.1 still corrects by nothing and 7.1 and 7.1.4 sit where they always did.
+   * Below it the term used to open up: a three or four channel fold came out
+   * 1.8 to 3 dB above 5.1 on the theory that fewer sources sum to less. The
+   * theory is sound and the number is not - the header records 4.1 dB measured
+   * against 4.8 predicted on noise, and only 3.2 dB on a real 5.1 balance -
+   * and by ear the boost is plainly wrong. Clamping it keeps the part that was
+   * measured and drops the part that was extrapolated.
+   */
+  match.summingDb = std::min(0.0, 10.0 * std::log10(OMNI_MATCH_REFERENCE_CHANNELS / channels));
+  return match;
 }
 
 std::vector<uint8_t> OmniphonyPcmHeader(const std::vector<uint8_t>& labels,

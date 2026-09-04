@@ -79,31 +79,6 @@ public:
   bool Convert(std::vector<uint8_t>& pcm, double& pts);
 
   /*!
-   * \brief Take whatever the resampler is still holding, at end of stream.
-   *
-   * Rate conversion keeps samples inside swresample that no further input will
-   * push out, so a track that ends without this loses its tail - a truncated
-   * transient, or a gap where a gapless boundary should be. \ref Reset wants
-   * the opposite of this and discards them, because after a seek they describe
-   * where the film used to be.
-   *
-   * Call once the decoder has reached end of stream, and keep calling until it
-   * returns false. \p pcm is cleared each time.
-   *
-   * \warning Nothing calls this yet, and that is not an oversight. Kodi has no
-   * end-of-stream signal for an audio codec: CDVDMsg::GENERAL_EOF exists and is
-   * handled, but nothing in the tree ever sends it; CDVDAudioCodecFFmpeg::m_eof
-   * is never set true; and PAPlayer returns READ_EOF the moment its demuxer
-   * runs dry, without asking the codec for a tail. Every Drain() in the player
-   * is the sink's, not a codec's. Giving this a caller means adding that signal
-   * to shared player code, which would change every codec's lifecycle and is a
-   * decision of its own. Until then the tail lost is the resampler's alone -
-   * well under a millisecond, and smaller than the decoder tail Kodi already
-   * discards on every track by the same omission.
-   */
-  bool Drain(std::vector<uint8_t>& pcm);
-
-  /*!
    * \brief True once this stream has proved unrenderable, which is permanent.
    *
    * Set when the decoder's layout cannot be labelled or the resampler refuses
@@ -130,8 +105,35 @@ public:
   bool HeaderPending() const { return m_headerPending; }
   void TakeHeader() { m_headerPending = false; }
 
+  /*!
+   * \brief The channel labels inside \ref Header, for describing the stream.
+   *
+   * Kept rather than parsed back out of the header, so the bytes the renderer
+   * is sent and the words the screen shows cannot say different things. Empty
+   * before the first frame, and emptied when the stream is given up on.
+   */
+  const std::vector<uint8_t>& Labels() const { return m_labels; }
+
   //! \brief Channels in the converted output, or 0 before the first frame.
   int Channels() const { return m_channels; }
+
+  /*!
+   * \brief The layout ffmpeg was opened with, before anything is decoded.
+   *
+   * The level the renderer is configured with has to be chosen at open, and
+   * this is the best that is known then. It is not merely the demuxer's hint:
+   * CDVDAudioCodecFFmpeg::Open takes the hint's mask when there is one and
+   * falls back to av_channel_layout_default for the hinted count when there is
+   * not, so what the decoder ends up configured with is at least as good as the
+   * hint and sometimes better.
+   *
+   * Still a hint, though. The decoder may correct it once it has seen the
+   * stream, and nothing rewrites the engine's config when it does.
+   *
+   * \param mask      set to the layout mask, or 0 if the order is not native
+   * \param channels  set to the channel count, or 0 if it is not known
+   */
+  void OpenLayout(uint64_t& mask, int& channels) const;
 
   //! \brief Bytes in one converted sample-frame, or 0 before the first frame.
   size_t FrameSize() const { return static_cast<size_t>(m_channels) * sizeof(float); }
@@ -170,6 +172,7 @@ private:
   int m_retainedBytes{0};
 
   std::unique_ptr<ActiveAE::IAEResample> m_resampler;
+  std::vector<uint8_t> m_labels;
   std::vector<uint8_t> m_header;
   bool m_headerPending{false};
   bool m_unsupported{false};

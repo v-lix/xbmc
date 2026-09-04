@@ -13,6 +13,9 @@ extern "C"
 #include <libavutil/channel_layout.h>
 }
 
+#include <cmath>
+#include <utility>
+
 #include <gtest/gtest.h>
 
 /*
@@ -153,4 +156,161 @@ TEST(TestOmniphonyPcmStream, HeaderEncodesTheRateLittleEndian)
   EXPECT_EQ(header[9], 0xAC);
   EXPECT_EQ(header[10], 0x00);
   EXPECT_EQ(header[11], 0x00);
+}
+
+/*
+ * The on-screen channel list, built from the layouts a listener actually meets.
+ * Every one of these is described from the labels the renderer is sent, in the
+ * order it is sent them, so what the row says and what the bridge was handed
+ * cannot drift apart.
+ */
+TEST(TestOmniphonyPcmStream, DescribesTheCommonLayouts)
+{
+  EXPECT_EQ(OmniphonyPcmDescribe(LabelsOf(AV_CH_LAYOUT_MONO, 1)), "Mono");
+  EXPECT_EQ(OmniphonyPcmDescribe(LabelsOf(AV_CH_LAYOUT_STEREO, 2)), "FL, FR");
+  EXPECT_EQ(OmniphonyPcmDescribe(LabelsOf(AV_CH_LAYOUT_2POINT1, 3)), "FL, FR, LFE");
+  EXPECT_EQ(OmniphonyPcmDescribe(LabelsOf(AV_CH_LAYOUT_QUAD, 4)), "FL, FR, BL, BR");
+  EXPECT_EQ(OmniphonyPcmDescribe(LabelsOf(AV_CH_LAYOUT_5POINT0, 5)), "FL, FR, FC, SL, SR");
+  EXPECT_EQ(OmniphonyPcmDescribe(LabelsOf(AV_CH_LAYOUT_5POINT1, 6)), "FL, FR, FC, LFE, SL, SR");
+  EXPECT_EQ(OmniphonyPcmDescribe(LabelsOf(AV_CH_LAYOUT_7POINT1, 8)),
+            "FL, FR, FC, LFE, BL, BR, SL, SR");
+}
+
+/*!
+ * 6.1 in interleave order, which is not the order it is usually written.
+ *
+ * BACK_CENTER is bit 8 and the side pair bits 9 and 10, so the centre back
+ * arrives before the sides rather than after them. Written out as its own case
+ * because it is the one layout where the order a listener expects and the order
+ * the samples arrive in disagree - and the samples win, since this row exists
+ * to say what the renderer was handed.
+ */
+TEST(TestOmniphonyPcmStream, DescribesSixPointOneInInterleaveOrder)
+{
+  EXPECT_EQ(OmniphonyPcmDescribe(LabelsOf(AV_CH_LAYOUT_6POINT1, 7)), "FL, FR, FC, LFE, BC, SL, SR");
+}
+
+//! Height layouts, where the count alone would say nothing useful at all.
+TEST(TestOmniphonyPcmStream, DescribesHeightLayouts)
+{
+  EXPECT_EQ(OmniphonyPcmDescribe(LabelsOf(AV_CH_LAYOUT_7POINT1POINT4_BACK, 12)),
+            "FL, FR, FC, LFE, BL, BR, SL, SR, TFL, TFR, TBL, TBR");
+}
+
+TEST(TestOmniphonyPcmStream, DescribesNothingItCannotName)
+{
+  EXPECT_TRUE(OmniphonyPcmDescribe({}).empty());
+  // 24 is Object and 255 is Unknown; neither is a speaker and neither can reach
+  // here from OmniphonyPcmChannelLabels, which refuses both.
+  EXPECT_TRUE(OmniphonyPcmDescribe({L, R, 24}).empty());
+  EXPECT_TRUE(OmniphonyPcmDescribe({L, R, 255}).empty());
+}
+
+/*
+ * The level match. Both terms are derived from the layout rather than measured
+ * per stream, so what they come to for each layout is worth pinning down: this
+ * is the whole of the arithmetic that decides whether "-3 dB" sounds the same
+ * on an album as on a film.
+ */
+TEST(TestOmniphonyPcmStream, LevelMatchIsNeutralAtTheReferenceLayout)
+{
+  // 5.1 is the layout the default was chosen against, so it must correct by
+  // nothing at all - that is what lets every profile in the field keep its
+  // number.
+  const auto m = OmniphonyPcmLevelMatch(AV_CH_LAYOUT_5POINT1, 6);
+  EXPECT_EQ(m.summingDb, 0.0);
+  EXPECT_EQ(m.downmixDb, OMNI_NORMALIZED_DOWNMIX_DB);
+}
+
+/*!
+ * A layout Kodi would not fold is corrected as though it were the reference.
+ *
+ * Not because Kodi normalises it - Kodi leaves it alone - but because the
+ * alternative was measured by ear and rejected: inheriting Kodi's own gap put
+ * a stereo album 14 dB above a 5.1 film at one setting, and mono 17 above it.
+ */
+TEST(TestOmniphonyPcmStream, LevelMatchGivesAPassThroughTheReferenceCorrection)
+{
+  for (const auto& [layout, channels] :
+       {std::pair{AV_CH_LAYOUT_STEREO, 2}, std::pair{AV_CH_LAYOUT_MONO, 1},
+        // 2.1 is the case a channel count gets wrong: three
+        // channels, so a count says "multichannel", but the only
+        // thing beyond the front pair is the LFE, dropped rather
+        // than summed. Nothing reaches the front pair that was
+        // not already there.
+        std::pair{AV_CH_LAYOUT_2POINT1, 3}})
+  {
+    const auto m = OmniphonyPcmLevelMatch(layout, channels);
+    EXPECT_EQ(m.downmixDb, OMNI_NORMALIZED_DOWNMIX_DB);
+    EXPECT_EQ(m.summingDb, 0.0);
+  }
+
+  // A centre or a surround is summed, and then it is a real fold - which takes
+  // the same attenuation by the other branch, and its own width with it.
+  EXPECT_EQ(OmniphonyPcmLevelMatch(AV_CH_LAYOUT_SURROUND, 3).downmixDb, OMNI_NORMALIZED_DOWNMIX_DB);
+  EXPECT_EQ(OmniphonyPcmLevelMatch(AV_CH_LAYOUT_QUAD, 4).downmixDb, OMNI_NORMALIZED_DOWNMIX_DB);
+}
+
+//! The summing term attenuates layouts wider than the reference and never
+//! boosts a narrower one. Rounded, because the point is the size.
+TEST(TestOmniphonyPcmStream, LevelMatchTracksTheSourceWidth)
+{
+  auto round2 = [](double v) { return std::round(v * 100.0) / 100.0; };
+  EXPECT_EQ(round2(OmniphonyPcmLevelMatch(AV_CH_LAYOUT_7POINT1, 8).summingDb), -1.25);
+  EXPECT_EQ(round2(OmniphonyPcmLevelMatch(AV_CH_LAYOUT_7POINT1POINT4_BACK, 12).summingDb), -3.01);
+
+  // Narrower than the reference and still folding - the boost these used to get
+  // is what made one setting mean two loudnesses.
+  EXPECT_EQ(OmniphonyPcmLevelMatch(AV_CH_LAYOUT_SURROUND, 3).summingDb, 0.0);
+  EXPECT_EQ(OmniphonyPcmLevelMatch(AV_CH_LAYOUT_QUAD, 4).summingDb, 0.0);
+  EXPECT_EQ(OmniphonyPcmLevelMatch(AV_CH_LAYOUT_MONO, 1).summingDb, 0.0);
+  EXPECT_EQ(OmniphonyPcmLevelMatch(AV_CH_LAYOUT_STEREO, 2).summingDb, 0.0);
+}
+
+/*!
+ * The whole point, in one assertion: one setting, one loudness.
+ *
+ * Every layout is corrected to within the reference's own attenuation or below
+ * it, so no stream can come out louder than 5.1 does at the same setting. The
+ * wide layouts are allowed to sit below it, which is the measured half of the
+ * summing term doing its job.
+ */
+TEST(TestOmniphonyPcmStream, NoLayoutIsLouderThanTheReference)
+{
+  const auto ref = OmniphonyPcmLevelMatch(AV_CH_LAYOUT_5POINT1, 6);
+  const double refGain = -ref.downmixDb + ref.summingDb;
+
+  const std::pair<uint64_t, int> layouts[] = {
+      {AV_CH_LAYOUT_MONO, 1},    {AV_CH_LAYOUT_STEREO, 2},
+      {AV_CH_LAYOUT_2POINT1, 3}, {AV_CH_LAYOUT_SURROUND, 3},
+      {AV_CH_LAYOUT_QUAD, 4},    {AV_CH_LAYOUT_5POINT1, 6},
+      {AV_CH_LAYOUT_7POINT1, 8}, {AV_CH_LAYOUT_7POINT1POINT4_BACK, 12},
+  };
+  for (const auto& [layout, channels] : layouts)
+  {
+    const auto m = OmniphonyPcmLevelMatch(layout, channels);
+    const double gain = -m.downmixDb + m.summingDb;
+    EXPECT_LE(gain, refGain) << "channels=" << channels;
+  }
+}
+
+/*!
+ * An unknown layout has to behave as 5.1 always has.
+ *
+ * A demuxer that reports no channel count leaves nothing to correct from, and
+ * the reference answer is the one that changes nothing for anybody: it is what
+ * the object path gets, and what this path got before the terms existed.
+ */
+TEST(TestOmniphonyPcmStream, LevelMatchFallsBackToTheReferenceWhenNothingIsKnown)
+{
+  const auto m = OmniphonyPcmLevelMatch(0, 0);
+  EXPECT_EQ(m.summingDb, 0.0);
+  EXPECT_EQ(m.downmixDb, OMNI_NORMALIZED_DOWNMIX_DB);
+
+  // A count with no mask is still worth something: it cannot say what is being
+  // folded, only that something must be.
+  EXPECT_EQ(OmniphonyPcmLevelMatch(0, 6).downmixDb, OMNI_NORMALIZED_DOWNMIX_DB);
+  // A count of two is a pass-through, and takes the reference correction like
+  // any other - see LevelMatchGivesAPassThroughTheReferenceCorrection.
+  EXPECT_EQ(OmniphonyPcmLevelMatch(0, 2).downmixDb, OMNI_NORMALIZED_DOWNMIX_DB);
 }

@@ -186,9 +186,15 @@ constexpr unsigned int OMNI_MODE_WINDOW_MS = 5000;
  * Before the correction is the whole of the point: this is not the gain the
  * engine receives. WriteConfig subtracts OMNI_NORMALIZED_DOWNMIX_DB from it
  * whenever Kodi is normalising its own stereo fold, which is the default, so
- * -3 here reaches the renderer as -12.5. Reading this number as the render
- * gain overstates it by 9.5 dB and makes the headroom look far worse than it
- * is - which is a mistake worth naming, because it has been made.
+ * -3 here reaches the renderer as -12.5 for a 5.1 film. Reading this number as
+ * the render gain overstates it by 9.5 dB and makes the headroom look far worse
+ * than it is - which is a mistake worth naming, because it has been made.
+ *
+ * Two channel-count terms move it further still, and in the other direction for
+ * a narrow source: a stereo album gets neither the downmix match, there being no
+ * downmix, nor the summing match a wide layout gets, so the same -3 reaches the
+ * renderer as about +1.8. See WriteConfig, where both terms are derived. This
+ * default is the number for 5.1, where both terms are zero by construction.
  *
  * Chosen to match that fold rather than to satisfy the limiter: what this
  * render has to sound like is Kodi's own downmix of the same film, at the same
@@ -293,15 +299,6 @@ const Room& RoomFor(int preset)
     preset = ROOM_MEDIUM;
   return rooms[preset];
 }
-
-/*!
- * \brief How much quieter Kodi's own stereo fold is when it normalises.
- *
- * Measured for 5.1 to stereo against the unnormalised fold of the same
- * material: 0.0999 against 0.2997 RMS, a factor of three. Carried over from the
- * in-process renderer, which established it.
- */
-constexpr double OMNI_NORMALIZED_DOWNMIX_DB = 9.5;
 
 void PutU32(uint8_t* p, uint32_t v)
 {
@@ -793,28 +790,71 @@ bool CDVDAudioCodecOmniphony::WriteConfig(const std::string& bridge) const
   // survived staging - see COmniphonyHrtf, and StageHrtf below for when.
   const std::string sofa = ActiveAE::COmniphonyHrtf::StagedPath();
 
-  // What this render has to sound like is Kodi's own stereo fold of the same
-  // film, and that fold's level depends on a setting of its own: with "maintain
-  // original volume" off the matrix downmix is normalised, a measured 9.5 dB
-  // quieter for 5.1 to stereo. None of that reaches here - the flag goes to a
-  // resampler this path does not use - so it is applied to the render instead.
-  // Matching it is also what keeps the limiter idle: left at full level against
-  // a normalised downmix the render would sit 9.5 dB hot and the limiter would
-  // be working on almost every film rather than on the rare transient.
-  // Exact for 5.1; other layouts normalise by a slightly different amount and
-  // land within a decibel or so.
+  /*
+   * One setting, two terms that depend on the channel count, so that -3 dB
+   * means the same loudness whatever the film turns out to be.
+   *
+   * What this render has to sound like is Kodi's own stereo fold of the same
+   * material, at the same loudness, so that turning the feature on is not also
+   * turning the volume up.
+   *
+   * The first term matches Kodi's downmix normalisation: with "maintain
+   * original volume" off the matrix downmix is normalised, a measured 9.5 dB
+   * quieter for 5.1 to stereo. None of that reaches here - the flag goes to a
+   * resampler this path does not use - so it is applied to the render instead.
+   * Matching it is also what keeps the limiter idle: left at full level against
+   * a normalised downmix the render would sit 9.5 dB hot and the limiter would
+   * be working on almost every film rather than on the rare transient.
+   *
+   * The second term matches the render's own summing gain, which grows with the
+   * source count where a normalised fold does not - but only downwards, for
+   * layouts wider than the reference. Below it the term was an extrapolation
+   * and listening went against it, so a narrow layout takes the first term
+   * alone and lands exactly where 5.1 does.
+   *
+   * Both are derived in OmniphonyPcmLevelMatch, which is where the rules and
+   * their limits are written out and where they are tested. Only the layout is
+   * decided here, and only the PCM path has one to offer: the object path's
+   * loudness follows the object count, which nothing knows at open and which no
+   * channel formula describes, so it keeps exactly the behaviour it has always
+   * had - the full normalisation match, no summing term.
+   *
+   * The layout comes from the decoder rather than from the demuxer's hint. It
+   * is still only what is known before anything has been decoded, which is all
+   * the engine's config can be written from, but ffmpeg has already reconciled
+   * the hint's mask and count by then and defaulted a layout where the mask was
+   * missing. Where even that is unknown the match falls back to the reference
+   * layout, which is what this path did before either term existed.
+   */
+  uint64_t sourceMask = 0;
+  int sourceChannels = 0;
+  if (m_pcm)
+    m_pcm->OpenLayout(sourceMask, sourceChannels);
+
+  const OmniphonyLevelMatch match = OmniphonyPcmLevelMatch(sourceMask, sourceChannels);
+  const double matchA = match.downmixDb;
+  const double matchB = match.summingDb;
+
   // Clamped to the range the setting declares rather than trusted: a profile
   // written before this existed reads it as zero, which is in range, but a
-  // hand-edited one need not be.
+  // hand-edited one need not be. The two match terms are applied after the
+  // clamp, because they are corrections rather than anything a listener chose.
   double level = OMNI_LEVEL_DB;
   if (settings)
   {
     level = std::clamp(
         settings->GetSettings()->GetNumber(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYLEVEL),
         OMNI_LEVEL_MIN_DB, OMNI_LEVEL_MAX_DB);
+    level += matchB;
     if (!settings->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_MAINTAINORIGINALVOLUME))
-      level -= OMNI_NORMALIZED_DOWNMIX_DB;
+      level -= matchA;
   }
+
+  if (m_pcm)
+    CLog::Log(LOGDEBUG,
+              "CDVDAudioCodecOmniphony: {} source channels, level {:.2f} dB "
+              "(downmix match {:.2f}, summing match {:+.2f})",
+              sourceChannels, level, matchA, matchB);
 
   // The LFE trim is deliberately not folded into the level above. That one
   // matches the render to Kodi's own stereo fold and moves the whole mix; this
@@ -1002,8 +1042,7 @@ bool CDVDAudioCodecOmniphony::StartHelper(CDVDStreamInfo& hints)
 
   // A helper that has just started has been given nothing, has rendered
   // nothing, and its bridge is waiting for a header - whichever bridge it is.
-  m_fed = false;
-  m_rendered = false;
+  ArmRecovery();
   m_headerSent = false;
   m_staging.clear();
 
@@ -1020,6 +1059,24 @@ bool CDVDAudioCodecOmniphony::StartHelper(CDVDStreamInfo& hints)
     CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: helper: {}", msg);
 
   return true;
+}
+
+void CDVDAudioCodecOmniphony::ArmRecovery()
+{
+  /*
+   * Re-arm the no-output backstop, which every reset of the bridge must do.
+   *
+   * These two say "the renderer has been given audio and has produced none",
+   * and GetData falls back when priming expires with both of them true. Latched
+   * for the life of the helper they would answer for the film's opening seconds
+   * and nothing after: a stream that plays, is seeked, and is then rejected for
+   * every packet from the new position would be silent to the end, because
+   * something had once rendered. A reset is exactly the boundary where that
+   * history stops describing the present, so it is where the question is asked
+   * again. The helper resets its own counterpart on the same command.
+   */
+  m_fed = false;
+  m_rendered = false;
 }
 
 void CDVDAudioCodecOmniphony::AnchorNewBlocks(size_t before)
@@ -1066,8 +1123,9 @@ bool CDVDAudioCodecOmniphony::Collect(int timeoutMs)
   const size_t had = m_out.frames.size();
   if (!m_helper->Collect(m_out, timeoutMs))
     return false;
-  // Latched for the life of the helper rather than tracked, because what reads
-  // it asks whether this renderer has ever worked at all - see GetData.
+  // Latched until the bridge is next reset, not for the life of the helper:
+  // what reads it asks whether the renderer is working *now*, and a reset is
+  // where "now" starts again. See GetData, and ArmRecovery.
   if (m_out.frames.size() > had)
     m_rendered = true;
   AnchorNewBlocks(had);
@@ -1152,7 +1210,18 @@ std::string CDVDAudioCodecOmniphony::InputDescription() const
    * Empty rather than a placeholder so a skin can test IsEmpty and fall back to
    * its own layout label. This row exists to say what the object renderer was
    * handed; when it was handed no objects, it has nothing to say.
+   *
+   * On the PCM path there is a layout to report, and it is worth reporting for
+   * the reason the second bullet gives: the channel row Kodi already has counts
+   * the render's own two channels, so nothing on the screen would otherwise say
+   * whether the film arrived as 5.1 or as stereo. The labels are the ones sent
+   * to the bridge, in the order they were sent, so this row and the wire cannot
+   * disagree. Empty until the first frame, which is the earliest anything true
+   * can be said.
    */
+  if (m_pcm)
+    return OmniphonyPcmDescribe(m_pcm->Labels());
+
   if (m_objectCount <= 0)
     return {};
 
@@ -1250,11 +1319,17 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
    * rather than ours, and a stream it cannot decode falls through to the
    * factory's next candidate exactly as it did before.
    *
-   * Phase 5 adds the second half of this test: with the objects child setting
-   * off, an Atmos stream comes down here too and has its decoded bed placed
-   * rather than its objects.
+   * The objects setting is the second half of the test rather than a switch of
+   * its own. Turning it off does not turn binaural off for an Atmos film; it
+   * says place the channels this soundtrack was mixed into and skip the objects
+   * - which is the consistent reading of a master that is still on, and the
+   * cheaper render for a device that cannot keep up with the objects.
    */
-  if (!CodecId(hints.codec))
+  bool objects = true;
+  if (const auto settings = CServiceBroker::GetSettingsComponent())
+    objects = settings->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYOBJECTS);
+
+  if (!objects || !CodecId(hints.codec))
   {
     auto pcm = std::make_unique<COmniphonyPcmSource>(m_processInfo);
     if (!pcm->Open(hints, options))
@@ -1525,6 +1600,7 @@ bool CDVDAudioCodecOmniphony::RestartBridge()
   // engine's sample counter, so every timestamp already banked describes a
   // clock that will not exist a moment from now, and the anchor with them.
   DropRendered();
+  ArmRecovery();
   m_headerSent = false;
   return m_helper->Send(OP_RESET, nullptr, 0);
 }
@@ -1555,6 +1631,11 @@ bool CDVDAudioCodecOmniphony::StagePcm()
       m_staging.insert(m_staging.end(), header.begin(), header.end());
       m_pcm->TakeHeader();
       m_headerSent = true;
+
+      // The layout the screen shows comes from these labels, so the row is
+      // rebuilt exactly when they are - at the first frame, and at any change
+      // of geometry after it.
+      m_infoDirty = true;
     }
 
     /*
@@ -2041,6 +2122,9 @@ void CDVDAudioCodecOmniphony::Reset()
 
   DropRendered();
   StartPriming(OMNI_PRIME_FRAMES_SEEK);
+  // The OP_RESET below returns the bridge to expecting a header, so whether the
+  // renderer works is an open question again - see ArmRecovery.
+  ArmRecovery();
   // A seek is a discontinuity: carrying the limiter's attack/hold/release
   // across it would attenuate the new position because of a peak in the old.
   m_limiter.Reset();
