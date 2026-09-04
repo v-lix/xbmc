@@ -1,11 +1,15 @@
 set(SOURCES DVDAudioCodecFFmpeg.cpp
             DVDAudioCodecOmniphony.cpp
-            DVDAudioCodecPassthrough.cpp)
+            DVDAudioCodecPassthrough.cpp
+            OmniphonyPcmSource.cpp
+            OmniphonyPcmStream.cpp)
 
 set(HEADERS DVDAudioCodec.h
             DVDAudioCodecFFmpeg.h
             DVDAudioCodecOmniphony.h
-            DVDAudioCodecPassthrough.h)
+            DVDAudioCodecPassthrough.h
+            OmniphonyPcmSource.h
+            OmniphonyPcmStream.h)
 
 if(CORE_SYSTEM_NAME STREQUAL android)
   list(APPEND SOURCES DVDAudioCodecAndroidMediaCodec.cpp)
