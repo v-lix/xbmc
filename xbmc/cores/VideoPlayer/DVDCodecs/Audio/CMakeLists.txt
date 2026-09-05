@@ -2,7 +2,8 @@ set(SOURCES DVDAudioCodecFFmpeg.cpp
             DVDAudioCodecOmniphony.cpp
             DVDAudioCodecPassthrough.cpp
             OmniphonyPcmSource.cpp
-            OmniphonyPcmStream.cpp)
+            OmniphonyPcmStream.cpp
+            OmniphonyRateCheck.cpp)
 
 set(HEADERS DVDAudioCodec.h
             DVDAudioCodecFFmpeg.h
