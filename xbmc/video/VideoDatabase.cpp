@@ -126,26 +126,81 @@ void CVideoDatabase::AddMissingColumns()
     CLog::Log(LOGERROR, "{} unable to migrate hdr10+ stream details", __FUNCTION__);
   }
 
+  // A build that keeps the audio codec and its profile in columns of their own stores the plain
+  // name - "truehd", with "Dolby Atmos" beside it - where this one stores "truehd_atmos". Reading
+  // a library it wrote would show the plain name in ListItem.AudioCodec, rank the stream below
+  // what it is, and make every file look changed the next time playback compares the two. Put the
+  // pairs it stored back into the one name this build uses, and touch nothing else on the row so
+  // that its profile and object counts survive for it to find again.
+  //
+  // Every name in the table is one StreamUtils::GetCodecName() produces itself, so a rescan of
+  // the same file writes back what was restored rather than contradicting it.
+  //
+  // Restoring a pair replaces the very name it matched on, so a second pass finds nothing left to
+  // do. That matters: the other build converts the names back whenever it runs against the same
+  // library, and neither side may be left needing to remember whether it has already run.
+  if (HasColumn("streamdetails", "strAudioProfile"))
+  {
+    struct ExtendedAudioCodec
+    {
+      const char* plain;
+      const char* profile;
+      const char* extended;
+    };
+
+    static const ExtendedAudioCodec extendedAudioCodecs[] = {
+        {"truehd", "Dolby Atmos", "truehd_atmos"}, {"eac3", "Dolby Atmos", "eac3_ddp_atmos"},
+        {"dtshd_ma", "DTS:X", "dtshd_ma_x"},       {"dtshd_ma", "DTS:X IMAX", "dtshd_ma_x_imax"},
+        {"dca", "DTS-ES", "dts_es"},               {"dca", "DTS 96/24", "dts_96_24"},
+        {"dca", "DTS Express", "dts_express"},     {"aac", "AAC-LC", "aac_lc"},
+        {"aac", "HE-AAC", "he_aac"},               {"aac", "HE-AAC v2", "he_aac_v2"},
+        {"aac", "AAC-SSR", "aac_ssr"},             {"aac", "AAC-LTP", "aac_ltp"}};
+
+    try
+    {
+      for (const auto& codec : extendedAudioCodecs)
+      {
+        m_pDS->exec(PrepareSQL("UPDATE streamdetails SET strAudioCodec='%s' "
+                               "WHERE strAudioCodec='%s' AND strAudioProfile='%s'",
+                               codec.extended, codec.plain, codec.profile));
+      }
+    }
+    catch (...)
+    {
+      CLog::Log(LOGERROR, "{} unable to restore extended audio codec names", __FUNCTION__);
+    }
+  }
+
   s_checkedDatabase = databaseFolder;
+}
+
+bool CVideoDatabase::HasColumn(const std::string& table, const std::string& column)
+{
+  try
+  {
+    if (nullptr == m_pDB || nullptr == m_pDS)
+      return false;
+
+    m_pDS->query(PrepareSQL("SELECT %s FROM %s LIMIT 1", column.c_str(), table.c_str()));
+    m_pDS->close();
+    return true;
+  }
+  catch (...)
+  {
+    // asking for a column that is not there is how the absence is detected
+    return false;
+  }
 }
 
 void CVideoDatabase::AddMissingColumn(const std::string& table,
                                       const std::string& column,
                                       const std::string& type)
 {
-  try
-  {
-    if (nullptr == m_pDB || nullptr == m_pDS)
-      return;
-
-    m_pDS->query(PrepareSQL("SELECT %s FROM %s LIMIT 1", column.c_str(), table.c_str()));
-    m_pDS->close();
+  if (nullptr == m_pDB || nullptr == m_pDS)
     return;
-  }
-  catch (...)
-  {
-    // the column is not there yet, fall through and add it
-  }
+
+  if (HasColumn(table, column))
+    return;
 
   try
   {
@@ -3285,26 +3340,209 @@ int CVideoDatabase::SetDetailsForMusicVideo(CVideoInfoTag& details,
   return -1;
 }
 
-void CVideoDatabase::SetStreamDetailsForFile(const CStreamDetails& details, const std::string &strFileNameAndPath)
+namespace
+{
+//! \brief A stored video stream, enough to recognise it and to carry forward what it holds.
+struct StoredVideoStream
+{
+  std::string codec;
+  int width{0};
+  int height{0};
+  std::string hdrTypeAlt;
+  std::string dvProfile;
+};
+
+//! \brief A stored audio stream, enough to tell whether the file's audio layout has changed.
+struct StoredAudioStream
+{
+  std::string codec;
+  int channels{0};
+  std::string language;
+};
+
+/*! \brief An audio codec name reduced to the plainer form another build may have stored.
+
+ Kodi names an audio stream by codec and profile at once - "truehd_atmos" rather than "truehd"
+ alongside "Dolby Atmos" - while a build that keeps the two apart stores only the first half.
+ Comparing the reduced names lets an unchanged layout be recognised whichever spelling is on
+ disk. AddMissingColumns() restores this build's spelling at startup, but a library shared with
+ that build can be written in the other one at any time, so the comparison cannot assume it.
+ */
+std::string ReducedAudioCodec(const std::string& codec)
+{
+  if (codec == "truehd_atmos")
+    return "truehd";
+  if (codec == "eac3_ddp_atmos")
+    return "eac3";
+  if (codec == "dtshd_ma_x" || codec == "dtshd_ma_x_imax")
+    return "dtshd_ma";
+  if (codec == "dts_es" || codec == "dts_96_24" || codec == "dts_express")
+    return "dca";
+  if (codec == "aac_lc" || codec == "he_aac" || codec == "he_aac_v2" || codec == "aac_ssr" ||
+      codec == "aac_ltp")
+    return "aac";
+
+  return codec;
+}
+
+//! \brief Whether the stored audio rows still describe the same tracks, in the same order.
+bool AudioLayoutIsUnchanged(const std::vector<StoredAudioStream>& stored,
+                            const CStreamDetails& details)
+{
+  if (stored.empty() || static_cast<int>(stored.size()) != details.GetAudioStreamCount())
+    return false;
+
+  for (int stream = 1; stream <= details.GetAudioStreamCount(); ++stream)
+  {
+    const StoredAudioStream& existing = stored[stream - 1];
+    if (!StringUtils::EqualsNoCase(ReducedAudioCodec(existing.codec),
+                                   ReducedAudioCodec(details.GetAudioCodec(stream))) ||
+        existing.channels != details.GetAudioChannels(stream) ||
+        !StringUtils::EqualsNoCase(existing.language, details.GetAudioLanguage(stream)))
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/*! \brief The HDR fields the stored rows hold for this video stream, if they can be trusted.
+
+ Several stored rows can describe the same codec at the same size, which only matters when they
+ disagree: if every one of them carries the same alternate HDR type and Dolby Vision profile, it
+ makes no difference which of them this stream used to be.
+ */
+bool StoredHdrDetails(const std::vector<StoredVideoStream>& stored,
+                      const CStreamDetails& details,
+                      int stream,
+                      std::string& hdrTypeAlt,
+                      std::string& dvProfile)
+{
+  const StoredVideoStream* match = nullptr;
+  for (const auto& candidate : stored)
+  {
+    if (!StringUtils::EqualsNoCase(candidate.codec, details.GetVideoCodec(stream)) ||
+        candidate.width != details.GetVideoWidth(stream) ||
+        candidate.height != details.GetVideoHeight(stream))
+    {
+      continue;
+    }
+
+    if (match &&
+        (match->hdrTypeAlt != candidate.hdrTypeAlt || match->dvProfile != candidate.dvProfile))
+    {
+      return false; // they disagree, and nothing says which one this stream is
+    }
+
+    match = &candidate;
+  }
+
+  if (!match)
+    return false;
+
+  hdrTypeAlt = match->hdrTypeAlt;
+  dvProfile = match->dvProfile;
+  return true;
+}
+} // unnamed namespace
+
+void CVideoDatabase::SetStreamDetailsForFile(const CStreamDetails& details,
+                                             const std::string& strFileNameAndPath,
+                                             bool partialDetails /* = false */)
 {
   // AddFile checks to make sure the file isn't already in the DB first
   int idFile = AddFile(strFileNameAndPath);
   if (idFile < 0)
     return;
-  SetStreamDetailsForFileId(details, idFile);
+  SetStreamDetailsForFileId(details, idFile, partialDetails);
 }
 
-void CVideoDatabase::SetStreamDetailsForFileId(const CStreamDetails& details, int idFile)
+void CVideoDatabase::SetStreamDetailsForFileId(const CStreamDetails& details,
+                                               int idFile,
+                                               bool partialDetails /* = false */)
 {
   if (idFile < 0)
     return;
 
   try
   {
-    m_pDS->exec(PrepareSQL("DELETE FROM streamdetails WHERE idFile = %i", idFile));
+    // Read what is stored before replacing it. Two things would otherwise be thrown away. The
+    // player fills only the primary HDR type, so a rewrite after playback blanks the alternate
+    // type and the Dolby Vision profile the scan had found. And the audio rows can hold columns
+    // this build never writes - another build's object metadata, say - which a delete and
+    // reinsert silently resets to NULL.
+    std::vector<StoredVideoStream> storedVideo;
+    std::vector<StoredAudioStream> storedAudio;
+
+    std::unique_ptr<Dataset> pDS(m_pDB->CreateDataset());
+    pDS->query(PrepareSQL("SELECT * FROM streamdetails WHERE idFile = %i", idFile));
+    // Resolved by name for the same reason GetStreamDetails() does it: these columns were
+    // appended later, so a database that never received them must not fail the whole read.
+    const int idxHdrTypeAlt = pDS->fieldIndex("strHdrTypeAlt");
+    const int idxDvProfile = pDS->fieldIndex("strDvProfile");
+    while (!pDS->eof())
+    {
+      switch (static_cast<CStreamDetail::StreamType>(pDS->fv(1).get_asInt()))
+      {
+        case CStreamDetail::VIDEO:
+        {
+          StoredVideoStream stored;
+          stored.codec = pDS->fv(2).get_asString();
+          stored.width = pDS->fv(4).get_asInt();
+          stored.height = pDS->fv(5).get_asInt();
+          if (idxHdrTypeAlt >= 0)
+            stored.hdrTypeAlt = pDS->fv(idxHdrTypeAlt).get_asString();
+          if (idxDvProfile >= 0)
+            stored.dvProfile = pDS->fv(idxDvProfile).get_asString();
+          storedVideo.emplace_back(std::move(stored));
+          break;
+        }
+        case CStreamDetail::AUDIO:
+        {
+          StoredAudioStream stored;
+          stored.codec = pDS->fv(6).get_asString();
+          stored.channels = pDS->fv(7).get_isNull() ? -1 : pDS->fv(7).get_asInt();
+          stored.language = pDS->fv(8).get_asString();
+          storedAudio.emplace_back(std::move(stored));
+          break;
+        }
+        case CStreamDetail::SUBTITLE:
+          break;
+      }
+      pDS->next();
+    }
+    pDS->close();
+
+    // Leaving unchanged audio rows alone keeps every column they carry, including any this build
+    // knows nothing about, and writes back exactly the same values when they are ours anyway.
+    const bool keepAudio = AudioLayoutIsUnchanged(storedAudio, details);
+
+    if (keepAudio)
+      m_pDS->exec(PrepareSQL("DELETE FROM streamdetails WHERE idFile = %i AND iStreamType <> %i",
+                             idFile, (int)CStreamDetail::AUDIO));
+    else
+      m_pDS->exec(PrepareSQL("DELETE FROM streamdetails WHERE idFile = %i", idFile));
 
     for (int i=1; i<=details.GetVideoStreamCount(); i++)
     {
+      // Only a caller that could not determine these inherits them. A scan can and is
+      // authoritative, so when it reports nothing that is the answer and the old value goes.
+      std::string hdrTypeAlt = details.GetVideoHdrTypeAlt(i);
+      std::string dvProfile = details.GetVideoDvProfile(i);
+      if (partialDetails && (hdrTypeAlt.empty() || dvProfile.empty()))
+      {
+        std::string storedHdrTypeAlt;
+        std::string storedDvProfile;
+        if (StoredHdrDetails(storedVideo, details, i, storedHdrTypeAlt, storedDvProfile))
+        {
+          if (hdrTypeAlt.empty())
+            hdrTypeAlt = storedHdrTypeAlt;
+          if (dvProfile.empty())
+            dvProfile = storedDvProfile;
+        }
+      }
+
       m_pDS->exec(PrepareSQL("INSERT INTO streamdetails "
                              "(idFile, iStreamType, strVideoCodec, fVideoAspect, iVideoWidth, "
                              "iVideoHeight, iVideoDuration, strStereoMode, strVideoLanguage,  "
@@ -3316,17 +3554,20 @@ void CVideoDatabase::SetStreamDetailsForFileId(const CStreamDetails& details, in
                              details.GetVideoDuration(i), details.GetStereoMode(i).c_str(),
                              details.GetVideoLanguage(i).c_str(),
                              details.GetVideoHdrType(i).c_str(),
-                             details.GetVideoHdrTypeAlt(i).c_str(),
-                             details.GetVideoDvProfile(i).c_str()));
+                             hdrTypeAlt.c_str(),
+                             dvProfile.c_str()));
     }
-    for (int i=1; i<=details.GetAudioStreamCount(); i++)
+    if (!keepAudio)
     {
-      m_pDS->exec(PrepareSQL("INSERT INTO streamdetails "
-        "(idFile, iStreamType, strAudioCodec, iAudioChannels, strAudioLanguage) "
-        "VALUES (%i,%i,'%s',%i,'%s')",
-        idFile, (int)CStreamDetail::AUDIO,
-        details.GetAudioCodec(i).c_str(), details.GetAudioChannels(i),
-        details.GetAudioLanguage(i).c_str()));
+      for (int i=1; i<=details.GetAudioStreamCount(); i++)
+      {
+        m_pDS->exec(PrepareSQL("INSERT INTO streamdetails "
+          "(idFile, iStreamType, strAudioCodec, iAudioChannels, strAudioLanguage) "
+          "VALUES (%i,%i,'%s',%i,'%s')",
+          idFile, (int)CStreamDetail::AUDIO,
+          details.GetAudioCodec(i).c_str(), details.GetAudioChannels(i),
+          details.GetAudioLanguage(i).c_str()));
+      }
     }
     for (int i=1; i<=details.GetSubtitleStreamCount(); i++)
     {
@@ -3748,13 +3989,16 @@ void CVideoDatabase::DeleteMovie(int idMovie,
     BeginTransaction();
 
     int idFile = GetDbId(PrepareSQL("SELECT idFile FROM movie WHERE idMovie=%i", idMovie));
-    DeleteStreamDetails(idFile);
 
     // keep the movie table entry, linking to tv shows, and bookmarks
     // so we can update the data in place
     // the ancillary tables are still purged
     if (!bKeepId)
     {
+      // Only when the entry really goes. A refresh updating it in place may carry no stream
+      // details of its own - a scrape carries none - and must not be left with no rows at all.
+      DeleteStreamDetails(idFile);
+
       const std::string path = GetSingleValue(PrepareSQL(
           "SELECT strPath FROM path JOIN files ON files.idPath=path.idPath WHERE files.idFile=%i",
           idFile));
@@ -3919,12 +4163,15 @@ void CVideoDatabase::DeleteEpisode(int idEpisode, bool bKeepId /* = false */)
       AnnounceRemove(MediaTypeEpisode, idEpisode);
 
     int idFile = GetDbId(PrepareSQL("SELECT idFile FROM episode WHERE idEpisode=%i", idEpisode));
-    DeleteStreamDetails(idFile);
 
     // keep episode table entry and bookmarks so we can update the data in place
     // the ancillary tables are still purged
     if (!bKeepId)
     {
+      // Only when the entry really goes. A refresh updating it in place may carry no stream
+      // details of its own - a scrape carries none - and must not be left with no rows at all.
+      DeleteStreamDetails(idFile);
+
       std::string path = GetSingleValue(PrepareSQL("SELECT strPath FROM path JOIN files ON files.idPath=path.idPath WHERE files.idFile=%i", idFile));
       if (!path.empty())
         InvalidatePathHash(path);
@@ -3955,12 +4202,15 @@ void CVideoDatabase::DeleteMusicVideo(int idMVideo, bool bKeepId /* = false */)
     BeginTransaction();
 
     int idFile = GetDbId(PrepareSQL("SELECT idFile FROM musicvideo WHERE idMVideo=%i", idMVideo));
-    DeleteStreamDetails(idFile);
 
     // keep the music video table entry and bookmarks so we can update data in place
     // the ancillary tables are still purged
     if (!bKeepId)
     {
+      // Only when the entry really goes. A refresh updating it in place may carry no stream
+      // details of its own - a scrape carries none - and must not be left with no rows at all.
+      DeleteStreamDetails(idFile);
+
       std::string path = GetSingleValue(PrepareSQL("SELECT strPath FROM path JOIN files ON files.idPath=path.idPath WHERE files.idFile=%i", idFile));
       if (!path.empty())
         InvalidatePathHash(path);
