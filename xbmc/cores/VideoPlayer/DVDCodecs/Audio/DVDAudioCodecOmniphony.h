@@ -686,4 +686,23 @@ private:
   bool m_reportedFallback{false};
   CProcessInfo& m_processInfo;
   bool m_failed{false};
+
+  /*!
+   * \brief Empty answers given since the last block reached the player.
+   *
+   * The one lever this codec has over how often CVideoPlayerAudio comes back
+   * to its message queue, and so over how much input arrives per block that
+   * leaves - see GetData, which explains what the ratio buys and what bounds
+   * it.
+   */
+  unsigned int m_yieldsSinceServe{0};
+
+  /*!
+   * \brief Whether a packet arrived since the last empty answer.
+   *
+   * Whether the lever above is connected to anything: an empty answer only
+   * works if the player answers it with a packet. See GetData. Starts true so
+   * the first one is tried.
+   */
+  bool m_fedSinceYield{true};
 };
