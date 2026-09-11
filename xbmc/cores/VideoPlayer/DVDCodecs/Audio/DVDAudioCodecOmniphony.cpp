@@ -1430,6 +1430,87 @@ void CDVDAudioCodecOmniphony::UpdateName()
   m_codecName = std::string("om-") + (codec ? codec : "?");
 }
 
+namespace
+{
+/*
+ * The engine's own spelling of the overhead positions, as the helper packs
+ * them (CHANNEL_LABELS in omniphony-helper.c). Matching on the engine's names
+ * rather than translating into Kodi's enum keeps this row and the wire from
+ * disagreeing, which is the same reason the helper borrows those names in the
+ * first place.
+ */
+bool IsHeightLabel(const std::string& label)
+{
+  return label == "Tfl" || label == "Tfr" || label == "Tsl" || label == "Tsr" || label == "Tbl" ||
+         label == "Tbr" || label == "Tfc" || label == "Tc";
+}
+
+bool IsLfeLabel(const std::string& label)
+{
+  return label == "LFE" || label == "LFE2";
+}
+} // namespace
+
+std::string OmniphonyDescribeSpatialBed(const std::string& bed, int objectCount)
+{
+  unsigned int floor = 0;
+  unsigned int lfe = 0;
+  unsigned int heights = 0;
+  for (std::string& label : StringUtils::Split(bed, ","))
+  {
+    StringUtils::Trim(label);
+    if (label.empty())
+      continue;
+    if (IsHeightLabel(label))
+      heights++;
+    else if (IsLfeLabel(label))
+      lfe++;
+    else
+      floor++;
+  }
+
+  // A layout number has to sit on a floor: "7.1", and "7.1.4" once there are
+  // heights above it. A bed with no floor channel has no such number, and the
+  // LFE-only bed an Atmos mix hands over is exactly that - "0.1" is not a
+  // layout anyone writes.
+  const bool layout = floor > 0;
+
+  std::string out;
+  if (objectCount > 0 && layout)
+  {
+    // With objects the bed is the context and the count is the news, so the
+    // bed is written the compact way a layout is written everywhere else and
+    // the objects follow it: "7.1.4 + 5 Objects".
+    out = std::to_string(floor) + "." + std::to_string(lfe);
+    if (heights > 0)
+      out += "." + std::to_string(heights);
+  }
+  else
+  {
+    // Nothing overhead and no layout to write means there is nothing here the
+    // caller's plain label list does not already say - see the header.
+    if (heights == 0)
+      return {};
+
+    // Without objects the heights are the news, so they are spelled out rather
+    // than folded into a third number: "7.1 + 4 Heights" says a quartet was
+    // placed, where "7.1.4" reads as a speaker layout the room is expected to
+    // have. Also the form a floorless bed falls back to, which cannot be
+    // written as a layout at all.
+    if (layout)
+      out = std::to_string(floor) + "." + std::to_string(lfe) + " + ";
+    out += std::to_string(heights);
+    out += heights == 1 ? " Height" : " Heights";
+  }
+
+  if (objectCount > 0)
+  {
+    out += " + " + std::to_string(objectCount);
+    out += objectCount == 1 ? " Object" : " Objects";
+  }
+  return out;
+}
+
 std::string CDVDAudioCodecOmniphony::InputDescription() const
 {
   /*
@@ -1448,7 +1529,10 @@ std::string CDVDAudioCodecOmniphony::InputDescription() const
    *
    * Empty rather than a placeholder so a skin can test IsEmpty and fall back to
    * its own layout label. This row exists to say what the object renderer was
-   * handed; when it was handed no objects, it has nothing to say.
+   * handed; when it was handed neither objects nor a bed with heights in it, it
+   * has nothing to say. A height-carrying bed is the exception and is named
+   * even with no objects, because a placed height quartet is the presentation,
+   * not a detail of one - see OmniphonyDescribeSpatialBed.
    *
    * On the PCM path there is a layout to report, and it is worth reporting for
    * the reason the second bullet gives: the channel row Kodi already has counts
@@ -1461,6 +1545,16 @@ std::string CDVDAudioCodecOmniphony::InputDescription() const
   if (m_pcm)
     return OmniphonyPcmDescribe(m_pcm->Labels());
 
+  // A bed with heights in it is a whole presentation and is worth naming on its
+  // own, objects or not: a DTS:X stream can carry a floor and a height quartet
+  // and no objects at all, and "nothing" is the wrong thing to say about twelve
+  // placed channels. A bed with nothing overhead has nothing of its own to add
+  // and still waits for a positive count, which is what the fall-through below
+  // is for.
+  const std::string spatial = OmniphonyDescribeSpatialBed(m_bed, m_objectCount);
+  if (!spatial.empty())
+    return spatial;
+
   if (m_objectCount <= 0)
     return {};
 
@@ -1468,16 +1562,22 @@ std::string CDVDAudioCodecOmniphony::InputDescription() const
   // English: it sits beside "om-truehd", "48000" and "RAW, RAW, RAW", and not
   // one of the Player.Process labels in CPlayerGUIInfo is translated. A
   // translated word here would be the only one on the panel.
-  std::string input = std::to_string(m_objectCount);
-  input += m_objectCount == 1 ? " Object" : " Objects";
+  std::string input;
   if (!m_bed.empty())
   {
-    // "15 Objects + LFE". The helper packs the bed without spaces so that it
+    // "LFE + 15 Objects". The helper packs the bed without spaces so that it
     // cannot be mistaken for the end of the status line; they go back in here.
+    //
+    // Bed first, objects last, which is the order the height form above reads
+    // in and the order the renderer lays the channels out. Both rows on the
+    // screen then end with the same word, and the count a listener is looking
+    // for sits in the same place whichever soundtrack is playing.
     std::string bed = m_bed;
     StringUtils::Replace(bed, ",", ", ");
-    input += " + " + bed;
+    input = bed + " + ";
   }
+  input += std::to_string(m_objectCount);
+  input += m_objectCount == 1 ? " Object" : " Objects";
   return input;
 }
 
@@ -2216,6 +2316,29 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
       }
     }
 
+    // Last on the line and free of spaces by construction, so the rest of the
+    // line is the whole value. Absent from an older helper, which is why its
+    // absence leaves m_bed empty rather than being treated as a broken message:
+    // the object count on its own is still worth showing.
+    //
+    // Read before the zero gate below, and kept across it. None of that gate's
+    // reasoning is about the bed: the two zeros it separates are both about
+    // whether a count can be trusted yet, and a bed the engine has laid out is
+    // equally true either way. A presentation that carries a floor and a height
+    // quartet and no objects reports zero forever, and its bed is the only
+    // thing there is to say about it.
+    const size_t bedAt = msg.find("bed=");
+    if (bedAt != std::string::npos)
+    {
+      std::string bed = msg.substr(bedAt + 4);
+      StringUtils::Trim(bed);
+      if (bed != m_bed)
+      {
+        m_bed = std::move(bed);
+        m_infoDirty = true;
+      }
+    }
+
     /*
      * Zero is not "this soundtrack has no objects". It is "the frame just
      * rendered carried no object metadata", which the engine supports
@@ -2227,8 +2350,10 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
      * So a zero report is not evidence of anything and is passed over, for the
      * render mode as much as for the screen. A soundtrack that genuinely
      * carries no objects reports zero forever, m_objectCount stays -1, and
-     * InputDescription says nothing - which is the same outcome by a route
-     * that cannot be confused with "we asked too early".
+     * InputDescription says nothing about objects - which is the same outcome
+     * by a route that cannot be confused with "we asked too early". It may
+     * still name the bed, which was read above and is not what this gate is
+     * about.
      *
      * All of that holds only until objects have actually been seen. After that,
      * "we asked too early" has stopped being available as an explanation: the
@@ -2256,17 +2381,6 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
     }
 
     m_objectCount = objects;
-
-    // Last on the line and free of spaces by construction, so the rest of the
-    // line is the whole value. Absent from an older helper, which is why its
-    // absence leaves m_bed empty rather than being treated as a broken message:
-    // the object count on its own is still worth showing.
-    const size_t bedAt = msg.find("bed=");
-    if (bedAt != std::string::npos)
-    {
-      m_bed = msg.substr(bedAt + 4);
-      StringUtils::Trim(m_bed);
-    }
 
     m_infoDirty = true;
 

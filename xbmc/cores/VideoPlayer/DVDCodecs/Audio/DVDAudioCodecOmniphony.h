@@ -30,6 +30,37 @@ class CProcessInfo;
 class COmniphonyPcmSource;
 
 /*!
+ * \brief Name the spatial bed the renderer was handed, e.g. "7.1.4 + 5
+ *        Objects" or, with nothing above it, "7.1 + 4 Heights".
+ *
+ * DTS:X hands the renderer a whole presentation rather than the sparse bed
+ * Atmos does: a full floor layout, a quartet of fixed heights above it, and
+ * the objects on top. "L, R, C, LFE, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr + 12
+ * Objects" is all of that, and says none of it - the reader has to count the
+ * labels and know which ones are overhead. Naming the bed by its layout says
+ * the same thing in the words a listener already uses.
+ *
+ * Which of the two forms is used depends on whether objects arrived, because
+ * that decides what the row is really reporting. With objects the bed is the
+ * context: it is written as the one compact number, "7.1.4", and the count
+ * that matters follows it. With no objects the heights are the whole of the
+ * news, so they are spelled out - "7.1 + 4 Heights" says a quartet was placed,
+ * where "7.1.4" would read as a speaker layout the room is expected to have.
+ *
+ * A bed with no floor channel has no layout number to write; an Atmos mix's
+ * LFE-only bed is exactly that, so it returns empty and the caller keeps
+ * "LFE + 15 Objects", which is already the right sentence for a sparse bed.
+ * Every form puts the object count last, so the rows read the same way round.
+ *
+ * \param bed comma-separated engine channel labels, as the helper packs them.
+ * \param objectCount objects carried alongside, or <= 0 for a bed-only
+ *        presentation, whose heights are still worth naming.
+ * \return the description, or empty when \p bed names neither a floor to write
+ *         a layout from nor a height channel to spell out.
+ */
+std::string OmniphonyDescribeSpatialBed(const std::string& bed, int objectCount);
+
+/*!
  * \brief The rate used when the stream does not say what it is.
  *
  * Not a preference: the renderer builds its head model at whatever rate it is
