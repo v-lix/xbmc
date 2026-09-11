@@ -10,6 +10,7 @@
 #include "AMLCodec.h"
 #include "DynamicDll.h"
 
+#include "cores/VideoPlayer/DVDCodecs/Audio/OmniphonyDiag.h" // TEMPORARY
 #include "cores/VideoPlayer/Interface/TimingConstants.h"
 #include "cores/VideoPlayer/Process/ProcessInfo.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
@@ -2376,6 +2377,11 @@ bool CAMLCodec::OpenDecoder()
   SetSpeed(m_speed);
   SetPollDevice(am_private->vcodec.cntl_handle);
 
+  // TEMPORARY: playback scope for OmniDiag. Here rather than in the audio codec
+  // so that a passthrough film - which never builds an Omniphony codec - can be
+  // measured as a control. See OmniphonyDiag.h.
+  COmniphonyDiag::Get().StartPlayback();
+
   return true;
 }
 
@@ -2432,6 +2438,8 @@ void CAMLCodec::SetVfmMap(const std::string &name, const std::string &map)
 void CAMLCodec::CloseDecoder()
 {
   CLog::Log(LOGINFO, "CAMLCodec::CloseDecoder");
+
+  COmniphonyDiag::Get().StopPlayback(); // TEMPORARY, see OpenDecoder
 
   // Make sure the green-flash hold can't outlive the decoder.
   HoldVideo(false);
@@ -2757,6 +2765,9 @@ int CAMLCodec::PollFrame()
   g_aml_sync_event.Set();
   int elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - now).count();
   CLog::Log(LOGDEBUG, LOGAVTIMING, "CAMLCodec::PollFrame elapsed:{:.3f}ms", elapsed / 1000.0);
+  // TEMPORARY: the same figure, aggregated to one line a second so it can be
+  // had without LOGAVTIMING - see OmniphonyDiag.h.
+  COmniphonyDiag::Get().OnPollFrame(elapsed);
   return 1;
 }
 

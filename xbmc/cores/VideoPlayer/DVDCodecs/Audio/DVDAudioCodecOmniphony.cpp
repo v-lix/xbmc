@@ -11,6 +11,7 @@
 #include "DVDAudioCodecFFmpeg.h"
 #include "DVDCodecs/DVDCodecs.h"
 #include "DVDStreamInfo.h"
+#include "OmniphonyDiag.h" // TEMPORARY, see OmniphonyDiag.h
 #include "OmniphonyPcmSource.h"
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/Omniphony/OmniphonyHrtf.h"
@@ -542,6 +543,11 @@ bool CDVDAudioCodecOmniphony::CHelper::SendLocked(uint8_t op, const void* payloa
     m_pending.insert(m_pending.end(), p, p + len);
   }
 
+  // TEMPORARY: published here and at the write below rather than from the
+  // codec, because the pump drains this on its own thread - a codec-side
+  // snapshot goes stale exactly while the audio thread is blocked.
+  COmniphonyDiag::Get().SetInputQueue(m_diagRun, m_pending.size() - m_pendingSent);
+
   // Counted here, where a reset is queued, rather than at the seek that caused
   // it: this is the only place that knows one actually went out. A reset the
   // caller asked for but that was refused above must not arm the drop, or
@@ -591,6 +597,11 @@ bool CDVDAudioCodecOmniphony::CHelper::ParseFrames()
           m_ready.enginePts.push_back(pts);
           m_readyFrames += frames;
           produced = true;
+          // TEMPORARY: the renderer's own output rate, measured where the
+          // blocks actually arrive rather than where they are consumed, and
+          // the PCM held here, which no codec-side field can see.
+          COmniphonyDiag::Get().OnRendered(m_diagRun, frames);
+          COmniphonyDiag::Get().SetPumpHeld(m_diagRun, m_readyFrames);
         }
       }
       off += OMNI_HDR_LEN + bytes;
@@ -725,6 +736,8 @@ void CDVDAudioCodecOmniphony::CHelper::Process()
           m_pending.clear();
           m_pendingSent = 0;
         }
+        COmniphonyDiag::Get().SetInputQueue(m_diagRun,
+                                            m_pending.size() - m_pendingSent); // TEMPORARY
       }
       else if (put < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
       {
@@ -769,6 +782,7 @@ bool CDVDAudioCodecOmniphony::CHelper::Collect(Rendered& out, int timeoutMs)
     m_ready.frames.clear();
     m_ready.enginePts.clear();
     m_readyFrames = 0;
+    COmniphonyDiag::Get().SetPumpHeld(m_diagRun, 0); // TEMPORARY
   }
   return !m_broken;
 }
@@ -787,6 +801,7 @@ bool CDVDAudioCodecOmniphony::CHelper::Resync()
   m_ready.enginePts.clear();
   m_readyFrames = 0;
   m_messages.clear();
+  COmniphonyDiag::Get().SetPumpHeld(m_diagRun, 0); // TEMPORARY
 
   /*
    * The queue and the arming happen here, under the lock that just emptied the
@@ -1195,6 +1210,13 @@ bool CDVDAudioCodecOmniphony::StartHelper(CDVDStreamInfo& hints)
   // that primed before starting the helper are re-armed rather than
   // contradicted: this is the same size, measured from a sensible moment.
   StartPriming(FramesFor(OMNI_PRIME_MS));
+
+  // TEMPORARY: here rather than at the fork, because the rate is only settled
+  // once the helper has accepted the open and this is the one place both a
+  // first open and a ReopenAs pass through. The pump thread needs the run too,
+  // since it is the one that reports rendered blocks.
+  m_diagRun = COmniphonyDiag::Get().AttachHelper(m_helper->Pid(), m_rate);
+  m_helper->SetDiagRun(m_diagRun);
   return true;
 }
 
@@ -1386,6 +1408,11 @@ bool CDVDAudioCodecOmniphony::Collect(int timeoutMs)
   if (m_out.frames.size() > had)
     m_rendered = true;
   AnchorNewBlocks(had);
+
+  // TEMPORARY: every route into the bank passes through here - AddData, GetData
+  // and AwaitRoom - so the reserve stays reported even while the audio thread is
+  // parked in the sink and no block is being handed over.
+  COmniphonyDiag::Get().SetCodecHeld(m_diagRun, GetBufferSize());
   return true;
 }
 
@@ -1412,10 +1439,23 @@ bool CDVDAudioCodecOmniphony::AwaitRoom()
   // GetData, on this same thread, so a wait for it here could only ever wait
   // out the budget.
   XbmcThreads::EndTime<> budget{std::chrono::milliseconds(OMNI_FEED_BUDGET_MS)};
+  // TEMPORARY: how long the feed was held up here, and that it was held up at
+  // all, which is one of the two reasons the player stops feeding.
+  const auto waitFrom = std::chrono::steady_clock::now();
+  bool waited = false;
   while (m_helper->Queued() > OMNI_FEED_QUEUE_MAX && !budget.IsTimePast())
   {
+    waited = true;
     if (!Collect(OMNI_PUMP_SLICE_MS))
       return false;
+  }
+  if (waited)
+  {
+    COmniphonyDiag::Get().OnFeedRefused(m_diagRun, COmniphonyDiag::Refusal::InputQueue);
+    COmniphonyDiag::Get().OnFeedWait(
+        m_diagRun, static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                             std::chrono::steady_clock::now() - waitFrom)
+                                             .count()));
   }
   return true;
 }
@@ -1862,6 +1902,12 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
 
 void CDVDAudioCodecOmniphony::Dispose()
 {
+  // TEMPORARY: before the helper goes, so nothing is sampling a dying process.
+  // The run token is what keeps a late Dispose from detaching a replacement
+  // codec's run - see COmniphonyDiag::DetachHelper.
+  COmniphonyDiag::Get().DetachHelper(m_diagRun);
+  m_diagRun = 0;
+
   if (m_helper)
   {
     m_helper->Send(OP_CLOSE, nullptr, 0);
@@ -1913,6 +1959,12 @@ void CDVDAudioCodecOmniphony::FallBack(const char* why)
   m_failed = true;
 
   CLog::Log(LOGERROR, "CDVDAudioCodecOmniphony: {} - falling back to software decode", why);
+
+  // TEMPORARY: the helper is about to be destroyed and nothing else here stops
+  // the sampling, so without this the zero throughput that follows would be
+  // read as a renderer that had stalled rather than one that had been given up.
+  COmniphonyDiag::Get().DetachHelper(m_diagRun);
+  m_diagRun = 0;
 
   if (m_helper)
   {
@@ -1987,6 +2039,7 @@ bool CDVDAudioCodecOmniphony::DrainStaging()
     if (!m_helper->Send(OP_FEED, m_staging.data() + sent, len))
       return false;
     m_fed = true;
+    COmniphonyDiag::Get().OnFed(m_diagRun, len); // TEMPORARY
     sent += len;
   }
 
@@ -2102,7 +2155,14 @@ bool CDVDAudioCodecOmniphony::AddPcmData(const DemuxPacket& packet)
     return false;
 
   if (!m_priming && GetBufferSize() >= FramesFor(OMNI_BANK_MS))
+  {
+    // TEMPORARY: the other of the two reasons the player stops feeding. This
+    // one is ordinary backpressure against a bounded reserve and is meant to
+    // happen; what the count is for is whether the reserve ever fills enough
+    // to reach it.
+    COmniphonyDiag::Get().OnFeedRefused(m_diagRun, COmniphonyDiag::Refusal::BankFull);
     return false;
+  }
 
   /*
    * From here the packet is inside the decoder, so every exit reports whether
@@ -2183,7 +2243,14 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
    * OMNI_PRIME_MS, which is the smaller number.
    */
   if (!m_priming && GetBufferSize() >= FramesFor(OMNI_BANK_MS))
+  {
+    // TEMPORARY: the other of the two reasons the player stops feeding. This
+    // one is ordinary backpressure against a bounded reserve and is meant to
+    // happen; what the count is for is whether the reserve ever fills enough
+    // to reach it.
+    COmniphonyDiag::Get().OnFeedRefused(m_diagRun, COmniphonyDiag::Refusal::BankFull);
     return false;
+  }
 
   /*
    * Held until blocks actually come back, then stamped onto the first of them -
@@ -2240,6 +2307,7 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
         return m_fallback ? m_fallback->AddData(packet) : false;
       }
       m_fed = true;
+      COmniphonyDiag::Get().OnFed(m_diagRun, m_dataSize); // TEMPORARY
     }
   }
 
@@ -2711,6 +2779,11 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
 
   // A block reached the player, so the allowance above starts again.
   m_yieldsSinceServe = 0;
+
+  // TEMPORARY: frames handed to the player - not frames the sink accepted - and
+  // the reserve as it stands after the reclaim.
+  COmniphonyDiag::Get().OnHandedOut(m_diagRun, frames);
+  COmniphonyDiag::Get().SetCodecHeld(m_diagRun, GetBufferSize());
 }
 
 void CDVDAudioCodecOmniphony::Reset()
@@ -2720,6 +2793,10 @@ void CDVDAudioCodecOmniphony::Reset()
     m_fallback->Reset();
     return;
   }
+
+  // TEMPORARY: a seek empties the bank and re-primes, so the delivery rate
+  // measured across it would count the gap as a renderer that fell behind.
+  COmniphonyDiag::Get().Mark(m_diagRun, "seek");
 
   m_parser.Reset();
   m_backlog.clear();

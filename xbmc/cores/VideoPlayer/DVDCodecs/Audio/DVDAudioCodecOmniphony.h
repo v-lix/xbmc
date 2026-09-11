@@ -252,6 +252,19 @@ private:
     //! \brief Status text the helper reported, drained by the caller for the log.
     std::vector<std::string> TakeMessages();
 
+    //! \brief The helper process, or -1. TEMPORARY, for OmniDiag only.
+    pid_t Pid() const { return m_pid; }
+
+    /*!
+     * \brief The OmniDiag run this helper belongs to. TEMPORARY.
+     *
+     * Carried here because the pump thread reports rendered blocks and only
+     * the codec knows which run they belong to. Atomic: written by the audio
+     * thread at open, read by the pump thread on every block.
+     */
+    void SetDiagRun(uint64_t run) { m_diagRun = run; }
+    uint64_t DiagRun() const { return m_diagRun.load(); }
+
   private:
     //! \brief \ref Send, for a caller that already holds \ref m_lock.
     bool SendLocked(uint8_t op, const void* payload, size_t len);
@@ -287,6 +300,9 @@ private:
      * the first's while its own boundary is still to come.
      */
     unsigned int m_resets{0};
+
+    //! \brief TEMPORARY, see \ref SetDiagRun.
+    std::atomic<uint64_t> m_diagRun{0};
 
     std::atomic<bool> m_broken{false};
   };
@@ -705,4 +721,7 @@ private:
    * the first one is tried.
    */
   bool m_fedSinceYield{true};
+
+  //! \brief TEMPORARY: this codec's run of OmniDiag - see OmniphonyDiag.h.
+  uint64_t m_diagRun{0};
 };
