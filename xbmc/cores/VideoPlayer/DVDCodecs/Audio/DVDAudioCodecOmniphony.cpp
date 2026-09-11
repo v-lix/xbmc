@@ -83,15 +83,22 @@ constexpr int OMNI_PUMP_IDLE_MS = 20;
  * \brief How far ahead of the player the render is allowed to work.
  *
  * The reserve exists to cover the dips, and the dips are short. Sampling the
- * helper's own CPU once a second across two whole films puts the render at
- * 0.42 of a core on Dolby Digital Plus and 0.47 on TrueHD, never above 0.82
- * for more than the odd second, so the work always has somewhere to go. What
- * varies is whether it gets the chance: on Dolby Digital Plus the reserve
- * fills and this limit is what stops it, while on TrueHD it stays near empty
- * because the player only feeds at the speed it plays. Something over a second
- * covers the dips with room to refill afterwards. Larger would not cover more
- * - a renderer that is short on average empties any reserve eventually - and
- * it would put more audio between a seek and what is heard.
+ * helper's own CPU once a second across twenty-one TrueHD titles puts the
+ * render at 0.67 of a core in the median title and 0.72 at the ninetieth
+ * percentile, so on nearly all of them the work has somewhere to go. Two are
+ * the exception, sitting at or just past a whole core, and no size of reserve
+ * helps those: a renderer with nothing left over has nothing to refill with.
+ * Something over a second covers the dips with room to refill afterwards.
+ * Larger would not cover more - a renderer that is short on average empties
+ * any reserve eventually - and it would put more audio between a seek and what
+ * is heard.
+ *
+ * Wherever there is that surplus, this limit is what stops the reserve
+ * growing, on TrueHD as much as on Dolby Digital Plus. Of TrueHD that only
+ * became true with the refill in GetData. One packet in per block out merely
+ * matches the player's own rate, so it holds the reserve wherever it happens
+ * to land instead of filling it - and where it landed on TrueHD was near empty
+ * for the length of a film.
  *
  * Do not read the pump thread's own throughput as the render's cost. It sleeps
  * once the bank is full, so it reads about one times realtime whatever the
@@ -113,6 +120,36 @@ constexpr unsigned int OMNI_BANK_MS = 1500;
  * fatal limit is never the one that arrives first.
  */
 constexpr size_t OMNI_FEED_QUEUE_MAX = OMNI_MAX_PENDING / 10;
+
+/*!
+ * \brief Empty answers GetData may give between two served blocks.
+ *
+ * The ratio of input to output while the reserve is refilling: two empty
+ * answers per block puts in twice what goes out. Also the bound on how long
+ * the sink can be given nothing - see GetData.
+ */
+constexpr unsigned int OMNI_REFILL_YIELDS = 2;
+
+/*!
+ * \brief How far below OMNI_FEED_QUEUE_MAX counts as "the helper has room".
+ *
+ * A quarter of the feed threshold. Below it the helper is close to running out
+ * of input and can absorb more; at or above it, it already has a backlog and
+ * feeding harder would only wait in AwaitRoom.
+ */
+constexpr size_t OMNI_REFILL_ROOM_DIVISOR = 4;
+
+/*!
+ * \brief How often GetData reports the reserve to the debug log.
+ *
+ * Nothing outside this codec reads GetBufferSize, and the only other reading
+ * is the one priming prints, so between the start of a film and its end the
+ * reserve is otherwise invisible. What it is doing is the first question any
+ * report of stuttering asks - see the line itself for what the two numbers
+ * separate - and a second is slow enough to cost nothing against a stream that
+ * asks for a block twelve hundred times in one.
+ */
+constexpr unsigned int OMNI_RESERVE_LOG_MS = 1000;
 
 /*!
  * \brief Sample-frames of decoded PCM in one write to the helper.
@@ -2039,6 +2076,10 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
     return m_fallback ? m_fallback->AddData(packet) : false;
   }
 
+  // The player came back with something to give. GetData's empty answer is
+  // what sent it, and this is the answer to whether that worked - see there.
+  m_fedSinceYield = true;
+
   // Everything above is common to both paths - the fallback, the bank, the
   // clock. What a packet turns into is where they part.
   if (m_pcm)
@@ -2408,8 +2449,108 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
               m_primeDeadline.IsTimePast() ? " (gave up waiting for more)" : "");
   }
 
+  // What the reserve is doing, once a second - see OMNI_RESERVE_LOG_MS. The two
+  // numbers are the pair that tells the failure modes apart, and neither is
+  // much use without the other: a short reserve with an empty helper queue is a
+  // feed that is not keeping the renderer busy, where a short reserve with a
+  // full one is a renderer that cannot keep up with the feed. A reserve sitting
+  // at OMNI_BANK_MS is the healthy case and means AddData is refusing packets,
+  // which is what is meant to bound it.
+  //
+  // Above the early return below on purpose, so a reserve that has run dry
+  // still reports rather than going quiet exactly when it matters.
+  if (m_reserveLogged.IsTimePast())
+  {
+    m_reserveLogged.Set(std::chrono::milliseconds(OMNI_RESERVE_LOG_MS));
+    CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: reserve {}ms of {}, helper queue {}kB",
+              GetBufferSize() * 1000 / static_cast<int>(m_rate), OMNI_BANK_MS,
+              m_helper ? m_helper->Queued() / 1024 : 0);
+  }
+
   if (m_out.frames.empty())
     return;
+
+  /*
+   * Hand back nothing once, so the player goes and fetches a packet.
+   *
+   * CVideoPlayerAudio has one loop and two ways round it. A packet it takes
+   * off the message queue is fed here and then drained: ProcessDecoderOutput
+   * pushes what comes back into the sink, and while that keeps succeeding the
+   * loop sets onlyPrioMsgs, which means priority-only messages and a zero
+   * timeout - so it does not come back for another packet at all. It only
+   * returns to the queue once ProcessDecoderOutput answers false, which is to
+   * say once this codec hands out nothing.
+   *
+   * For a synchronous decoder that is exactly right: one packet in, one block
+   * out, and the false comes after every block. This one answers later than it
+   * is asked and holds a reserve, so the same loop drains the whole reserve
+   * into a sink that accepts it at the speed it plays, feeding the helper
+   * nothing for as long as that takes. It is a sawtooth, and it is in every
+   * instrumented playback there is, demos and films alike: the player empties
+   * its demux queue into the feed in one burst until AwaitRoom stops it, goes
+   * quiet for seconds - four of them, in one film, with the reserve falling
+   * from 539ms to 10ms across the gap - and comes back only once the reserve
+   * has run out. `refused bank=0` in all of them: the reserve never once
+   * reached OMNI_BANK_MS, so what stopped the feeding was never this codec.
+   *
+   * So the codec has to send it back, and how often decides everything. An
+   * empty answer costs the sink nothing - the player fetches a packet, feeds
+   * it, and comes straight back for this block - so the ratio of empty answers
+   * to served blocks is the ratio of input rate to output rate.
+   *
+   * One for one only holds the reserve where it is. A TrueHD access unit and a
+   * rendered block are both 40 samples, so alternating puts in exactly what
+   * goes out: the reserve stops falling, and it can never grow. That is the
+   * mistake this had for a while, and AwaitRoom had already named it - matching
+   * the two rates "turned out to be the problem: it also stopped the renderer
+   * ever getting ahead, because the player only feeds at the speed it plays".
+   * Across seventeen instrumented playbacks the reserve reached OMNI_BANK_MS
+   * exactly seven times, every one of them the priming overshoot in the first
+   * seconds, and from there every playback was flat or falling. A title that
+   * primed high stayed clean; one knocked down to 700ms early sat at 700ms for
+   * the rest of the film and stuttered, the same file that had been faultless
+   * the run before.
+   *
+   * So while the reserve is short and the helper has room for more, more than
+   * one empty answer may follow a block: input then runs ahead of output and
+   * the reserve fills. OMNI_REFILL_YIELDS of them puts in twice what goes out.
+   * It is self-limiting from both ends. The helper only converts input into
+   * reserve as fast as it renders, so the surplus lands in its input queue, and
+   * once that is no longer low the allowance drops back to one and the reserve
+   * merely holds - which is the right answer for a renderer that is already
+   * flat out, since feeding it harder would only park the audio thread in
+   * AwaitRoom. At the other end the reserve reaches OMNI_BANK_MS, this stops
+   * firing, and AddData's refusal takes over.
+   *
+   * The allowance is also what bounds the starvation this had in its first
+   * shape. Answering empty on every call - which is what re-arming per feed
+   * did - trades a feed for an empty answer with no block in between, and the
+   * sink is given nothing at all until the reserve fills. Counting the empty
+   * answers since the last block caps that at OMNI_REFILL_YIELDS in a row.
+   *
+   * And none of it fires when the player has nothing to give. An empty answer
+   * only buys anything if the player answers it with a packet; if its demux
+   * queue is empty it instead waits on the message queue for as long as the
+   * sink has audio left - CVideoPlayerAudio passes GetCacheTime() as the
+   * timeout, which AwaitRoom relies on as the player's one throttle - and that
+   * is a wait for nothing while this codec sits on a reserve the sink could
+   * have had. m_fedSinceYield is the answer to "did the last empty answer bring
+   * a packet back": while it does, keep going; when it stops, serve, and let
+   * the reserve cover the drought it was banked for. It also keeps the empty
+   * answer out of the one path in CVideoPlayerAudio::Process that can mark the
+   * stream stalled, which is reached only on a message queue that timed out -
+   * that is to say only when nothing was fed.
+   */
+  const bool helperHasRoom =
+      m_helper && m_helper->Queued() < OMNI_FEED_QUEUE_MAX / OMNI_REFILL_ROOM_DIVISOR;
+  const unsigned int allowance = helperHasRoom ? OMNI_REFILL_YIELDS : 1;
+  if (m_yieldsSinceServe < allowance && m_fedSinceYield &&
+      GetBufferSize() < FramesFor(OMNI_BANK_MS))
+  {
+    ++m_yieldsSinceServe;
+    m_fedSinceYield = false;
+    return;
+  }
 
   const uint32_t frames = m_out.frames.front();
   const size_t samples = static_cast<size_t>(frames) * OMNI_OUT_CHANNELS;
@@ -2490,6 +2631,9 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
     m_out.pcm.erase(m_out.pcm.begin(), m_out.pcm.begin() + m_pcmConsumed);
     m_pcmConsumed = 0;
   }
+
+  // A block reached the player, so the allowance above starts again.
+  m_yieldsSinceServe = 0;
 }
 
 void CDVDAudioCodecOmniphony::Reset()

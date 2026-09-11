@@ -160,10 +160,10 @@ private:
    * work while the player was inside AddData or GetData, and the player spends
    * almost all of its time elsewhere - parked in CAudioSinkAE::AddPackets
    * waiting for the sink to take audio. Rendering is what should fill that
-   * time: sampled across whole films the render costs 0.42 of a core on Dolby
-   * Digital Plus and 0.47 on TrueHD, so what it needs is not more speed but
-   * somewhere to have put the surplus beforehand. A thread here turns the
-   * player's idle time into exactly that.
+   * time: sampled once a second across twenty-one TrueHD titles the render
+   * costs 0.67 of a core in the median title, so what it needs is not more
+   * speed but somewhere to have put the surplus beforehand. A thread here turns
+   * the player's idle time into exactly that.
    */
   class CHelper : private CThread
   {
@@ -655,4 +655,26 @@ private:
   bool m_reportedFallback{false};
   CProcessInfo& m_processInfo;
   bool m_failed{false};
+
+  /*!
+   * \brief Empty answers given since the last block reached the player.
+   *
+   * The one lever this codec has over how often CVideoPlayerAudio comes back
+   * to its message queue, and so over how much input arrives per block that
+   * leaves - see GetData, which explains what the ratio buys and what bounds
+   * it.
+   */
+  unsigned int m_yieldsSinceServe{0};
+
+  //! \brief When GetData may next report the reserve - see OMNI_RESERVE_LOG_MS.
+  XbmcThreads::EndTime<> m_reserveLogged;
+
+  /*!
+   * \brief Whether a packet arrived since the last empty answer.
+   *
+   * Whether the lever above is connected to anything: an empty answer only
+   * works if the player answers it with a packet. See GetData. Starts true so
+   * the first one is tried.
+   */
+  bool m_fedSinceYield{true};
 };
