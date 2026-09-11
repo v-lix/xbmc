@@ -30,6 +30,61 @@ class CProcessInfo;
 class COmniphonyPcmSource;
 
 /*!
+ * \brief Name the spatial bed the renderer was handed, e.g. "7.1.4 + 5
+ *        Objects" or, with nothing above it, "7.1 + 4 Heights".
+ *
+ * DTS:X hands the renderer a whole presentation rather than the sparse bed
+ * Atmos does: a full floor layout, a quartet of fixed heights above it, and
+ * the objects on top. "L, R, C, LFE, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr + 12
+ * Objects" is all of that, and says none of it - the reader has to count the
+ * labels and know which ones are overhead. Naming the bed by its layout says
+ * the same thing in the words a listener already uses.
+ *
+ * Which of the two forms is used depends on whether objects arrived, because
+ * that decides what the row is really reporting. With objects the bed is the
+ * context: it is written as the one compact number, "7.1.4", and the count
+ * that matters follows it. With no objects the heights are the whole of the
+ * news, so they are spelled out - "7.1 + 4 Heights" says a quartet was placed,
+ * where "7.1.4" would read as a speaker layout the room is expected to have.
+ *
+ * A bed with no floor channel has no layout number to write; an Atmos mix's
+ * LFE-only bed is exactly that, so it returns empty and the caller keeps
+ * "LFE + 15 Objects", which is already the right sentence for a sparse bed.
+ * Every form puts the object count last, so the rows read the same way round.
+ *
+ * \param bed comma-separated engine channel labels, as the helper packs them.
+ * \param objectCount objects carried alongside, or <= 0 for a bed-only
+ *        presentation, whose heights are still worth naming.
+ * \return the description, or empty when \p bed names neither a floor to write
+ *         a layout from nor a height channel to spell out.
+ */
+std::string OmniphonyDescribeSpatialBed(const std::string& bed, int objectCount);
+
+/*!
+ * \brief Name a presentation the decoder had to earn, for the player row.
+ *
+ * Some streams do not say what they are. An Auro-Codec carrier reaches Kodi as
+ * an ordinary DTS-HD MA track and stays one until a decoder reads the side
+ * channel folded into the low bits of its PCM; no demuxer field and no
+ * syncword names it. When the decoder reports such a name it is because
+ * nothing else could, so it outranks anything OmniphonyDescribeSpatialBed can
+ * derive from the labels: "Auro 11.1" is what the release is sold as and what
+ * a listener buys speakers for, where the derived form would say
+ * "5.1 + 6 Heights" - true, and the same fact restated as arithmetic.
+ *
+ * The object count still follows when there is one, so a presentation that
+ * carried both a name and objects would lose neither. Auro is channel-based
+ * and reports none, which is why the plain name is the usual result.
+ *
+ * \param presentation the decoder's name for the stream, or empty when the
+ *        container already named it and the decoder had nothing to add.
+ * \param objectCount objects carried alongside, or <= 0 for none.
+ * \return the description, or empty when \p presentation is empty - the
+ *         caller's cue to fall back to the bed-derived form.
+ */
+std::string OmniphonyDescribePresentation(const std::string& presentation, int objectCount);
+
+/*!
  * \brief The rate used when the stream does not say what it is.
  *
  * Not a preference: the renderer builds its head model at whatever rate it is
@@ -617,6 +672,21 @@ private:
    * clause instead of writing one.
    */
   std::string m_bed;
+
+  /*!
+   * \brief What the stream presents itself as, when its container does not say.
+   *
+   * "Auro 11.1". An Auro-Codec carrier reaches Kodi as an ordinary DTS-HD MA
+   * track and stays indistinguishable from one until the decoder has read the
+   * side channel hidden in the low bits of its PCM, so no demuxer field and no
+   * syncword names it and the decoder is the only thing that can.
+   *
+   * Empty for every stream whose name Kodi already has - Atmos, DTS:X, plain
+   * multichannel - and empty for an engine or helper too old to report it.
+   * As with the bed, all of those mean "say nothing" rather than "there is
+   * none".
+   */
+  std::string m_presentation;
 
   /*!
    * \brief Which head model this stream opened with, worded for the screen.
