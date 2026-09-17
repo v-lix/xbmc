@@ -14,6 +14,17 @@ extern "C"
 #include <libavcodec/defs.h>
 }
 
+namespace
+{
+/*
+ * The DTS:X alternate-profile syncwords that carry an object declaration are
+ * 0xF14000D0 through 0xF14000D4, and ffmpeg reports the low nibble of whichever
+ * one it saw. Those five values are the whole range a declaration can arrive in.
+ */
+constexpr int DTSX_SYNCWORD_NIBBLE_MIN = 0;
+constexpr int DTSX_SYNCWORD_NIBBLE_MAX = 4;
+} // unnamed namespace
+
 int StreamUtils::GetCodecPriority(const std::string &codec)
 {
   /*
@@ -121,4 +132,27 @@ std::string StreamUtils::GetCodecName(int codecId, int profile)
     codecName = avcodec_get_name(codec->id);
 
   return codecName;
+}
+
+bool StreamUtils::IsDTSXProfile(int profile)
+{
+  return profile == AV_PROFILE_DTS_HD_MA_X || profile == AV_PROFILE_DTS_HD_MA_X_IMAX;
+}
+
+int StreamUtils::GetDTSXObjectCount(int profile, int level)
+{
+  // The level says which variant, the profile says of what, and the level means
+  // nothing on its own: every codec is free to report whatever it likes there,
+  // and an Auro-3D carrier will report its layout in the very same field.
+  if (!IsDTSXProfile(profile))
+    return -1;
+
+  // Outside that range the stream carried no object declaration - the older
+  // 0x02000850 form, or an ffmpeg without this tree's dca_xll patch, which
+  // leaves the level at the AV_LEVEL_UNKNOWN it starts at.
+  if (level < DTSX_SYNCWORD_NIBBLE_MIN || level > DTSX_SYNCWORD_NIBBLE_MAX)
+    return -1;
+
+  // The nibble is the declaration count less one, as transmitted.
+  return level + 1;
 }
