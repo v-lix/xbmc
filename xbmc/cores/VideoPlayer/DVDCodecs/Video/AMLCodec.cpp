@@ -253,6 +253,12 @@ public:
 #define TRICKMODE_I     0x01
 #define TRICKMODE_FFFB  0x02
 
+// Frame durations, in UNIT_FREQ ticks, that a real stream can have: 200fps at
+// one end and 5fps at the other. Anything outside this is the decoder talking
+// about itself rather than about the stream.
+#define MIN_VIDEO_RATE  (UNIT_FREQ / 200)
+#define MAX_VIDEO_RATE  (UNIT_FREQ / 5)
+
 static const uint64_t UINT64_0 = 0x8000000000000000ULL;
 
 #define EXTERNAL_PTS    (1)
@@ -3435,14 +3441,29 @@ void CAMLCodec::SetVideoRate(int videoRate)
 
 unsigned int CAMLCodec::GetDecoderVideoRate()
 {
+  // Runs on the renderer thread, once a frame, against the same codec handle the
+  // video thread resets. Reset() moves the poll device under this lock before it
+  // touches the decoder and again afterwards, so taking it here keeps the probe
+  // out of the window where the decoder is being rebuilt.
+  std::lock_guard<std::mutex> lock(pollSyncMutex);
+
   if (m_speed != DVD_PLAYSPEED_NORMAL || m_pollDevice < 0)
     return 0;
 
   struct vdec_info vi = {};
-  if (m_dll->codec_get_vdec_info(&am_private->vcodec, &vi) == 0 && vi.frame_dur > 0)
-    return vi.frame_dur;
-  else
+  if (m_dll->codec_get_vdec_info(&am_private->vcodec, &vi) != 0)
     return 0;
+
+  // frame_dur is u32 in the kernel's vdec_info, so a decoder that never
+  // finished initialising and reports a negative duration arrives here as a
+  // number just short of 2^32, and sails past a bare "greater than zero".
+  // Taking it poisons video_rate, which is unsigned as well and wraps in every
+  // product it appears in: -64 reads as 4294967232, which turns the drain poll
+  // from 418ms into 44s. Only accept durations a stream could actually have.
+  if (vi.frame_dur < MIN_VIDEO_RATE || vi.frame_dur > MAX_VIDEO_RATE)
+    return 0;
+
+  return vi.frame_dur;
 }
 
 std::string CAMLCodec::GetHDRStaticMetadata()
