@@ -167,13 +167,28 @@ bool CVideoDatabase::HasColumn(const std::string& table, const std::string& colu
     if (nullptr == m_pDB || nullptr == m_pDS)
       return false;
 
-    m_pDS->query(PrepareSQL("SELECT %s FROM %s LIMIT 1", column.c_str(), table.c_str()));
+    // Ask the schema rather than the table. Selecting a column that is not there throws, and
+    // the database layer logs everything it throws, so that put an SQL error in the log on every
+    // start against a library without the column. PRAGMA table_info on its own would not get
+    // through the dataset, which refuses anything that is not a SELECT, so SQLite is asked
+    // through its table-valued form. Names compare without regard to case, as the databases
+    // themselves compare column names.
+    const std::string sql =
+        m_sqlite ? PrepareSQL("SELECT COUNT(1) FROM pragma_table_info('%s') "
+                              "WHERE lower(name) = lower('%s')",
+                              table.c_str(), column.c_str())
+                 : PrepareSQL("SELECT COUNT(1) FROM information_schema.columns "
+                              "WHERE table_schema = DATABASE() AND table_name = '%s' "
+                              "AND lower(column_name) = lower('%s')",
+                              table.c_str(), column.c_str());
+    m_pDS->query(sql);
+    const bool found = !m_pDS->eof() && m_pDS->fv(0).get_asInt() > 0;
     m_pDS->close();
-    return true;
+    return found;
   }
   catch (...)
   {
-    // asking for a column that is not there is how the absence is detected
+    // a schema that cannot be read is treated as not having the column
     return false;
   }
 }

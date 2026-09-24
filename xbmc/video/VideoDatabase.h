@@ -1229,7 +1229,8 @@ private:
   /*! \brief Whether a table has a column, which another build may have added.
    \param table the table to look in
    \param column the column name
-   \return true only if the column can be read; false also when there is no open database
+   \return true only if the table's schema lists the column; false also when there is no open
+   database or its schema cannot be read
    */
   bool HasColumn(const std::string& table, const std::string& column);
 
