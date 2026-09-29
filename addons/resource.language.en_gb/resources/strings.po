@@ -24525,6 +24525,42 @@ msgctxt "#39344"
 msgid "Place the sound of anything you play around you on headphones, instead of folding it flat to stereo. It applies to every soundtrack that can be decoded, films and music alike. Turning it on turns passthrough off, and it is unused while the audio output is set to more than two channels."
 msgstr ""
 
+#. label for setting audiooutput.omniphonystudio
+#: system/settings/settings.xml
+msgctxt "#39345"
+msgid "- Omniphony Studio remote control"
+msgstr ""
+
+#. help text for setting audiooutput.omniphonystudio
+#: system/settings/settings.xml
+msgctxt "#39346"
+msgid "Let Omniphony Studio on a computer on your network show where each sound is placed and adjust the rendering while something plays. It connects only during playback. What it changes lasts until the next thing plays, which starts again from the settings here; it cannot change the output, the files on this device or the engine itself. Anyone on your network can connect while this is on. Takes effect from the next thing you play."
+msgstr ""
+
+#. label for setting audiooutput.omniphonystudioport
+#: system/settings/settings.xml
+msgctxt "#39347"
+msgid "- Studio port"
+msgstr ""
+
+#. help text for setting audiooutput.omniphonystudioport
+#: system/settings/settings.xml
+msgctxt "#39348"
+msgid "The network port Studio connects to. Enter the same number as Omniphony Port in Studio. 9000 is what Studio expects; change both only if something else on this device already uses it."
+msgstr ""
+
+#. label for setting audiooutput.omniphonystudioaddress
+#: system/settings/settings.xml
+msgctxt "#39349"
+msgid "- This device's address"
+msgstr ""
+
+#. help text for setting audiooutput.omniphonystudioaddress
+#: system/settings/settings.xml
+msgctxt "#39350"
+msgid "The address to enter as Host in Studio. Shown for information only: it is this device's address on the network it is connected to now, and changes if the network gives it another."
+msgstr ""
+
 #. Dolby Vision RPU Conversion
 #: system/settings/settings.xml
 msgctxt "#39300"

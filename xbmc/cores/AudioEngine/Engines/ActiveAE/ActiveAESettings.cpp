@@ -17,6 +17,7 @@
 #include "dialogs/GUIDialogFileBrowser.h"
 #include "dialogs/GUIDialogOK.h"
 #include "guilib/LocalizeStrings.h"
+#include "network/Network.h"
 #include "storage/MediaManager.h"
 #include "utils/Variant.h"
 #include "settings/Settings.h"
@@ -80,6 +81,8 @@ CActiveAESettings::CActiveAESettings(CActiveAE &ae) : m_audioEngine(ae)
   settings->GetSettingsManager()->RegisterSettingOptionsFiller("audiodevicespassthrough", SettingOptionsAudioDevicesPassthroughFiller);
   settings->GetSettingsManager()->RegisterSettingOptionsFiller("audiostreamsilence", SettingOptionsAudioStreamsilenceFiller);
   settings->GetSettingsManager()->RegisterSettingOptionsFiller("bluetoothcodecs", SettingOptionsBluetoothCodecsFiller);
+  settings->GetSettingsManager()->RegisterSettingOptionsFiller(
+      "omniphonystudioaddress", SettingOptionsOmniphonyStudioAddressFiller);
 }
 
 CActiveAESettings::~CActiveAESettings()
@@ -92,6 +95,7 @@ CActiveAESettings::~CActiveAESettings()
   settings->GetSettingsManager()->UnregisterSettingOptionsFiller("audiodevicespassthrough");
   settings->GetSettingsManager()->UnregisterSettingOptionsFiller("audiostreamsilence");
   settings->GetSettingsManager()->UnregisterSettingOptionsFiller("bluetoothcodecs");
+  settings->GetSettingsManager()->UnregisterSettingOptionsFiller("omniphonystudioaddress");
   settings->GetSettingsManager()->UnregisterCallback(this);
   m_instance = nullptr;
 }
@@ -309,6 +313,25 @@ void CActiveAESettings::SettingOptionsAudioStreamsilenceFiller(
       list.emplace_back(StringUtils::Format(g_localizeStrings.Get(13555), i), i);
     }
   }
+}
+
+void CActiveAESettings::SettingOptionsOmniphonyStudioAddressFiller(
+    const SettingConstPtr& setting,
+    std::vector<StringSettingOption>& list,
+    std::string& current,
+    void* data)
+{
+  // One option, always the empty value the setting holds, so the address is
+  // worked out each time the page is drawn and never stored: a value saved in
+  // guisettings.xml would go on showing an address the network has since
+  // replaced. The control is disabled, so the list never opens.
+  const CNetworkInterface* iface = CServiceBroker::GetNetwork().GetFirstConnectedInterface();
+  std::string address = iface ? iface->GetCurrentIPAddress() : "";
+  if (address.empty())
+    address = g_localizeStrings.Get(15208); // Not connected
+
+  list.emplace_back(address, "");
+  current.clear();
 }
 
 bool CActiveAESettings::IsSettingVisible(const std::string& condition,

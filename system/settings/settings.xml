@@ -3903,6 +3903,50 @@
           </dependencies>
           <control type="toggle" />
         </setting>
+        <setting id="audiooutput.omniphonystudio" type="boolean" label="39345" help="39346">
+          <level>2</level>
+          <default>false</default>
+          <dependencies>
+            <dependency type="enable" setting="audiooutput.omniphony" operator="is">true</dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
+        <setting id="audiooutput.omniphonystudioport" type="integer" label="39347" help="39348">
+          <level>2</level>
+          <default>9000</default>
+          <constraints>
+            <minimum>1024</minimum>
+            <step>1</step>
+            <maximum>65535</maximum>
+          </constraints>
+          <dependencies>
+            <dependency type="visible">
+              <and>
+                <condition on="setting" setting="audiooutput.omniphony" operator="is">true</condition>
+                <condition on="setting" setting="audiooutput.omniphonystudio" operator="is">true</condition>
+              </and>
+            </dependency>
+          </dependencies>
+          <control type="edit" format="integer" />
+        </setting>
+        <setting id="audiooutput.omniphonystudioaddress" type="string" label="39349" help="39350">
+          <level>2</level>
+          <enable>false</enable>
+          <default></default>
+          <constraints>
+            <options>omniphonystudioaddress</options>
+            <allowempty>true</allowempty>
+          </constraints>
+          <dependencies>
+            <dependency type="visible">
+              <and>
+                <condition on="setting" setting="audiooutput.omniphony" operator="is">true</condition>
+                <condition on="setting" setting="audiooutput.omniphonystudio" operator="is">true</condition>
+              </and>
+            </dependency>
+          </dependencies>
+          <control type="list" format="string" />
+        </setting>
       </group>
     </category>
     <category id="input" label="14125" help="36374">

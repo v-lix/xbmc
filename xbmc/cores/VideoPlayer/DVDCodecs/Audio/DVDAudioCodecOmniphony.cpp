@@ -442,6 +442,12 @@ constexpr double OMNI_DISTANCE_MIN_M = 1.0;
 constexpr double OMNI_DISTANCE_MAX_M = 6.0;
 constexpr int OMNI_REVERB_PERCENT = 10;
 
+//! The Studio port setting's default and range - see settings.xml. 9000 is the
+//! port Omniphony Studio connects to unless told otherwise.
+constexpr int OMNI_STUDIO_PORT = 9000;
+constexpr int OMNI_STUDIO_PORT_MIN = 1024;
+constexpr int OMNI_STUDIO_PORT_MAX = 65535;
+
 //! The room presets - see RoomFor. Order matches the options in settings.xml.
 enum RoomPreset
 {
@@ -1308,6 +1314,42 @@ bool CDVDAudioCodecOmniphony::WriteConfig(const std::string& bridge) const
   // comes back, so one loud transient would quieten everything after it. The
   // limiter in GetData does this job instead, and releases.
   yaml += "  auto_gain: false\n";
+
+  // This file is the engine's whole configuration, rewritten for every stream,
+  // and managed_host says so: the engine then keeps none of what Omniphony
+  // Studio changes past the stream - no save, no handoff to the next engine -
+  // refuses what would break this host (the output leaving stereo, which the
+  // helper cannot frame; test signals; files on the device; the process
+  // itself), and never makes this open wait for its control port while the
+  // previous track's helper still holds it. Written with Studio off too, so an
+  // engine never restores a handoff an earlier build left behind.
+  //
+  // osc is stated either way, because an OMNIPHONY_OSC_PORT left in kodi.conf
+  // would otherwise turn the listener on by itself. osc_port 0 is no fixed
+  // monitoring target: Studio registers for what it receives, and without this
+  // every frame's metadata would be sent to 127.0.0.1:9000 - the engine's own
+  // listener - whether anything was connected or not.
+  yaml += "  managed_host: kodi\n";
+  bool studio = false;
+  int studioPort = OMNI_STUDIO_PORT;
+  if (settings)
+  {
+    studio = settings->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYSTUDIO);
+    studioPort = std::clamp(
+        settings->GetSettings()->GetInt(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYSTUDIOPORT),
+        OMNI_STUDIO_PORT_MIN, OMNI_STUDIO_PORT_MAX);
+  }
+  if (studio)
+  {
+    yaml += "  osc: true\n";
+    yaml += "  osc_rx_port: " + std::to_string(studioPort) + "\n";
+    yaml += "  osc_port: 0\n";
+  }
+  else
+  {
+    yaml += "  osc: false\n";
+  }
+
   yaml += "  binaural:\n";
   yaml += "    output_mode: binaural\n";
   if (m_mode == RenderMode::Cascade)
