@@ -22,6 +22,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <string>
 #include <vector>
@@ -219,6 +220,7 @@ public:
   void GetData(DVDAudioFrame& frame) override;
   void Drain() override;
   void Reset() override;
+  void SetPlayingPts(double pts) override;
   AEAudioFormat GetFormat() override;
   //! Once the software decoder has taken over it is the one doing the work, and
   //! saying otherwise puts "om-truehd" on screen over a plain downmix.
@@ -276,6 +278,11 @@ private:
     //! \brief Queue one command, carrying \p us microseconds of audio where it
     //! carries any that can be told. False means the helper is gone.
     bool Send(uint8_t op, const void* payload, size_t len, double us = 0.0);
+
+    //! \brief Queue one command to go ahead of everything waiting, in place of
+    //! one queued this way and not yet started - see
+    //! COmniphonyCommandQueue::PushAhead. False means the helper is gone.
+    bool SendAhead(uint8_t op, const void* payload, size_t len);
 
     /*!
      * \brief Take everything rendered so far.
@@ -804,6 +811,30 @@ private:
 
   //! \brief When GetData may next report the reserve - see OMNI_RESERVE_LOG_MS.
   XbmcThreads::EndTime<> m_reserveLogged;
+
+  //! \brief Whether the helper is to be told where the listener is - see
+  //! SetPlayingPts. Its open line says.
+  bool m_heard{false};
+
+  //! \brief A block handed to the player: its timestamp on the demuxer's
+  //! timeline and on the engine's.
+  struct Served
+  {
+    double pts;
+    int64_t enginePts;
+  };
+
+  /*!
+   * \brief The blocks handed to the player, oldest first, back to the one
+   * last heard - what SetPlayingPts finds the listener's place in.
+   *
+   * Only while \ref m_heard, and emptied wherever the engine's count restarts.
+   */
+  std::deque<Served> m_served;
+
+  //! \brief When the helper may next be told where the listener is - see
+  //! OMNI_HEARD_MS.
+  XbmcThreads::EndTime<> m_heardSent;
 
   /*!
    * \brief Whether a packet arrived since the last empty answer.

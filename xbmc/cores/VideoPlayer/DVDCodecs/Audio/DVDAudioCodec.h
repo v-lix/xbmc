@@ -88,6 +88,17 @@ public:
    */
   virtual void Drain() {}
 
+  /*!
+   * \brief The timestamp of the audio being heard now, as the sink puts it.
+   *
+   * The player calls this each time it hands the sink a frame. A codec that
+   * tells something else about the audio it produces - Omniphony shows its
+   * objects in Omniphony Studio - produces it ahead of the listener by
+   * everything buffered on the way to the speakers, and uses this to keep what
+   * it tells in step with what is heard. Codecs that tell nothing ignore it.
+   */
+  virtual void SetPlayingPts(double pts) {}
+
   /*
    * resets the decoder
    */

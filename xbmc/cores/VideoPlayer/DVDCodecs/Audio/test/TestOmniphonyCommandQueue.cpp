@@ -36,6 +36,31 @@ std::vector<uint8_t> Unsent(const COmniphonyCommandQueue& queue)
   return std::vector<uint8_t>(queue.Data(), queue.Data() + queue.Bytes());
 }
 
+void PushAhead(COmniphonyCommandQueue& queue, uint8_t tag, size_t payload)
+{
+  const std::vector<uint8_t> header(HEADER, tag);
+  const std::vector<uint8_t> body(payload, tag);
+  queue.PushAhead(header.data(), header.size(), body.data(), body.size());
+}
+
+std::vector<uint8_t> Next(const COmniphonyCommandQueue& queue)
+{
+  return std::vector<uint8_t>(queue.Next(), queue.Next() + queue.NextBytes());
+}
+
+//! Everything the pump would write from here, a run at a time as it does.
+std::vector<uint8_t> WriteAll(COmniphonyCommandQueue& queue)
+{
+  std::vector<uint8_t> written;
+  while (queue.NextBytes())
+  {
+    const auto run = Next(queue);
+    written.insert(written.end(), run.begin(), run.end());
+    queue.Written(run.size());
+  }
+  return written;
+}
+
 std::vector<uint8_t> Command(uint8_t tag, size_t payload)
 {
   return std::vector<uint8_t>(HEADER + payload, tag);
@@ -245,4 +270,106 @@ TEST(TestOmniphonyCommandQueue, ClearForgetsEverything)
   Push(queue, Kind::Audio, 3, 8, 10000.0);
   EXPECT_EQ(Unsent(queue), Command(3, 8));
   EXPECT_DOUBLE_EQ(queue.Us(), 10000.0);
+}
+
+TEST(TestOmniphonyCommandQueue, AheadWaitsOnlyForTheCommandBeingWritten)
+{
+  COmniphonyCommandQueue queue;
+  Push(queue, Kind::Audio, 1, 8, 10000.0);
+  Push(queue, Kind::Audio, 2, 8, 10000.0);
+  queue.Written(5);
+  PushAhead(queue, 9, 2);
+
+  // Not counted as audio or as backlog, and not in the way of a seek.
+  EXPECT_EQ(queue.Bytes(), 2 * (HEADER + 8) - 5);
+  EXPECT_DOUBLE_EQ(queue.Us(), 20000.0);
+
+  const auto first = Command(1, 8);
+  EXPECT_EQ(WriteAll(queue), Join({std::vector<uint8_t>(first.begin() + 5, first.end()),
+                                   Command(9, 2), Command(2, 8)}));
+  EXPECT_EQ(queue.Bytes(), 0u);
+  EXPECT_DOUBLE_EQ(queue.Us(), 0.0);
+}
+
+TEST(TestOmniphonyCommandQueue, AheadGoesFirstFromABoundary)
+{
+  COmniphonyCommandQueue queue;
+  Push(queue, Kind::Audio, 1, 8, 10000.0);
+  PushAhead(queue, 9, 2);
+  EXPECT_EQ(WriteAll(queue), Join({Command(9, 2), Command(1, 8)}));
+
+  // And with nothing else queued at all.
+  PushAhead(queue, 8, 2);
+  EXPECT_EQ(WriteAll(queue), Command(8, 2));
+}
+
+TEST(TestOmniphonyCommandQueue, OnlyTheLatestAheadGoes)
+{
+  COmniphonyCommandQueue queue;
+  PushAhead(queue, 9, 2);
+  PushAhead(queue, 8, 2);
+  EXPECT_EQ(WriteAll(queue), Command(8, 2));
+}
+
+TEST(TestOmniphonyCommandQueue, AnAheadAlreadyStartedFinishesBeforeANewerOne)
+{
+  COmniphonyCommandQueue queue;
+  Push(queue, Kind::Audio, 1, 8, 10000.0);
+  PushAhead(queue, 9, 4);
+  queue.Written(3);
+  PushAhead(queue, 8, 4);
+  PushAhead(queue, 7, 4);
+
+  const auto started = Command(9, 4);
+  EXPECT_EQ(WriteAll(queue), Join({std::vector<uint8_t>(started.begin() + 3, started.end()),
+                                   Command(7, 4), Command(1, 8)}));
+}
+
+TEST(TestOmniphonyCommandQueue, AheadSurvivesADropAndGoesWithAClear)
+{
+  COmniphonyCommandQueue queue;
+  Push(queue, Kind::Audio, 1, 8, 10000.0);
+  Push(queue, Kind::Reset, 2, 0);
+  PushAhead(queue, 9, 2);
+  EXPECT_EQ(queue.DropStale(), 1u);
+  EXPECT_EQ(WriteAll(queue), Command(9, 2));
+
+  PushAhead(queue, 8, 2);
+  queue.Written(1);
+  queue.Clear();
+  EXPECT_EQ(queue.NextBytes(), 0u);
+  Push(queue, Kind::Audio, 3, 8, 10000.0);
+  EXPECT_EQ(WriteAll(queue), Command(3, 8));
+}
+
+TEST(TestOmniphonyCommandQueue, AheadKeepsTheFramingAByteAtATime)
+{
+  COmniphonyCommandQueue queue;
+  Push(queue, Kind::Audio, 1, 8, 10000.0);
+  Push(queue, Kind::Control, 2, 3);
+  Push(queue, Kind::Audio, 3, 8, 10000.0);
+
+  // A pipe that takes one byte per write. Put ahead part-way through the first
+  // command, it waits for that command's end; two more while it is going out,
+  // and only the latest follows it; one part-way through the last command
+  // waits for that one's end.
+  std::vector<uint8_t> written;
+  for (size_t i = 0; queue.NextBytes(); ++i)
+  {
+    if (i == 2)
+      PushAhead(queue, 0x40, 1);
+    if (i == 13)
+      PushAhead(queue, 0x41, 1);
+    if (i == 14)
+      PushAhead(queue, 0x42, 1);
+    if (i == 30)
+      PushAhead(queue, 0x43, 1);
+    written.push_back(*queue.Next());
+    queue.Written(1);
+  }
+
+  EXPECT_EQ(written, Join({Command(1, 8), Command(0x40, 1), Command(0x42, 1), Command(2, 3),
+                           Command(3, 8), Command(0x43, 1)}));
+  EXPECT_EQ(queue.Bytes(), 0u);
+  EXPECT_DOUBLE_EQ(queue.Us(), 0.0);
 }

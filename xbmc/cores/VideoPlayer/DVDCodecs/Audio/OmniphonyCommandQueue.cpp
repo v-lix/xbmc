@@ -30,8 +30,61 @@ void COmniphonyCommandQueue::Push(Kind kind,
   m_us += m_commands.back().us;
 }
 
+void COmniphonyCommandQueue::PushAhead(const uint8_t* header,
+                                       size_t headerLen,
+                                       const uint8_t* payload,
+                                       size_t payloadLen)
+{
+  // One already started has to finish - the helper has part of it - so a newer
+  // one waits behind it rather than replacing it.
+  std::vector<uint8_t>& slot = m_aheadSent ? m_aheadNext : m_ahead;
+  slot.assign(header, header + headerLen);
+  if (payloadLen)
+    slot.insert(slot.end(), payload, payload + payloadLen);
+}
+
+bool COmniphonyCommandQueue::AheadIsNext() const
+{
+  if (m_ahead.empty())
+    return false;
+  if (m_aheadSent)
+    return true;
+  // The oldest command not written in full, if it has not been started either,
+  // leaves the stream at a boundary.
+  return m_commands.empty() || m_commands.front().start == m_base + m_sent;
+}
+
+const uint8_t* COmniphonyCommandQueue::Next() const
+{
+  return AheadIsNext() ? m_ahead.data() + m_aheadSent : Data();
+}
+
+size_t COmniphonyCommandQueue::NextBytes() const
+{
+  if (AheadIsNext())
+    return m_ahead.size() - m_aheadSent;
+  // Otherwise a write would run on through every command waiting, and one to
+  // go ahead of them would only get its turn when a write happened to end on
+  // a boundary - which, with the pipe full, is almost never.
+  if (!m_ahead.empty() && !m_commands.empty())
+    return static_cast<size_t>(m_commands.front().end - (m_base + m_sent));
+  return Bytes();
+}
+
 void COmniphonyCommandQueue::Written(size_t n)
 {
+  if (AheadIsNext())
+  {
+    m_aheadSent += std::min(n, m_ahead.size() - m_aheadSent);
+    if (m_aheadSent == m_ahead.size())
+    {
+      m_ahead.swap(m_aheadNext);
+      m_aheadNext.clear();
+      m_aheadSent = 0;
+    }
+    return;
+  }
+
   m_sent += std::min(n, Bytes());
 
   const uint64_t at = m_base + m_sent;
@@ -111,4 +164,7 @@ void COmniphonyCommandQueue::Clear()
   m_sent = 0;
   m_commands.clear();
   m_us = 0.0;
+  m_ahead.clear();
+  m_aheadSent = 0;
+  m_aheadNext.clear();
 }

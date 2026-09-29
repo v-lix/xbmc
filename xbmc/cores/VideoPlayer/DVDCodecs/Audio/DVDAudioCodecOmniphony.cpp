@@ -46,6 +46,9 @@ constexpr uint8_t OP_FEED = 2;
 constexpr uint8_t OP_FLUSH = 3;
 constexpr uint8_t OP_RESET = 4;
 constexpr uint8_t OP_CLOSE = 5;
+//! Where the listener is - see SetPlayingPts. Only to a helper whose open line
+//! said heard=on: an older one exits on an op it does not know.
+constexpr uint8_t OP_HEARD = 6;
 
 //! The helper writes this only after all drain output has crossed the pipe.
 constexpr const char* OMNI_FLUSH_MARK = "flush";
@@ -203,6 +206,26 @@ constexpr size_t OMNI_BACKLOG_DIVISOR = 2;
  * asks for a block twelve hundred times in one.
  */
 constexpr unsigned int OMNI_RESERVE_LOG_MS = 1000;
+
+/*!
+ * \brief How often the helper is told where the listener is.
+ *
+ * The engine passes it on to Omniphony Studio at most this often itself, and a
+ * Studio that follows the sound carries it on by its own clock between two
+ * reports - see SetPlayingPts. Fifty times a second is finer than Studio
+ * redraws, at one small command each time.
+ */
+constexpr unsigned int OMNI_HEARD_MS = 20;
+
+/*!
+ * \brief The most blocks kept to find where the listener is - see m_served.
+ *
+ * They are the blocks between this codec and the speakers: ActiveAE and the
+ * sink hold under a second, twelve hundred blocks of TrueHD at the most. The
+ * bound is only for a player that stops saying what is playing, which would
+ * otherwise leave this growing for the length of the film.
+ */
+constexpr size_t OMNI_SERVED_MAX = 8192;
 
 /*!
  * \brief Sample-frames of decoded PCM in one write to the helper.
@@ -426,6 +449,12 @@ constexpr double OMNI_DISTANCE_M = 2.0;
 constexpr double OMNI_DISTANCE_MIN_M = 1.0;
 constexpr double OMNI_DISTANCE_MAX_M = 6.0;
 constexpr int OMNI_REVERB_PERCENT = 10;
+
+//! The Studio port setting's default and range - see settings.xml. 9000 is the
+//! port Omniphony Studio connects to unless told otherwise.
+constexpr int OMNI_STUDIO_PORT = 9000;
+constexpr int OMNI_STUDIO_PORT_MIN = 1024;
+constexpr int OMNI_STUDIO_PORT_MAX = 65535;
 
 //! The room presets - see RoomFor. Order matches the options in settings.xml.
 enum RoomPreset
@@ -735,6 +764,23 @@ bool CDVDAudioCodecOmniphony::CHelper::SendLocked(uint8_t op,
   return true;
 }
 
+bool CDVDAudioCodecOmniphony::CHelper::SendAhead(uint8_t op, const void* payload, size_t len)
+{
+  std::unique_lock<CCriticalSection> lock(m_lock);
+  if (m_broken || m_in < 0)
+    return false;
+
+  uint8_t hdr[OMNI_HDR_LEN] = {'O', 'M', 'N', 'C'};
+  hdr[4] = op;
+  hdr[5] = 0;
+  hdr[6] = 0;
+  hdr[7] = 0;
+  PutU32(hdr + 8, static_cast<uint32_t>(len));
+  PutU32(hdr + 12, 0);
+  m_queue.PushAhead(hdr, OMNI_HDR_LEN, static_cast<const uint8_t*>(payload), len);
+  return true;
+}
+
 bool CDVDAudioCodecOmniphony::CHelper::ParseFrames()
 {
   std::unique_lock<CCriticalSection> lock(m_lock);
@@ -880,7 +926,7 @@ void CDVDAudioCodecOmniphony::CHelper::Process()
     bool room;
     {
       std::unique_lock<CCriticalSection> lock(m_lock);
-      haveWork = m_in >= 0 && m_queue.Bytes() > 0;
+      haveWork = m_in >= 0 && m_queue.NextBytes() > 0;
       room = m_readyFrames < OMNI_PUMP_HOLD_FRAMES;
     }
 
@@ -974,7 +1020,7 @@ void CDVDAudioCodecOmniphony::CHelper::Process()
     if (inIdx >= 0 && (fds[inIdx].revents & POLLOUT))
     {
       std::unique_lock<CCriticalSection> lock(m_lock);
-      const ssize_t put = write(m_in, m_queue.Data(), m_queue.Bytes());
+      const ssize_t put = write(m_in, m_queue.Next(), m_queue.NextBytes());
       if (put > 0)
         m_queue.Written(static_cast<size_t>(put));
       else if (put < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
@@ -1293,6 +1339,42 @@ bool CDVDAudioCodecOmniphony::WriteConfig(const std::string& bridge) const
   // comes back, so one loud transient would quieten everything after it. The
   // limiter in GetData does this job instead, and releases.
   yaml += "  auto_gain: false\n";
+
+  // This file is the engine's whole configuration, rewritten for every stream,
+  // and managed_host says so: the engine then keeps none of what Omniphony
+  // Studio changes past the stream - no save, no handoff to the next engine -
+  // refuses what would break this host (the output leaving stereo, which the
+  // helper cannot frame; test signals; files on the device; the process
+  // itself), and never makes this open wait for its control port while the
+  // previous track's helper still holds it. Written with Studio off too, so an
+  // engine never restores a handoff an earlier build left behind.
+  //
+  // osc is stated either way, because an OMNIPHONY_OSC_PORT left in kodi.conf
+  // would otherwise turn the listener on by itself. osc_port 0 is no fixed
+  // monitoring target: Studio registers for what it receives, and without this
+  // every frame's metadata would be sent to 127.0.0.1:9000 - the engine's own
+  // listener - whether anything was connected or not.
+  yaml += "  managed_host: kodi\n";
+  bool studio = false;
+  int studioPort = OMNI_STUDIO_PORT;
+  if (settings)
+  {
+    studio = settings->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYSTUDIO);
+    studioPort = std::clamp(
+        settings->GetSettings()->GetInt(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYSTUDIOPORT),
+        OMNI_STUDIO_PORT_MIN, OMNI_STUDIO_PORT_MAX);
+  }
+  if (studio)
+  {
+    yaml += "  osc: true\n";
+    yaml += "  osc_rx_port: " + std::to_string(studioPort) + "\n";
+    yaml += "  osc_port: 0\n";
+  }
+  else
+  {
+    yaml += "  osc: false\n";
+  }
+
   yaml += "  binaural:\n";
   yaml += "    output_mode: binaural\n";
   if (m_mode == RenderMode::Cascade)
@@ -1471,6 +1553,12 @@ bool CDVDAudioCodecOmniphony::StartHelper(CDVDStreamInfo& hints)
     open += "codec=" + std::string(codec) + "\n";
   if (m_mode == RenderMode::Cascade)
     open += "layout=" + LayoutPath() + "\n";
+  // Only for Studio, the one thing told about the blocks - see SetPlayingPts.
+  // Whether the helper and its engine can is on the open line.
+  m_heard = false;
+  const auto settings = CServiceBroker::GetSettingsComponent();
+  if (settings && settings->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYSTUDIO))
+    open += "heard=on\n";
 
   // A helper that has just started has been given nothing, has rendered
   // nothing, and its bridge is waiting for a header - whichever bridge it is.
@@ -1528,7 +1616,13 @@ bool CDVDAudioCodecOmniphony::AwaitOpen()
     {
       CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: helper: {}", msg);
       if (StringUtils::StartsWith(msg, OMNI_OPEN_MARK))
+      {
         opened = true;
+        // Absent from an older helper, and off from an engine without the
+        // option: either way it is never sent HEARD, which the older helper
+        // would exit on.
+        m_heard = msg.find(" heard=on") != std::string::npos;
+      }
     }
     // After the drain, not before: a helper that answered and then died still
     // answered, and its message is worth having in the log either way.
@@ -1665,8 +1759,10 @@ bool CDVDAudioCodecOmniphony::DropRendered()
   m_pcmConsumed = 0;
   // Every caller either restarts the helper or seeks it, and both restart the
   // engine's sample counter - so an anchor onto the old count is meaningless
-  // and a held demux timestamp belongs to audio that will never arrive.
+  // and a held demux timestamp belongs to audio that will never arrive. The
+  // blocks already handed out count on the old one too.
   m_anchor = DVD_NOPTS_VALUE;
+  m_served.clear();
   m_pendingPts = DVD_NOPTS_VALUE;
   // Every caller that goes on parsing resets the parser alongside; the PCM path
   // has none, and counts what it stages from here.
@@ -3234,6 +3330,15 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
   frame.pts = frame.hasTimestamp ? m_anchor + static_cast<double>(m_out.enginePts.front())
                                  : static_cast<double>(DVD_NOPTS_VALUE);
 
+  // What the sink says is playing comes back as this timestamp - see
+  // SetPlayingPts.
+  if (m_heard && frame.hasTimestamp)
+  {
+    if (m_served.size() >= OMNI_SERVED_MAX)
+      m_served.pop_front();
+    m_served.push_back({frame.pts, m_out.enginePts.front()});
+  }
+
   // A block is on its way out, so this codec is unambiguously the one being
   // heard - which is the condition PublishRenderInfo waits for. Every block
   // rather than only on a change, because the screen is emptied behind us; see
@@ -3253,6 +3358,40 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
 
   // A block reached the player, so the allowance above starts again.
   m_yieldsSinceServe = 0;
+}
+
+void CDVDAudioCodecOmniphony::SetPlayingPts(double pts)
+{
+  /*
+   * With Omniphony Studio connected the engine tells it about each block - the
+   * objects and where they are, the meters - as it renders it, and the render
+   * runs ahead of the sound by everything buffered from here on: the reserve,
+   * up to OMNI_BANK_MS, then ActiveAE and the sink. Studio drew the objects two
+   * seconds and more ahead of what was heard. So the helper is told where the
+   * listener is, and the engine passes that on to Studio with a marker naming
+   * the block each of its messages describes, so a Studio that follows the
+   * sound shows each block when the listener gets there.
+   *
+   * The sink answers with a demuxer timestamp, and the engine counts its own.
+   * The anchor between the two cannot be used to go back: it moves when the
+   * source's timestamps jump, and the blocks still in the sink were stamped
+   * before it moved. So the block playing is found among those handed out, and
+   * the listener's place is that block's engine timestamp plus how far into it
+   * the sink is. Ahead of the queued input, which a second of would otherwise
+   * keep it from the helper for as long.
+   */
+  if (!m_heard || !m_helper || m_fallback || pts == DVD_NOPTS_VALUE)
+    return;
+  while (m_served.size() > 1 && m_served[1].pts <= pts)
+    m_served.pop_front();
+  if (m_served.empty() || m_served.front().pts > pts || !m_heardSent.IsTimePast())
+    return;
+  m_heardSent.Set(std::chrono::milliseconds(OMNI_HEARD_MS));
+
+  const int64_t us = m_served.front().enginePts + static_cast<int64_t>(pts - m_served.front().pts);
+  uint8_t payload[sizeof(us)];
+  std::memcpy(payload, &us, sizeof(us));
+  m_helper->SendAhead(OP_HEARD, payload, sizeof(payload));
 }
 
 void CDVDAudioCodecOmniphony::Drain()

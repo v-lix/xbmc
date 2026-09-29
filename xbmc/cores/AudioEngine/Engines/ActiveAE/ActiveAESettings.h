@@ -55,6 +55,12 @@ public:
                                                    std::vector<StringSettingOption>& list,
                                                    std::string& current,
                                                    void* data);
+  //! This device's address, for the information line under the Studio port.
+  static void SettingOptionsOmniphonyStudioAddressFiller(
+      const std::shared_ptr<const CSetting>& setting,
+      std::vector<StringSettingOption>& list,
+      std::string& current,
+      void* data);
   static bool IsSettingVisible(const std::string& condition,
                                const std::string& value,
                                const std::shared_ptr<const CSetting>& setting,

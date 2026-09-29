@@ -1320,6 +1320,11 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
 
   int framesOutput = m_audioSink.AddPackets(audioframe);
 
+  // What is being heard, now that the sink has placed this frame behind what it
+  // already holds - for a codec keeping something else in step with the sound.
+  if (audioframe.hasTimestamp)
+    m_pAudioCodec->SetPlayingPts(m_audioSink.GetPlayingPts());
+
   // Published per frame rather than from the SYNC_STARTING block below, because
   // SwitchCodecIfNeeded() swaps the codec without returning the player to
   // SYNC_STARTING: a mid-playback passthrough toggle would otherwise leave the
