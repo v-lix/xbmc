@@ -14,16 +14,21 @@
 #include "OmniphonyPcmSource.h"
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/Omniphony/OmniphonyHrtf.h"
+#include "cores/AudioEngine/Omniphony/OmniphonyRoom.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 #include "cores/VideoPlayer/Interface/DemuxPacket.h"
 #include "cores/VideoPlayer/Process/ProcessInfo.h"
+#include "dialogs/GUIDialogKaiToast.h"
 #include "filesystem/Directory.h"
+#include "filesystem/File.h"
 #include "filesystem/SpecialProtocol.h"
+#include "guilib/LocalizeStrings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "threads/SystemClock.h"
 #include "utils/StreamUtils.h"
 #include "utils/StringUtils.h"
+#include "utils/URIUtils.h"
 #include "utils/log.h"
 
 #include <algorithm>
@@ -1127,52 +1132,176 @@ std::string CDVDAudioCodecOmniphony::LayoutPath()
 
 std::string CDVDAudioCodecOmniphony::ConfigPath()
 {
-  // Beside the staged HRTF, in the directory this feature already owns.
+  // Beside the staged HRTF set and room, in the directory this feature already
+  // owns. It once sat in special://temp, which put a YAML file next to kodi.log
+  // and had at least one person read it as a log; the folder name says whose
+  // it is.
   //
-  // It used to sit in special://temp, which put a YAML file next to kodi.log
-  // and had at least one person read it as a log. The folder name is the only
-  // thing telling a reader whose the file is, so it may as well say so.
+  // Kodi's own and not a file to edit: it is made whole from the settings
+  // every time a stream opens, and written only when that makes it differ -
+  // the settings rarely change between films, and this is the box's flash.
+  // The file a listener edits is config.yaml beside it, which nothing here
+  // writes; the helper composes the two into a third beside them,
+  // effective.yaml, which is its own: it too is written only when what it
+  // says changes, and is there only while config.yaml is what plays.
+  return CSpecialProtocol::TranslatePath("special://profile/omniphony/render.yaml");
+}
+
+std::string OmniphonyYamlQuote(const std::string& value)
+{
+  std::string quoted = value;
+  StringUtils::Replace(quoted, "'", "''");
+  return "'" + quoted + "'";
+}
+
+std::string OmniphonyRenderYaml(const OmniphonyRenderChoices& choices,
+                                const std::string& bridge,
+                                double levelDb)
+{
+  // Paths single-quoted: a file name can hold anything a double-quoted
+  // scalar would read as an escape - see OmniphonyYamlQuote.
+  std::string yaml = "render:\n";
+  yaml += "  bridge_path: " + OmniphonyYamlQuote(bridge) + "\n";
+  yaml += "  master_gain: " + StringUtils::Format("{:.2f}", levelDb) + "\n";
+  // The LFE trim rides on the generic placement layout's per-channel gain,
+  // which the engine stamps onto the channel's render gain - summed with whatever gain the
+  // stream itself carries - for a direct-routed channel as much as a
+  // spatialized one. In binaural there is no LFE speaker to trim, so this is
+  // the only thing that reaches it.
   //
-  // Neither location makes it a file to edit: it is emitted whole from the
-  // settings every time a stream opens, and again if the helper is re-opened
-  // at the stream's own rate, so an edit survives until the next play. That is
-  // also why it is not written to the top of userdata beside guisettings.xml,
-  // where it would read as something the user maintains.
-  return CSpecialProtocol::TranslatePath("special://masterprofile/omniphony/render.yaml");
+  // Only the LFE rows are written. A bed entry is looked up per channel label
+  // and a label with no entry keeps its built-in pose and unity gain, so naming
+  // these two leaves every other channel exactly as the engine would place it.
+  // `spatialize: false` is not decoration: an entry defaults it to true, and
+  // omitting it would move the LFE off its direct route onto the panner.
+  //
+  // LFE2 mirrors LFE rather than being left out. It is a real second LFE - an
+  // OAMD speaker label the decoder can emit - and near-nonexistent in practice;
+  // mirroring costs one line and stops the one stream that does carry it from
+  // having half its sub-bass trimmed and half not.
+  //
+  // Written at unity too rather than omitted there, so the file states the
+  // level outright instead of leaning on the engine's default matching ours.
+  // Do not set a placement mode, for generic or for any family. With none
+  // set, the engine places every family's fixed channels on the sphere when
+  // the output is headphones - the only output this codec renders - and all
+  // of them still inherit these two direct-routed LFE entries, which apply in
+  // every mode. Writing the legacy virtual_bed key in place of placement would
+  // migrate to generic Manual and override that default.
+  yaml += "  placement:\n";
+  yaml += "    generic:\n";
+  yaml += "      layout:\n";
+  yaml += "        speakers:\n";
+  const std::string lfe_db = StringUtils::Format("{:.1f}", choices.lfeDb);
+  yaml += "          - { name: LFE, coord_mode: cartesian, x: 0, y: 1, z: 0, "
+          "spatialize: false, gain_db: " +
+          lfe_db + " }\n";
+  yaml += "          - { name: LFE2, coord_mode: cartesian, x: 0, y: 1, z: 0, "
+          "spatialize: false, gain_db: " +
+          lfe_db + " }\n";
+  // Deliberately off: it is a one-way reduction of the master gain that never
+  // comes back, so one loud transient would quieten everything after it. The
+  // limiter in GetData does this job instead, and releases.
+  yaml += "  auto_gain: false\n";
+  yaml += "  binaural:\n";
+  yaml += "    output_mode: binaural\n";
+  if (choices.cascade)
+    yaml += "    mode: cascaded\n";
+  // A room renders in place of the head model, on its own loudspeakers -
+  // what it was measured with is in the measurement. The prepared file is
+  // what makes that so from the start: the engine reads its loudspeakers when
+  // it is built, and names no layout of its own for the stream. Everything
+  // below still applies while the room loads, and if it cannot be read: the
+  // engine renders the same loudspeakers through the embedded set meanwhile,
+  // and the synthetic room and the rest are that set's.
+  if (!choices.room.empty())
+  {
+    yaml += "    hrir_source: brir\n";
+    yaml += "    brir_sofa_path: " + OmniphonyYamlQuote(choices.room) + "\n";
+  }
+  else if (!choices.hrtf.empty())
+  {
+    yaml += "    hrir_source: sofa\n";
+    yaml += "    hrtf_sofa_path: " + OmniphonyYamlQuote(choices.hrtf) + "\n";
+    // The set's finished grids, one per stream rate ({khz}), with the
+    // equalisation written below: the 48 kHz one built when the set was
+    // chosen, any other by the first stream at its rate.
+    if (!choices.hrtfGrid.empty())
+    {
+      yaml += "    hrtf_grid_cache:\n";
+      yaml += "      path: " + OmniphonyYamlQuote(choices.hrtfGrid) + "\n";
+      yaml += "      diffuse_field_eq: true\n";
+    }
+  }
+  else
+  {
+    yaml += "    hrir_source: saf\n";
+  }
+  yaml += "    unit_scale_m: " + StringUtils::Format("{:.2f}", choices.distanceM) + "\n";
+  // Not exposed: the head model and the wall absorption are not things a
+  // listener can judge by ear in isolation, and the tuned values are better
+  // than a guess. The same reasoning the in-process renderer used.
+  yaml += "    head_radius_m: 0.0875\n";
+  yaml += "    air_absorption: true\n";
+  // A measured set carries the colouration of the head it was measured on -
+  // the engine puts the embedded KEMAR's own diffuse-field response at 9 dB
+  // between 300 Hz and 12 kHz. A loudspeaker listener's ears imprint that on
+  // everything and the brain discounts it; on headphones it is heard on top of
+  // the listener's own, as timbre rather than as space. Dividing the set by
+  // that response is the standard remedy, and the engine leaves it off only
+  // because it cannot know it is feeding headphones. This path always is.
+  //
+  // Free, and safe for the level: the filter is folded into every kernel at
+  // build time rather than run per sample, both ears get the same one so every
+  // interaural difference survives intact, and it is applied before the set is
+  // level-normalised - so the loudness the binaural level setting is matched
+  // against does not move.
+  yaml += "    diffuse_field_eq: true\n";
+
+  const Room& r = RoomFor(choices.roomPreset);
+  if (r.width <= 0.0)
+  {
+    yaml += "    reflections: { enabled: false }\n";
+  }
+  else
+  {
+    yaml += "    reflections: { enabled: true, room_width_m: " +
+            StringUtils::Format("{:.2f}", r.width) +
+            ", room_depth_m: " + StringUtils::Format("{:.2f}", r.depth) + ",\n";
+    yaml += "                   room_height_m: " + StringUtils::Format("{:.2f}", r.height) +
+            ", level: 0.5 }\n";
+  }
+
+  // Reverb is the tail, reflections are the room; the tail without the room
+  // sounds like an effect rather than a place, so it follows the room away.
+  if (choices.reverbPercent <= 0 || r.width <= 0.0)
+  {
+    yaml += "    reverb: { enabled: false }\n";
+  }
+  else
+  {
+    yaml += "    reverb: { enabled: true, level: " +
+            StringUtils::Format("{:.2f}", choices.reverbPercent / 100.0) +
+            ", rt60_s: 0.35, predelay_ms: 20 }\n";
+  }
+  return yaml;
 }
 
 /*!
  * \brief Emit the engine's config for this stream.
  *
  * The engine takes its render parameters from a YAML file, and the C ABI has no
- * runtime equivalent - orender_set_option defines no keys at this ABI and
- * answers -1 to everything. So a setting that is going to reach the renderer
- * has to be written here, before the helper opens it.
+ * runtime equivalent for most of them: orender_set_option takes only the few
+ * keys a host has to change on a live renderer - the decode thread, where the
+ * listener is - and none of the render's. So a setting that is going to reach
+ * the renderer has to be written here, before the helper opens it.
  *
  * The file is owned completely rather than merged, so no YAML parser is needed
- * on this side - only string emission.
+ * on this side - only string emission. The listener's own config.yaml is
+ * composed over it by the engine, in the helper - see StartHelper.
  */
 bool CDVDAudioCodecOmniphony::WriteConfig(const std::string& bridge) const
 {
-  const auto settings = CServiceBroker::GetSettingsComponent();
-
-  int room = ROOM_MEDIUM;
-  double distance = OMNI_DISTANCE_M;
-  int reverb = OMNI_REVERB_PERCENT;
-  if (settings)
-  {
-    room = settings->GetSettings()->GetInt(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYROOM);
-    distance = std::clamp(
-        settings->GetSettings()->GetNumber(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYDISTANCE),
-        OMNI_DISTANCE_MIN_M, OMNI_DISTANCE_MAX_M);
-    reverb = std::clamp(
-        settings->GetSettings()->GetInt(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYREVERB), 0, 100);
-  }
-
-  // Empty unless the listener has supplied their own measurement and it
-  // survived staging - see COmniphonyHrtf, and StageIfChanged below for when.
-  const std::string sofa = ActiveAE::COmniphonyHrtf::StagedPath();
-
   /*
    * One setting, two terms that depend on the channel count, so that -3 dB
    * means the same loudness whatever the film turns out to be.
@@ -1218,20 +1347,12 @@ bool CDVDAudioCodecOmniphony::WriteConfig(const std::string& bridge) const
   const double matchA = match.downmixDb;
   const double matchB = match.summingDb;
 
-  // Clamped to the range the setting declares rather than trusted: a profile
-  // written before this existed takes the declared default, but a hand-edited
-  // one need not be in range. The two match terms are applied after the
-  // clamp, because they are corrections rather than anything a listener chose.
-  double level = OMNI_LEVEL_DB;
-  if (settings)
-  {
-    level = std::clamp(
-        settings->GetSettings()->GetNumber(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYLEVEL),
-        OMNI_LEVEL_MIN_DB, OMNI_LEVEL_MAX_DB);
-    level += matchB;
-    if (!settings->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_MAINTAINORIGINALVOLUME))
-      level -= matchA;
-  }
+  // The level was clamped to the range the setting declares when the stream
+  // opened - see Open. The two match terms are applied after the clamp,
+  // because they are corrections rather than anything a listener chose.
+  double level = m_choices.levelDb + matchB;
+  if (!m_choices.maintainVolume)
+    level -= matchA;
 
   if (m_pcm)
     CLog::Log(LOGDEBUG,
@@ -1239,130 +1360,29 @@ bool CDVDAudioCodecOmniphony::WriteConfig(const std::string& bridge) const
               "(downmix match {:.2f}, summing match {:+.2f})",
               sourceChannels, level, matchA, matchB);
 
-  // The LFE trim is deliberately not folded into the level above. That one
-  // matches the render to Kodi's own stereo fold and moves the whole mix; this
-  // one changes the LFE against the rest of it, which is the only reason to
-  // have a second number at all. Clamped for the same reason as the level.
-  double lfe = OMNI_LFE_DB;
-  if (settings)
-  {
-    lfe =
-        std::clamp(settings->GetSettings()->GetNumber(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYLFE),
-                   OMNI_LFE_MIN_DB, OMNI_LFE_MAX_DB);
-  }
+  const std::string yaml = OmniphonyRenderYaml(m_choices, bridge, level);
 
-  std::string yaml = "render:\n";
-  yaml += "  bridge_path: \"" + bridge + "\"\n";
-  yaml += "  master_gain: " + StringUtils::Format("{:.2f}", level) + "\n";
-  // The LFE trim rides on the generic placement layout's per-channel gain,
-  // which the engine stamps onto the channel's render gain - summed with whatever gain the
-  // stream itself carries - for a direct-routed channel as much as a
-  // spatialized one. In binaural there is no LFE speaker to trim, so this is
-  // the only thing that reaches it.
-  //
-  // Only the LFE rows are written. A bed entry is looked up per channel label
-  // and a label with no entry keeps its built-in pose and unity gain, so naming
-  // these two leaves every other channel exactly as the engine would place it.
-  // `spatialize: false` is not decoration: an entry defaults it to true, and
-  // omitting it would move the LFE off its direct route onto the panner.
-  //
-  // LFE2 mirrors LFE rather than being left out. It is a real second LFE - an
-  // OAMD speaker label the decoder can emit - and near-nonexistent in practice;
-  // mirroring costs one line and stops the one stream that does carry it from
-  // having half its sub-bass trimmed and half not.
-  //
-  // Written at unity too rather than omitted there, so the file states the
-  // level outright instead of leaning on the engine's default matching ours.
-  // Do not set a generic placement mode. Each source family then keeps its
-  // upstream default (DTS/Auro Sphere; Dolby/PCM/generic Room), while all of
-  // them inherit these two direct-routed LFE entries. Writing the legacy
-  // virtual_bed key would migrate to generic Manual and override those family
-  // defaults.
-  yaml += "  placement:\n";
-  yaml += "    generic:\n";
-  yaml += "      layout:\n";
-  yaml += "        speakers:\n";
-  const std::string lfe_db = StringUtils::Format("{:.1f}", lfe);
-  yaml += "          - { name: LFE, coord_mode: cartesian, x: 0, y: 1, z: 0, "
-          "spatialize: false, gain_db: " +
-          lfe_db + " }\n";
-  yaml += "          - { name: LFE2, coord_mode: cartesian, x: 0, y: 1, z: 0, "
-          "spatialize: false, gain_db: " +
-          lfe_db + " }\n";
-  // Deliberately off: it is a one-way reduction of the master gain that never
-  // comes back, so one loud transient would quieten everything after it. The
-  // limiter in GetData does this job instead, and releases.
-  yaml += "  auto_gain: false\n";
-  yaml += "  binaural:\n";
-  yaml += "    output_mode: binaural\n";
-  if (m_mode == RenderMode::Cascade)
-    yaml += "    mode: cascaded\n";
-  if (sofa.empty())
-  {
-    yaml += "    hrir_source: saf\n";
-  }
-  else
-  {
-    yaml += "    hrir_source: sofa\n";
-    yaml += "    hrtf_sofa_path: \"" + sofa + "\"\n";
-  }
-  yaml += "    unit_scale_m: " + StringUtils::Format("{:.2f}", distance) + "\n";
-  // Not exposed: the head model and the wall absorption are not things a
-  // listener can judge by ear in isolation, and the tuned values are better
-  // than a guess. The same reasoning the in-process renderer used.
-  yaml += "    head_radius_m: 0.0875\n";
-  yaml += "    air_absorption: true\n";
-  // A measured set carries the colouration of the head it was measured on -
-  // the engine puts the embedded KEMAR's own diffuse-field response at 9 dB
-  // between 300 Hz and 12 kHz. A loudspeaker listener's ears imprint that on
-  // everything and the brain discounts it; on headphones it is heard on top of
-  // the listener's own, as timbre rather than as space. Dividing the set by
-  // that response is the standard remedy, and the engine leaves it off only
-  // because it cannot know it is feeding headphones. This path always is.
-  //
-  // Free, and safe for the level: the filter is folded into every kernel at
-  // build time rather than run per sample, both ears get the same one so every
-  // interaural difference survives intact, and it is applied before the set is
-  // level-normalised - so the loudness the binaural level setting is matched
-  // against does not move.
-  yaml += "    diffuse_field_eq: true\n";
-
-  const Room& r = RoomFor(room);
-  if (r.width <= 0.0)
-  {
-    yaml += "    reflections: { enabled: false }\n";
-  }
-  else
-  {
-    yaml += "    reflections: { enabled: true, room_width_m: " +
-            StringUtils::Format("{:.2f}", r.width) +
-            ", room_depth_m: " + StringUtils::Format("{:.2f}", r.depth) + ",\n";
-    yaml += "                   room_height_m: " + StringUtils::Format("{:.2f}", r.height) +
-            ", level: 0.5 }\n";
-  }
-
-  // Reverb is the tail, reflections are the room; the tail without the room
-  // sounds like an effect rather than a place, so it follows the room away.
-  if (reverb <= 0 || r.width <= 0.0)
-  {
-    yaml += "    reverb: { enabled: false }\n";
-  }
-  else
-  {
-    yaml += "    reverb: { enabled: true, level: " + StringUtils::Format("{:.2f}", reverb / 100.0) +
-            ", rt60_s: 0.35, predelay_ms: 20 }\n";
-  }
-
-  // The HRTF staging creates this directory too, but only when a personal head
-  // model is actually chosen - which most streams will not have done.
-  const std::string dir = "special://masterprofile/omniphony/";
+  // The staging creates this directory too, but only when a custom response
+  // is actually chosen - which most streams will not have done.
+  const std::string dir = "special://profile/omniphony/";
   if (!XFILE::CDirectory::Exists(dir) && !XFILE::CDirectory::Create(dir))
   {
     CLog::Log(LOGERROR, "CDVDAudioCodecOmniphony: could not create {}", dir);
     return false;
   }
 
+  // Read first and left alone when it already says this: most opens write
+  // the same settings as the last one did.
   const std::string path = ConfigPath();
+  if (FILE* f = fopen(path.c_str(), "rb"))
+  {
+    std::string was(yaml.size() + 1, '\0');
+    const size_t got = fread(was.data(), 1, was.size(), f);
+    fclose(f);
+    if (got == yaml.size() && was.compare(0, got, yaml) == 0)
+      return true;
+  }
+
   FILE* f = fopen(path.c_str(), "wb");
   if (!f)
   {
@@ -1458,7 +1478,12 @@ bool CDVDAudioCodecOmniphony::StartHelper(CDVDStreamInfo& hints)
   }
 
   const std::string dir = CSpecialProtocol::TranslatePath("special://xbmcbin/omniphony");
-  const std::string bridge = dir + (m_pcm ? "/libpcm_bridge.so" : "/libharletty_bridge.so");
+  // One bridge per codec family: DTS has its own, TrueHD and E-AC-3 share
+  // the Dolby one.
+  const std::string bridge =
+      dir + (m_pcm                            ? "/libpcm_bridge.so"
+             : std::strcmp(codec, "dts") == 0 ? "/libharletty_dts_bridge.so"
+                                              : "/libharletty_dolby_bridge.so");
   if (!WriteConfig(bridge))
   {
     m_helper.reset();
@@ -1471,6 +1496,24 @@ bool CDVDAudioCodecOmniphony::StartHelper(CDVDStreamInfo& hints)
     open += "codec=" + std::string(codec) + "\n";
   if (m_mode == RenderMode::Cascade)
     open += "layout=" + LayoutPath() + "\n";
+  // The listener's config.yaml, which the engine composes over the config
+  // above, whole or not at all, into the helper's effective.yaml beside it,
+  // and creates the renderer from that; refused, it creates it from
+  // render.yaml. Read where it is at each open - nothing here writes it - so
+  // an edit is heard from the next stream, or the next re-open at a stream's
+  // own rate. Its relative paths start in its own folder.
+  const std::string user = "special://profile/omniphony/config.yaml";
+  if (XFILE::CFile::Exists(user))
+  {
+    std::string dir = CSpecialProtocol::TranslatePath("special://profile/omniphony/");
+    URIUtils::RemoveSlashAtEnd(dir);
+    open +=
+        "override=" + CSpecialProtocol::TranslatePath(user) + "\n" + "override_dir=" + dir + "\n";
+  }
+
+  // A new helper reports its own delay, and until it has there is none: a
+  // room it renders is still loading.
+  m_latencyUs = 0.0;
 
   // A helper that has just started has been given nothing, has rendered
   // nothing, and its bridge is waiting for a header - whichever bridge it is.
@@ -1527,6 +1570,7 @@ bool CDVDAudioCodecOmniphony::AwaitOpen()
     for (const auto& msg : m_helper->TakeMessages())
     {
       CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: helper: {}", msg);
+      ReadOverrideReport(msg);
       if (StringUtils::StartsWith(msg, OMNI_OPEN_MARK))
         opened = true;
     }
@@ -1765,37 +1809,173 @@ void CDVDAudioCodecOmniphony::UpdateName()
   m_codecName = std::string("om-") + (codec ? codec : "?");
 }
 
-std::string OmniphonyDescribeHrir(const std::string& selector)
+std::string OmniphonyDescribeHrir(const std::string& hrir)
 {
-  // These two words match the setting's own option labels 39326 and 39327, but
-  // they are written out rather than taken from them. The setting is
-  // translated and this screen is not, and a label that changed language while
-  // everything around it stayed English would look like a bug rather than a
-  // courtesy.
-  if (selector == "saf")
-    return "Built-in";
-  if (selector == "sofa")
-    return "Personal";
+  // These follow the setting's own option labels 39326, 39327 and 39345 -
+  // Built-in HRTF (HRIR), Custom HRTF (HRIR), Custom Room (BRIR) - by the kind
+  // of response each convolves with, but they are written out rather than
+  // taken from them. The setting is translated and this screen is not, and a
+  // label that changed language while everything around it stayed English
+  // would look like a bug rather than a courtesy.
+  //
+  // What the engine is convolving with, not what was chosen: a custom file it
+  // could not load, or a room still loading or refused, reads Built-in HRIR,
+  // because that is what is heard.
+  if (hrir == "saf")
+    return "Built-in HRIR";
+  if (hrir == "sofa")
+    return "Custom HRIR";
+  if (hrir == "brir")
+    return "Custom BRIR";
   return {};
+}
+
+std::string OmniphonyDescribeRender(const std::string& path)
+{
+  // As the settings' own names put it - Direct, Cascade, Room - with the
+  // count of loudspeakers after the two that pan onto them, written out for
+  // the reason the response row's are.
+  const size_t colon = path.find(':');
+  const std::string kind = path.substr(0, colon);
+  const std::string count = colon == std::string::npos ? std::string() : path.substr(colon + 1);
+  const bool counted =
+      !count.empty() && count.size() <= 3 &&
+      std::all_of(count.begin(), count.end(), [](char c) { return c >= '0' && c <= '9'; });
+  if (kind == "direct" && colon == std::string::npos)
+    return "Direct";
+  if (kind == "cascade" && counted)
+    return "Cascade " + count;
+  if (kind == "room" && counted)
+    return "Room " + count;
+  return {};
+}
+
+bool OmniphonyStatusField(const std::string& msg, const std::string& key, std::string& value)
+{
+  const std::string marker = " " + key + "=";
+  const size_t at = msg.find(marker);
+  if (at == std::string::npos)
+    return false;
+  const size_t from = at + marker.size();
+  const size_t end = msg.find(' ', from);
+  value = msg.substr(from, end == std::string::npos ? std::string::npos : end - from);
+  return true;
+}
+
+double OmniphonyLatencyUs(uint64_t samples, unsigned int rate)
+{
+  return rate ? static_cast<double>(samples) * DVD_TIME_BASE / rate : 0.0;
+}
+
+OmniphonyOverrideAck OmniphonyReadOverrideAck(const std::string& ack)
+{
+  OmniphonyOverrideAck result;
+  std::string status;
+  if (!OmniphonyStatusField(ack, "override", status))
+    return result;
+
+  using Status = OmniphonyOverrideAck::Status;
+  if (status == "applied")
+  {
+    result.status = Status::Applied;
+    std::string keys;
+    if (OmniphonyStatusField(ack, "keys", keys))
+      result.keys = static_cast<unsigned int>(std::strtoul(keys.c_str(), nullptr, 10));
+  }
+  else if (status == "none")
+    result.status = Status::None;
+  else if (status == "rejected")
+    result.status = Status::Rejected;
+  else if (status == "unsupported")
+    result.status = Status::Unsupported;
+  return result;
 }
 
 void CDVDAudioCodecOmniphony::ReadHrirReport(const std::string& msg)
 {
-  // "stream ... hrir=sofa ...": one word, ended by a space. A line without the
-  // field - an older helper, or anything but a stream report - changes nothing.
+  // "stream ... hrir=sofa brir=none latency=0 ...": one word each, ended by a
+  // space. A line without hrir= - an older helper, or anything but a stream
+  // report - changes nothing; one without latency= is a helper from before
+  // rooms, which has no delay to add.
   if (!StringUtils::StartsWith(msg, "stream "))
     return;
-  const size_t at = msg.find(" hrir=");
-  if (at == std::string::npos)
+  std::string hrir;
+  if (!OmniphonyStatusField(msg, "hrir", hrir))
     return;
-  const size_t from = at + 6;
-  const size_t end = msg.find(' ', from);
-  std::string sofa = OmniphonyDescribeHrir(
-      msg.substr(from, end == std::string::npos ? std::string::npos : end - from));
-  if (sofa != m_sofa)
+
+  // Samples at the rate the engine runs at, which is this stream's: a re-open
+  // at another rate is a new helper, which reports its own.
+  std::string latency;
+  if (OmniphonyStatusField(msg, "latency", latency))
   {
-    m_sofa = std::move(sofa);
+    const double us = OmniphonyLatencyUs(std::strtoull(latency.c_str(), nullptr, 10), m_rate);
+    if (us != m_latencyUs)
+    {
+      CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: the render is {} samples late ({:.0f} us)",
+                latency, us);
+      m_latencyUs = us;
+    }
+  }
+
+  if (hrir != m_hrir)
+  {
+    m_hrir = std::move(hrir);
     m_infoDirty = true;
+  }
+
+  // How the session renders, whatever chose it - see PublishRenderInfo.
+  std::string render;
+  if (OmniphonyStatusField(msg, "render", render) && render != m_renderPath)
+  {
+    m_renderPath = std::move(render);
+    m_infoDirty = true;
+  }
+}
+
+void CDVDAudioCodecOmniphony::ReadOverrideReport(const std::string& msg)
+{
+  /*
+   * At most one notification per stream, and only when the listener's file
+   * did not do what they wrote it to: a patch refused whole, with the engine's
+   * reason, or an engine too old to compose one. "applied" and "none" are
+   * the file working, and the render row says the first. The helper sends the
+   * reason on the line after its acknowledgement, which may arrive here a
+   * call later than the acknowledgement does, so the refusal waits for it.
+   */
+  const auto notify = [this](const std::string& text)
+  {
+    if (m_overrideNoticed)
+      return;
+    m_overrideNoticed = true;
+    CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Warning, g_localizeStrings.Get(39364),
+                                          text);
+  };
+
+  if (StringUtils::StartsWith(msg, OMNI_OPEN_MARK))
+  {
+    const OmniphonyOverrideAck ack = OmniphonyReadOverrideAck(msg);
+    const bool applied = ack.status == OmniphonyOverrideAck::Status::Applied;
+    if (applied != m_overrideApplied)
+    {
+      m_overrideApplied = applied;
+      m_infoDirty = true;
+    }
+    if (applied)
+      CLog::Log(LOGINFO, "CDVDAudioCodecOmniphony: config.yaml applied, {} keys", ack.keys);
+    else if (ack.status == OmniphonyOverrideAck::Status::Unsupported)
+    {
+      CLog::Log(LOGWARNING, "CDVDAudioCodecOmniphony: this engine cannot apply config.yaml");
+      notify(g_localizeStrings.Get(39366));
+    }
+    return;
+  }
+
+  constexpr const char* error = "override_error ";
+  if (StringUtils::StartsWith(msg, error))
+  {
+    const std::string reason = msg.substr(std::strlen(error));
+    CLog::Log(LOGWARNING, "CDVDAudioCodecOmniphony: config.yaml not applied: {}", reason);
+    notify(StringUtils::Format(g_localizeStrings.Get(39365), reason));
   }
 }
 
@@ -2046,7 +2226,27 @@ void CDVDAudioCodecOmniphony::PublishRenderInfo()
   {
     m_infoDirty = false;
     m_input = InputDescription();
-    m_render = m_mode == RenderMode::Cascade ? "Cascade 12" : "Direct";
+    // As the engine renders, which config.yaml can have chosen in place of
+    // the settings; nothing until it has said, like the response row. A room
+    // is named by its loudspeakers, as Cascade is by its virtual ones, so a
+    // room still loading reads Cascade on the room's own until it convolves.
+    m_render = OmniphonyDescribeRender(m_renderPath);
+    // Once the engine has reported, which m_hrir comes with, a helper or an
+    // engine that cannot say how it renders leaves it to the settings, which
+    // are what was asked for.
+    if (m_render.empty() && !m_hrir.empty())
+    {
+      if (!m_choices.room.empty())
+        m_render = m_roomSpeakers ? "Room " + std::to_string(m_roomSpeakers) : "Room";
+      else
+        m_render = m_mode == RenderMode::Cascade ? "Cascade 12" : "Direct";
+    }
+    // The patch is named on the response's row because it can change anything
+    // here, and a listener comparing two renders should be able to tell that
+    // one of them had it. Nothing until the engine has said what it renders.
+    m_sofa = OmniphonyDescribeHrir(m_hrir);
+    if (!m_sofa.empty() && m_overrideApplied)
+      m_sofa += " - override";
   }
 
   /*
@@ -2194,41 +2394,102 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
   m_limiter.SetSamplerate(m_rate);
   m_limiter.Reset();
 
+  // What this stream renders with, read once - see OmniphonyRenderChoices.
+  // The defaults are the settings' own, for a settings component that is not
+  // there to ask.
+  m_choices = OmniphonyRenderChoices{};
+  m_roomSpeakers = 0;
   if (const auto settings = CServiceBroker::GetSettingsComponent())
   {
+    const auto& s = settings->GetSettings();
+
+    // Clamped to the ranges the settings declare rather than trusted: a
+    // profile written before one existed takes the declared default, but a
+    // hand-edited one need not be in range.
+    m_choices.roomPreset = s->GetInt(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYROOM);
+    m_choices.distanceM = std::clamp(s->GetNumber(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYDISTANCE),
+                                     OMNI_DISTANCE_MIN_M, OMNI_DISTANCE_MAX_M);
+    m_choices.reverbPercent =
+        std::clamp(s->GetInt(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYREVERB), 0, 100);
+    m_choices.levelDb = std::clamp(s->GetNumber(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYLEVEL),
+                                   OMNI_LEVEL_MIN_DB, OMNI_LEVEL_MAX_DB);
+    m_choices.maintainVolume = s->GetBool(CSettings::SETTING_AUDIOOUTPUT_MAINTAINORIGINALVOLUME);
+    // The LFE trim is deliberately not folded into the level. That one matches
+    // the render to Kodi's own stereo fold and moves the whole mix; this one
+    // changes the LFE against the rest of it, which is the only reason to have
+    // a second number at all.
+    m_choices.lfeDb = std::clamp(s->GetNumber(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYLFE),
+                                 OMNI_LFE_MIN_DB, OMNI_LFE_MAX_DB);
+
+    const int response = s->GetInt(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYHRTFMODE);
+
     /*
      * Cascading, only because the listener asked for it. It is worth having as
-     * a switch because cascading is the cheaper mode on this hardware for the
-     * object counts we actually see - measured 0.430 against 0.470 - and the
-     * render has almost no margin over realtime, so a listener whose sound
-     * breaks up has something to try.
+     * a switch because cascading is the cheaper mode for the object counts we
+     * actually see - measured 0.430 against 0.470 on this hardware. The render
+     * has had headroom to spare since the decoder and the renderer were tuned
+     * and decoding moved to a thread of its own, so this is a choice of sound
+     * now rather than a rescue, but a box that does struggle still has it.
      *
      * Never for a stream decoded here. Its channel bed is at most 7.1.4, twelve
      * sources, which is what Cascade would reduce anything to anyway, so Direct
-     * is the same work without the panning error.
+     * is the same work without the panning error. Never with a room either,
+     * which brings its own loudspeakers: a layout named here would replace
+     * them.
      */
-    if (!m_pcm && settings->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYCASCADE))
+    if (!m_pcm && response != ActiveAE::OMNI_HRTF_ROOM &&
+        s->GetBool(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYCASCADE))
       m_mode = RenderMode::Cascade;
+    m_choices.cascade = m_mode == RenderMode::Cascade;
 
     /*
-     * Before WriteConfig, which asks what came of it. Normally a no-op - it
-     * only does work the first time a newly chosen file is used.
+     * Normally a no-op - the file was staged when it was chosen, and this only
+     * does work for a profile that has not staged it yet.
      *
-     * Built-in stages the empty path, which clears the copy held in the
-     * profile. That is what makes the choice reversible: WriteConfig asks
-     * COmniphonyHrtf what is staged, so leaving an old copy in place would go
-     * on using it however the setting read.
+     * Every other response stages the empty path, which clears the copy held
+     * in the profile. That is what makes the choice reversible: the config
+     * names whatever is staged, so leaving an old copy in place would go on
+     * using it however the setting read.
      */
-    const bool personal =
-        settings->GetSettings()->GetInt(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYHRTFMODE) ==
-        ActiveAE::OMNI_HRTF_PERSONAL;
-    const std::string chosen =
-        personal ? settings->GetSettings()->GetString(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYHRTF)
-                 : std::string();
+    const std::string chosen = response == ActiveAE::OMNI_HRTF_PERSONAL
+                                   ? s->GetString(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYHRTF)
+                                   : std::string();
     const auto result = ActiveAE::COmniphonyHrtf::StageIfChanged(chosen);
     if (result != ActiveAE::COmniphonyHrtf::Result::Ok)
       CLog::Log(LOGWARNING, "CDVDAudioCodecOmniphony: {} - rendering with the built-in head model",
                 ActiveAE::COmniphonyHrtf::Explain(result));
+    m_choices.hrtf = ActiveAE::COmniphonyHrtf::StagedPath();
+    if (!m_choices.hrtf.empty())
+      m_choices.hrtfGrid = ActiveAE::COmniphonyHrtf::GridCachePath();
+
+    /*
+     * The room the settings prepared and copied into the profile when it was
+     * chosen, the same way round as the HRTF set above: normally a no-op, and
+     * every other response clears the copy. Never prepared here: that reads
+     * the whole room set, which a film's opening cannot wait for and which
+     * only the settings screen can show progress for. A room with no copy and
+     * no prepared room left to copy is rendered without, on the built-in set,
+     * and the listener is told why.
+     */
+    const std::string room = response == ActiveAE::OMNI_HRTF_ROOM
+                                 ? s->GetString(CSettings::SETTING_AUDIOOUTPUT_OMNIPHONYBRIR)
+                                 : std::string();
+    m_choices.room = ActiveAE::COmniphonyRoom::StageIfChanged(room);
+    if (response == ActiveAE::OMNI_HRTF_ROOM)
+    {
+      if (m_choices.room.empty())
+      {
+        CLog::Log(LOGWARNING,
+                  "CDVDAudioCodecOmniphony: no prepared room for '{}' - rendering with the "
+                  "built-in head model",
+                  room);
+        CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Warning,
+                                              g_localizeStrings.Get(39309),
+                                              g_localizeStrings.Get(39363));
+      }
+      else
+        m_roomSpeakers = ActiveAE::COmniphonyRoom::Loudspeakers(m_choices.room);
+    }
   }
 
   /*
@@ -2236,7 +2497,11 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
    * could load it is the engine's to say. So the head model row says nothing
    * until the engine reports what it is convolving with - see ReadHrirReport.
    */
+  m_hrir.clear();
+  m_renderPath.clear();
   m_sofa.clear();
+  m_overrideApplied = false;
+  m_overrideNoticed = false;
   m_infoDirty = true;
 
   if (!StartHelper(hints))
@@ -2254,7 +2519,9 @@ bool CDVDAudioCodecOmniphony::Open(CDVDStreamInfo& hints, CDVDCodecOptions& opti
   // than from CodecId, which is null for everything the PCM path carries.
   CLog::Log(LOGINFO, "CDVDAudioCodecOmniphony: rendering {} to headphones out of process, {}",
             m_pcm ? m_codecName + " (decoded here)" : m_codecName + " objects",
-            m_mode == RenderMode::Cascade ? "cascade-12" : "direct");
+            !m_choices.room.empty()         ? "room " + m_choices.room
+            : m_mode == RenderMode::Cascade ? std::string("cascade-12")
+                                            : std::string("direct"));
   return true;
 }
 
@@ -2298,6 +2565,8 @@ void CDVDAudioCodecOmniphony::ClearRenderInfo()
   m_infoDirty = false;
   m_input.clear();
   m_render.clear();
+  m_hrir.clear();
+  m_renderPath.clear();
   m_sofa.clear();
   m_processInfo.SetOmniphonyInput({});
   m_processInfo.SetOmniphonyRender({});
@@ -2554,6 +2823,7 @@ bool CDVDAudioCodecOmniphony::AddPcmData(const DemuxPacket& packet)
   {
     CLog::Log(LOGDEBUG, "CDVDAudioCodecOmniphony: helper: {}", msg);
     ReadHrirReport(msg);
+    ReadOverrideReport(msg);
   }
 
   return consumed;
@@ -2742,6 +3012,7 @@ bool CDVDAudioCodecOmniphony::AddData(const DemuxPacket& packet)
     // Before the object gate below: the head model is reported on the same
     // line whether or not the frame carried objects.
     ReadHrirReport(msg);
+    ReadOverrideReport(msg);
 
     // "stream objects=N spatial=S channels=C bed=L,R,LFE", sent whenever what
     // the engine is being handed changes. Not once: the ABI is explicit that
@@ -3226,13 +3497,16 @@ void CDVDAudioCodecOmniphony::GetData(DVDAudioFrame& frame)
   // The engine's own timestamp, moved onto the demuxer's timeline. It counts
   // output samples, so consecutive blocks are exactly their duration apart and
   // nothing here has to accumulate anything - except where the source itself
-  // jumped, which the timeline hands over when the count gets there.
+  // jumped, which the timeline hands over when the count gets there. Less the
+  // render's own delay, which is the one thing the count does not know: what
+  // comes out at a sample went in that much earlier - see m_latencyUs.
   const double shift = m_timeline.Take(static_cast<double>(m_out.enginePts.front()));
   if (m_anchor != DVD_NOPTS_VALUE)
     m_anchor += shift;
   frame.hasTimestamp = m_anchor != DVD_NOPTS_VALUE;
-  frame.pts = frame.hasTimestamp ? m_anchor + static_cast<double>(m_out.enginePts.front())
-                                 : static_cast<double>(DVD_NOPTS_VALUE);
+  frame.pts = frame.hasTimestamp
+                  ? m_anchor + static_cast<double>(m_out.enginePts.front()) - m_latencyUs
+                  : static_cast<double>(DVD_NOPTS_VALUE);
 
   // A block is on its way out, so this codec is unambiguously the one being
   // heard - which is the condition PublishRenderInfo waits for. Every block
@@ -3346,6 +3620,7 @@ void CDVDAudioCodecOmniphony::Drain()
       // information AddData consumes so a short stream's tail has the right
       // description.
       ReadHrirReport(msg);
+      ReadOverrideReport(msg);
       const size_t at = msg.find("objects=");
       if (at == std::string::npos)
         continue;

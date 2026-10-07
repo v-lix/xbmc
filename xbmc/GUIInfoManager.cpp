@@ -1279,8 +1279,9 @@ const infomap player_times[] =   {{ "seektime",         PLAYER_SEEKTIME },
 ///                  \anchor Player_Process_omniphony_render
 ///                  _string_,
 ///     @return How the binaural renderer places the sound: `Direct` for every
-///     source on its own or `Cascade 12` through twelve virtual speakers. Empty
-///     when the audio is not being rendered binaurally.
+///     source on its own\, `Cascade 12` through twelve virtual speakers\, or
+///     `Room 13` through the loudspeakers of a measured room\, as many as the
+///     room has. Empty when the audio is not being rendered binaurally.
 ///     <p><hr>
 ///     @skinning_v21 **[New Infolabel]** \link Player_Process_omniphony_render `Player.Process(omniphony.render)`\endlink
 ///     <p>
@@ -1288,10 +1289,11 @@ const infomap player_times[] =   {{ "seektime",         PLAYER_SEEKTIME },
 ///   \table_row3{   <b>`Player.Process(omniphony.sofa)`</b>,
 ///                  \anchor Player_Process_omniphony_sofa
 ///                  _string_,
-///     @return The head model the binaural renderer is convolving with: `Built-in`
-///     or `Personal`. A personal file the engine could not load reads `Built-in`.
-///     Empty when the audio is not being rendered binaurally or the engine does
-///     not report it.
+///     @return The response the binaural renderer is convolving with:
+///     `Built-in HRIR`\, `Custom HRIR` or `Custom BRIR`\, followed by ` - override`
+///     while the listener's config.yaml is applied. A custom file the engine could
+///     not load\, or a room still loading\, reads `Built-in HRIR`. Empty when the
+///     audio is not being rendered binaurally or the engine does not report it.
 ///     <p><hr>
 ///     @skinning_v21 **[New Infolabel]** \link Player_Process_omniphony_sofa `Player.Process(omniphony.sofa)`\endlink
 ///     <p>

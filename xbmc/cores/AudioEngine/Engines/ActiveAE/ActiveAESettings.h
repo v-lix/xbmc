@@ -70,12 +70,14 @@ protected:
   CActiveAE &m_audioEngine;
   CCriticalSection m_cs;
   /*!
-   * \brief React to the object-audio head model being switched.
+   * \brief React to the binaural response being switched.
    *
-   * Choosing a personal measurement asks for the file there and then, because
-   * "Personal" with no file is not a state worth keeping; choosing the
-   * built-in set discards the copy held in the profile. Both of those are
-   * settings writes that re-enter this class, so it is called outside the lock.
+   * Choosing a custom HRTF set or a measured room asks for the file there and
+   * then, because either with no file is not a state worth keeping, and a
+   * cancel or a refused file returns to the response that was in use. Choosing
+   * the built-in set discards the HRTF copy held in the profile. All of those
+   * are settings writes that re-enter this class, so it is called outside the
+   * lock.
    */
   static void OnOmniphonyHrtfModeChanged(int mode);
 

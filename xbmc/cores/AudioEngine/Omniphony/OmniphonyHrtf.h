@@ -8,16 +8,19 @@
 
 #pragma once
 
+#include "OmniphonyTool.h"
+
 #include <string>
 
 namespace ActiveAE
 {
 
-//! \brief Which head model the render uses. Order matches settings.xml.
+//! \brief Which binaural response the render uses. Order matches settings.xml.
 enum OmniphonyHrtfMode
 {
   OMNI_HRTF_BUILTIN = 0,
-  OMNI_HRTF_PERSONAL = 1,
+  OMNI_HRTF_PERSONAL = 1, //!< "Custom (HRIR)": a SOFA HRTF set of the listener's
+  OMNI_HRTF_ROOM = 2, //!< "Room (BRIR)": a measured room - see COmniphonyRoom
 };
 
 /*!
@@ -44,6 +47,10 @@ enum OmniphonyHrtfMode
 class COmniphonyHrtf
 {
 public:
+  //! The stream rate the staged set's grid is built for when the file is
+  //! chosen - see GridCachePath.
+  static constexpr unsigned int GRID_RATE = 48000;
+
   //! \brief Why a file was refused, or Ok.
   enum class Result
   {
@@ -53,40 +60,63 @@ public:
     NotSofa, //!< not an HDF5 container, which every SOFA file is
     Unreadable, //!< an HDF5 layout this engine's reader does not accept
     NoImpulseResponses, //!< no Data.IR: frequency domain or filter coefficients
-    WrongConvention, //!< not SimpleFreeFieldHRIR
+    WrongConvention, //!< neither stage takes it, or (unread) not SimpleFreeFieldHRIR
+    RoomResponse, //!< a measured room, which belongs under Room (BRIR)
     CopyFailed, //!< could not be copied into the profile
+    Cancelled, //!< the listener stopped the check
   };
 
   /*!
    * \brief Check a file the way the engine's reader will.
    *
-   * Screens for the things that reader requires and does not report: the
-   * container format, an HDF5 revision it can parse, time-domain impulse
-   * responses, and the free-field HRIR convention. A file that passes will
-   * load; a file that fails would either be refused or, worse, accepted and
-   * rendered as noise.
+   * The container is screened here first - big enough, an HDF5 file, a
+   * revision the reader can parse - and then the engine itself is asked what
+   * the file holds (COmniphonyTool::Describe): a set of directions the HRTF
+   * stage takes, a room it does not, or neither. Asking is what tells a room
+   * set from an HRTF set, which share a container and can share a convention,
+   * and what lets the dialog say what was found. Where the engine cannot be
+   * asked, two markers are looked for instead: time-domain impulse responses
+   * and the free-field HRIR convention. A file that passes will load; a file
+   * that fails would either be refused or, worse, accepted and rendered as
+   * noise - a room cut to the HRTF stage's few milliseconds is no room.
    *
-   * \param path A Kodi path. Reading is sequential, so a large file on a slow
-   *             share is slow to check - prefer checking the local copy.
+   * \param path        A Kodi path. Reading is sequential, so a large file on
+   *                    a slow share is slow to check - prefer the local copy.
+   * \param interactive the engine is asked behind a cancellable busy dialog
+   * \param contents    what the engine found, when \p described
    */
-  static Result Validate(const std::string& path);
+  static Result Validate(const std::string& path,
+                         bool interactive,
+                         OmniphonySofaInfo& contents,
+                         bool& described);
 
   /*!
    * \brief Copy a chosen file into the profile, replacing any previous one.
    *
    * The copy is validated before it replaces what is already there, so a bad
-   * choice costs the user nothing: the previous file, if any, survives.
+   * choice costs the user nothing: the previous file, if any, survives. A note
+   * beside the copy records where it came from - see StageIfChanged. When
+   * \p interactive, the engine builds the copy's grid for GRID_RATE behind
+   * a busy dialog before it replaces anything - see GridCachePath - and a
+   * cancel there cancels the choice, the previous file and its grids left
+   * as they were.
    *
-   * \return Ok when the file is staged and in use from the next stream on.
+   * \return Ok when the file is staged and in use from the next stream on,
+   *         Cancelled when the listener cancelled either busy dialog.
    */
-  static Result Stage(const std::string& path);
+  static Result Stage(const std::string& path,
+                      bool interactive,
+                      OmniphonySofaInfo& contents,
+                      bool& described);
 
   /*!
    * \brief Stage \p path only if it is not what is already staged.
    *
    * Every stream open asks for the same file, and copying it each time would
-   * fetch a measurement kept on a share once per film. A note beside the copy
-   * records where it came from, so the usual answer is to do nothing.
+   * fetch a measurement kept on a share once per film. The note beside the
+   * copy records where it came from, so the usual answer is to do nothing:
+   * the file was staged when it was chosen. Never interactive - a stream
+   * opening asks this.
    */
   static Result StageIfChanged(const std::string& path);
 
@@ -100,6 +130,26 @@ public:
    * knows nothing about Kodi paths.
    */
   static std::string StagedPath();
+
+  /*!
+   * \brief Absolute path of the files the engine keeps the staged set's
+   * finished HRIR grids in, beside it: hrtf{khz}.grid, one per stream rate
+   * in kHz (hrtf48.grid, hrtf44.grid, hrtf96.grid ...).
+   *
+   * For streams with diffuse-field equalisation, which is how this codec
+   * configures them. The GRID_RATE one is built when the listener chooses
+   * the file (Stage); a stream at another rate builds its own at its first
+   * film and keeps it, and every later stream at a rate reads its grid, so
+   * the set plays from its start rather than after the seconds its grid
+   * takes to build. A grid missing, or built by another engine build, is
+   * built again by the next stream at its rate, so an updated engine
+   * rebuilds each once. All of them are discarded with the staged copy, and
+   * when another file is staged, so none is left for a file not in use.
+   */
+  static std::string GridCachePath();
+
+  //! \brief Whether the staged set's grid for streams at \p rate Hz is kept.
+  static bool GridKept(unsigned int rate);
 
   /*!
    * \brief Whether a personal file is staged in the profile.

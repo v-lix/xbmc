@@ -24409,40 +24409,40 @@ msgctxt "#39323"
 msgid "How much reverberation tail the simulated room adds after its early reflections. Raise it for a more spacious, distant sound, lower it for a drier and more direct one. Has no effect when room simulation is off."
 msgstr ""
 
-#. label for setting audiooutput.omniphonyhrtf
+#. label for setting audiooutput.omniphonyhrtfmode
 #: system/settings/settings.xml
 msgctxt "#39324"
-msgid "- Head-related transfer function"
+msgid "- Binaural response"
 msgstr ""
 
-#. help text for setting audiooutput.omniphonyhrtf
+#. help text for setting audiooutput.omniphonyhrtfmode
 #: system/settings/settings.xml
 msgctxt "#39325"
-msgid "Whether to use the measurements built into the engine, which suit most listeners, or a SOFA file of your own. These describe how your head and ears colour sound from each direction, so your own can place sounds more convincingly. \"Built-in\" also removes the copy held in your profile."
+msgid "Which measurements place the sound. Built-in HRTF uses the HRTF set built into the engine, which suits most listeners. Custom HRTF uses an HRTF set of your own, from a SOFA file: one measured on your own head can place sounds more convincingly. Custom Room uses a measured listening room, its loudspeakers and its acoustics, in place of the simulated room. Choosing either custom response asks for the file, and \"Built-in HRTF\" also removes the copies held in your profile."
 msgstr ""
 
-#. Head-related transfer function: the engine's own measurements
+#. Binaural response: the engine's own measurements
 #: system/settings/settings.xml
 msgctxt "#39326"
-msgid "Built-in"
+msgid "Built-in HRTF (HRIR)"
 msgstr ""
 
-#. Head-related transfer function: a SOFA file the listener supplies
+#. Binaural response: a SOFA HRTF set the listener supplies
 #: system/settings/settings.xml
 msgctxt "#39327"
-msgid "Personal"
+msgid "Custom HRTF (HRIR)"
 msgstr ""
 
 #. label for setting audiooutput.omniphonyhrtf
 #: system/settings/settings.xml
 msgctxt "#39328"
-msgid "- Personal HRTF file (SOFA)"
+msgid "- Custom HRTF file (SOFA)"
 msgstr ""
 
 #. help text for setting audiooutput.omniphonyhrtf
 #: system/settings/settings.xml
 msgctxt "#39329"
-msgid "Choose the SOFA file to use. It is checked and copied into your profile the first time a film plays with it selected; one that cannot be used is refused and the built-in set used instead. It must be a free-field HRIR measurement (SimpleFreeFieldHRIR), whatever it is named."
+msgid "Choose the SOFA file to use. It is checked and copied into your profile when it is chosen, and the check says what the file holds; one that cannot be used is refused and the previous choice kept. It must be a free-field HRTF set (SimpleFreeFieldHRIR), whatever it is named; a measured room belongs under Custom Room (BRIR)."
 msgstr ""
 
 #. label for setting audiooutput.omniphonycascade
@@ -24457,10 +24457,10 @@ msgctxt "#39331"
 msgid "Render the objects onto twelve virtual loudspeakers and place those around you, instead of placing every object individually. Turning it on costs less CPU, worth having if the sound breaks up, for slightly less precise placement."
 msgstr ""
 
-#. heading for the personal HRTF file browser and its result dialog
+#. heading for the custom HRTF file browser and its result dialog
 #: xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESettings.cpp
 msgctxt "#39332"
-msgid "Personal HRTF file"
+msgid "Custom HRTF file"
 msgstr ""
 
 #. HRTF file check: accepted
@@ -24499,10 +24499,10 @@ msgctxt "#39338"
 msgid "This SOFA file holds no impulse responses. Filter coefficients and frequency-domain measurements cannot be used; the file must contain Data.IR."
 msgstr ""
 
-#. HRTF file check: wrong SOFA convention
+#. HRIR file check: neither an HRTF set nor a room the engine reads, or (unread) the wrong SOFA convention
 #: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
 msgctxt "#39339"
-msgid "This SOFA file is not a free-field HRIR measurement. Look for a file whose convention is SimpleFreeFieldHRIR - room responses and loudspeaker measurements will not work here."
+msgid "This SOFA file is not a free-field HRIR measurement. Look for a file whose convention is SimpleFreeFieldHRIR; a measured room belongs under Custom Room (BRIR)."
 msgstr ""
 
 #. HRTF file check: could not be copied
@@ -24533,6 +24533,160 @@ msgstr ""
 #: system/settings/settings.xml
 msgctxt "#39344"
 msgid "Place the sound of anything you play around you on headphones, instead of folding it flat to stereo. It applies to every soundtrack that can be decoded, films and music alike. Turning it on turns passthrough off, and it is unused while the audio output is set to more than two channels."
+msgstr ""
+
+#. Binaural response: a measured listening room
+#: system/settings/settings.xml
+msgctxt "#39345"
+msgid "Custom Room (BRIR)"
+msgstr ""
+
+#. label for setting audiooutput.omniphonybrir
+#: system/settings/settings.xml
+msgctxt "#39346"
+msgid "- Custom Room file (SOFA)"
+msgstr ""
+
+#. help text for setting audiooutput.omniphonybrir
+#: system/settings/settings.xml
+msgctxt "#39347"
+msgid "Choose the measured room to use: a room-response SOFA file (MultiSpeakerBRIR, such as the BBC's listening rooms) or a room already prepared (.room). A SOFA file is prepared once, when it is chosen: the head orientation straight ahead is kept as a small .room file in the SOFA folder - /storage/sofa, shared on the network as SOFA unless the device has a samba.conf of its own - and copied into your profile, and that copy is what plays. The .room file can be kept as a backup or used on another device, and once it exists the SOFA file is no longer needed. Room simulation, distance, reverb and cascade do not apply: the room is in the measurement."
+msgstr ""
+
+#. heading for the custom Room file browser and its result dialog
+#: xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESettings.cpp
+msgctxt "#39348"
+msgid "Custom Room file"
+msgstr ""
+
+#. name of the SOFA folder at the top of the file browser
+#: xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESettings.cpp
+msgctxt "#39349"
+msgid "SOFA files"
+msgstr ""
+
+#. SOFA file check, what the file holds: {0} convention, {1} directions, {2} samples, {3} rate
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyTool.cpp
+msgctxt "#39350"
+msgid "Contents: an HRTF set ({0}), {1:d} directions, {2:d} samples at {3:d} Hz."
+msgstr ""
+
+#. SOFA file check, what the file holds: {0} loudspeakers, {1} their names, {2} head orientations, {3} samples, {4} rate
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyTool.cpp
+msgctxt "#39351"
+msgid "Contents: a room measured with {0:d} loudspeakers ({1}) at {2:d} head orientations, {3:d} samples at {4:d} Hz."
+msgstr ""
+
+#. SOFA file check, what the file holds: {0} loudspeakers, {1} their names, {2} samples, {3} rate
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyTool.cpp
+msgctxt "#39352"
+msgid "Contents: a prepared room with {0:d} loudspeakers ({1}), {2:d} samples at {3:d} Hz."
+msgstr ""
+
+#. SOFA file check, what the file holds: {0} convention, {1} measurements, {2} sources in each, {3} the engine's reason, in English
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyTool.cpp
+msgctxt "#39353"
+msgid "Contents: {0}, {1:d} measurements of {2:d} sources each. Neither binaural response can use it: {3}"
+msgstr ""
+
+#. HRIR file check: the file is a measured room
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyHrtf.cpp
+msgctxt "#39354"
+msgid "This is a measured room, not an HRTF set. Choose it under Custom Room (BRIR) instead."
+msgstr ""
+
+#. Room file check: the file is an HRTF set
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyRoom.cpp
+msgctxt "#39355"
+msgid "This is an HRTF set, not a measured room. Choose it under Custom HRTF (HRIR) instead."
+msgstr ""
+
+#. Room file check: prepared
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyRoom.cpp
+msgctxt "#39356"
+msgid "The room has been prepared and will be used from the next thing you play."
+msgstr ""
+
+#. Room file check: prepared before from the same file
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyRoom.cpp
+msgctxt "#39357"
+msgid "This room was prepared before from the same file and will be used from the next thing you play."
+msgstr ""
+
+#. Room file check: not enough memory
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyRoom.cpp
+msgctxt "#39358"
+msgid "There is not enough free memory on this device to prepare this file."
+msgstr ""
+
+#. Room file check: the file ended early
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyRoom.cpp
+msgctxt "#39359"
+msgid "The file could not be read to the end. If it is on the network, try again, or copy it to the SOFA folder first."
+msgstr ""
+
+#. Room file check: could not be saved
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyRoom.cpp
+msgctxt "#39360"
+msgid "The prepared room could not be saved. Check there is space left on the device."
+msgstr ""
+
+#. Room file check: engine cannot prepare rooms
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyRoom.cpp
+msgctxt "#39361"
+msgid "The spatial audio engine on this system cannot prepare rooms."
+msgstr ""
+
+#. Room file check: the engine failed
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyRoom.cpp
+msgctxt "#39362"
+msgid "The spatial audio engine could not prepare this file."
+msgstr ""
+
+#. notification at playback: no prepared room to play
+#: xbmc/cores/VideoPlayer/DVDCodecs/Audio/DVDAudioCodecOmniphony.cpp
+msgctxt "#39363"
+msgid "The prepared room is missing. Choose the room again; the built-in HRTF plays meanwhile."
+msgstr ""
+
+#. heading of the notification about the listener's config.yaml
+#: xbmc/cores/VideoPlayer/DVDCodecs/Audio/DVDAudioCodecOmniphony.cpp
+msgctxt "#39364"
+msgid "Binaural config.yaml"
+msgstr ""
+
+#. notification: config.yaml refused, {0} the engine's reason, in English
+#: xbmc/cores/VideoPlayer/DVDCodecs/Audio/DVDAudioCodecOmniphony.cpp
+msgctxt "#39365"
+msgid "Not applied: {0}"
+msgstr ""
+
+#. notification: the engine cannot apply config.yaml
+#: xbmc/cores/VideoPlayer/DVDCodecs/Audio/DVDAudioCodecOmniphony.cpp
+msgctxt "#39366"
+msgid "Not applied: this engine cannot read it."
+msgstr ""
+
+#. Room file check: a prepared room the engine cannot read whole
+#: xbmc/cores/AudioEngine/Omniphony/OmniphonyRoom.cpp
+msgctxt "#39367"
+msgid "This prepared room cannot be read: it is incomplete, or was written by a different version of the spatial audio engine. Prepare it again from its SOFA file."
+msgstr ""
+
+msgctxt "#39368"
+msgid "Saved as {0} in the SOFA folder: a prepared room, the room set reduced to what plays, a few MB that loads in a moment. Nothing else is needed from now on, so the .sofa file can be deleted - choose the .room here instead, or copy it to another box."
+msgstr ""
+
+msgctxt "#39369"
+msgid "{0} is a prepared room, the room set reduced to what plays: it needs nothing else, and can be copied to another box as it is."
+msgstr ""
+
+msgctxt "#39370"
+msgid "The chosen file itself is no longer needed, and can be moved or deleted."
+msgstr ""
+
+msgctxt "#39371"
+msgid "Its HRIR grid has been prepared for 48 kHz, so films at that rate start with it; a film at another rate prepares its own the first time and keeps it."
 msgstr ""
 
 #. Dolby Vision RPU Conversion

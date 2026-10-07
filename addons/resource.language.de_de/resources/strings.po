@@ -18107,28 +18107,28 @@ msgid "How much reverberation tail the simulated room adds after its early refle
 msgstr "Wie viel Nachhall der simulierte Raum nach seinen frühen Reflexionen hinzufügt. Erhöhen für einen räumlicheren, entfernteren Klang, verringern für einen trockeneren und direkteren. Ohne Wirkung, wenn die Raumsimulation ausgeschaltet ist."
 
 msgctxt "#39324"
-msgid "- Head-related transfer function"
-msgstr "- Kopfbezogene Übertragungsfunktion"
+msgid "- Binaural response"
+msgstr "- Binaurale Antwort"
 
 msgctxt "#39325"
-msgid "Whether to use the measurements built into the engine, which suit most listeners, or a SOFA file of your own. These describe how your head and ears colour sound from each direction, so your own can place sounds more convincingly. \"Built-in\" also removes the copy held in your profile."
-msgstr "Ob die in die Engine eingebauten Messungen verwendet werden, die für die meisten Hörer passen, oder eine eigene SOFA-Datei. Sie beschreiben, wie Kopf und Ohren den Klang aus jeder Richtung färben, daher kann eine eigene Messung Klänge überzeugender platzieren. \"Integriert\" entfernt außerdem die im Profil gespeicherte Kopie."
+msgid "Which measurements place the sound. Built-in HRTF uses the HRTF set built into the engine, which suits most listeners. Custom HRTF uses an HRTF set of your own, from a SOFA file: one measured on your own head can place sounds more convincingly. Custom Room uses a measured listening room, its loudspeakers and its acoustics, in place of the simulated room. Choosing either custom response asks for the file, and \"Built-in HRTF\" also removes the copies held in your profile."
+msgstr "Welche Messungen den Klang platzieren. Integrierte HRTF verwendet den in die Engine eingebauten HRTF-Satz, der für die meisten Hörer passt. Eigene HRTF verwendet einen eigenen HRTF-Satz aus einer SOFA-Datei: Ein am eigenen Kopf gemessener Satz kann Klänge überzeugender platzieren. Eigener Raum verwendet einen gemessenen Hörraum mit seinen Lautsprechern und seiner Akustik anstelle des simulierten Raums. Bei einer der eigenen Antworten wird nach der Datei gefragt, und \"Integrierte HRTF\" entfernt außerdem die im Profil gespeicherten Kopien."
 
 msgctxt "#39326"
-msgid "Built-in"
-msgstr "Integriert"
+msgid "Built-in HRTF (HRIR)"
+msgstr "Integrierte HRTF (HRIR)"
 
 msgctxt "#39327"
-msgid "Personal"
-msgstr "Persönlich"
+msgid "Custom HRTF (HRIR)"
+msgstr "Eigene HRTF (HRIR)"
 
 msgctxt "#39328"
-msgid "- Personal HRTF file (SOFA)"
-msgstr "- Persönliche HRTF-Datei (SOFA)"
+msgid "- Custom HRTF file (SOFA)"
+msgstr "- Eigene HRTF-Datei (SOFA)"
 
 msgctxt "#39329"
-msgid "Choose the SOFA file to use. It is checked and copied into your profile the first time a film plays with it selected; one that cannot be used is refused and the built-in set used instead. It must be a free-field HRIR measurement (SimpleFreeFieldHRIR), whatever it is named."
-msgstr "Die zu verwendende SOFA-Datei wählen. Sie wird geprüft und ins Profil kopiert, wenn zum ersten Mal ein Film mit ihr abgespielt wird; eine unbrauchbare Datei wird abgelehnt und stattdessen der integrierte Satz verwendet. Es muss eine Freifeld-HRIR-Messung (SimpleFreeFieldHRIR) sein, unabhängig vom Dateinamen."
+msgid "Choose the SOFA file to use. It is checked and copied into your profile when it is chosen, and the check says what the file holds; one that cannot be used is refused and the previous choice kept. It must be a free-field HRTF set (SimpleFreeFieldHRIR), whatever it is named; a measured room belongs under Custom Room (BRIR)."
+msgstr "Die zu verwendende SOFA-Datei wählen. Sie wird bei der Auswahl geprüft und ins Profil kopiert, und die Prüfung zeigt, was die Datei enthält; eine unbrauchbare Datei wird abgelehnt und die bisherige Auswahl beibehalten. Es muss ein Freifeld-HRTF-Satz (SimpleFreeFieldHRIR) sein, unabhängig vom Dateinamen; ein gemessener Raum gehört zu Eigener Raum (BRIR)."
 
 msgctxt "#39330"
 msgid "- Cascade mode (12 virtual speakers)"
@@ -18139,8 +18139,8 @@ msgid "Render the objects onto twelve virtual loudspeakers and place those aroun
 msgstr "Die Objekte auf zwölf virtuelle Lautsprecher rendern und diese rund um den Hörer platzieren, statt jedes Objekt einzeln zu platzieren. Einschalten spart CPU-Last – sinnvoll, wenn der Ton abreißt – auf Kosten einer etwas ungenaueren Platzierung."
 
 msgctxt "#39332"
-msgid "Personal HRTF file"
-msgstr "Persönliche HRTF-Datei"
+msgid "Custom HRTF file"
+msgstr "Eigene HRTF-Datei"
 
 msgctxt "#39333"
 msgid "This file can be used. It has been copied into your profile and will be used from the next thing you play."
@@ -18167,8 +18167,8 @@ msgid "This SOFA file holds no impulse responses. Filter coefficients and freque
 msgstr "Diese SOFA-Datei enthält keine Impulsantworten. Filterkoeffizienten und Messungen im Frequenzbereich können nicht verwendet werden; die Datei muss Data.IR enthalten."
 
 msgctxt "#39339"
-msgid "This SOFA file is not a free-field HRIR measurement. Look for a file whose convention is SimpleFreeFieldHRIR - room responses and loudspeaker measurements will not work here."
-msgstr "Diese SOFA-Datei ist keine Freifeld-HRIR-Messung. Eine Datei mit der Konvention SimpleFreeFieldHRIR verwenden – Raumantworten und Lautsprechermessungen funktionieren hier nicht."
+msgid "This SOFA file is not a free-field HRIR measurement. Look for a file whose convention is SimpleFreeFieldHRIR; a measured room belongs under Custom Room (BRIR)."
+msgstr "Diese SOFA-Datei ist keine Freifeld-HRIR-Messung. Eine Datei mit der Konvention SimpleFreeFieldHRIR verwenden; ein gemessener Raum gehört zu Eigener Raum (BRIR)."
 
 msgctxt "#39340"
 msgid "The file could not be copied into your profile. Check there is space left on the device."
@@ -18189,6 +18189,114 @@ msgstr "Binaurales Rendering für Kopfhörer"
 msgctxt "#39344"
 msgid "Place the sound of anything you play around you on headphones, instead of folding it flat to stereo. It applies to every soundtrack that can be decoded, films and music alike. Turning it on turns passthrough off, and it is unused while the audio output is set to more than two channels."
 msgstr "Den Klang von allem, was abgespielt wird, auf Kopfhörern rund um den Hörer platzieren, statt ihn flach auf Stereo herunterzumischen. Gilt für jede dekodierbare Tonspur, Filme wie Musik. Das Einschalten deaktiviert Passthrough, und die Einstellung wird nicht verwendet, solange die Audioausgabe auf mehr als zwei Kanäle eingestellt ist."
+
+msgctxt "#39345"
+msgid "Custom Room (BRIR)"
+msgstr "Eigener Raum (BRIR)"
+
+msgctxt "#39346"
+msgid "- Custom Room file (SOFA)"
+msgstr "- Eigene Raumdatei (SOFA)"
+
+msgctxt "#39347"
+msgid "Choose the measured room to use: a room-response SOFA file (MultiSpeakerBRIR, such as the BBC's listening rooms) or a room already prepared (.room). A SOFA file is prepared once, when it is chosen: the head orientation straight ahead is kept as a small .room file in the SOFA folder - /storage/sofa, shared on the network as SOFA unless the device has a samba.conf of its own - and copied into your profile, and that copy is what plays. The .room file can be kept as a backup or used on another device, and once it exists the SOFA file is no longer needed. Room simulation, distance, reverb and cascade do not apply: the room is in the measurement."
+msgstr "Den zu verwendenden gemessenen Raum wählen: eine SOFA-Datei mit Raumantworten (MultiSpeakerBRIR, etwa die Hörräume der BBC) oder einen bereits vorbereiteten Raum (.room). Eine SOFA-Datei wird einmal bei der Auswahl vorbereitet: Die Kopfausrichtung nach vorn wird als kleine .room-Datei im SOFA-Ordner gespeichert – /storage/sofa, im Netzwerk als SOFA freigegeben, sofern das Gerät keine eigene samba.conf hat – und ins Profil kopiert; diese Kopie wird abgespielt. Die .room-Datei kann als Sicherung aufbewahrt oder auf einem anderen Gerät verwendet werden; sobald sie existiert, wird die SOFA-Datei nicht mehr benötigt. Raumsimulation, Lautsprecherabstand, Nachhall und Kaskadenmodus gelten hier nicht: Der Raum steckt in der Messung."
+
+msgctxt "#39348"
+msgid "Custom Room file"
+msgstr "Eigene Raumdatei"
+
+msgctxt "#39349"
+msgid "SOFA files"
+msgstr "SOFA-Dateien"
+
+msgctxt "#39350"
+msgid "Contents: an HRTF set ({0}), {1:d} directions, {2:d} samples at {3:d} Hz."
+msgstr "Inhalt: ein HRTF-Satz ({0}), {1:d} Richtungen, {2:d} Samples bei {3:d} Hz."
+
+msgctxt "#39351"
+msgid "Contents: a room measured with {0:d} loudspeakers ({1}) at {2:d} head orientations, {3:d} samples at {4:d} Hz."
+msgstr "Inhalt: ein Raum, gemessen mit {0:d} Lautsprechern ({1}) in {2:d} Kopfausrichtungen, {3:d} Samples bei {4:d} Hz."
+
+msgctxt "#39352"
+msgid "Contents: a prepared room with {0:d} loudspeakers ({1}), {2:d} samples at {3:d} Hz."
+msgstr "Inhalt: ein vorbereiteter Raum mit {0:d} Lautsprechern ({1}), {2:d} Samples bei {3:d} Hz."
+
+msgctxt "#39353"
+msgid "Contents: {0}, {1:d} measurements of {2:d} sources each. Neither binaural response can use it: {3}"
+msgstr "Inhalt: {0}, {1:d} Messungen mit je {2:d} Quellen. Keine der binauralen Antworten kann sie verwenden: {3}"
+
+msgctxt "#39354"
+msgid "This is a measured room, not an HRTF set. Choose it under Custom Room (BRIR) instead."
+msgstr "Dies ist ein gemessener Raum, kein HRTF-Satz. Stattdessen unter Eigener Raum (BRIR) auswählen."
+
+msgctxt "#39355"
+msgid "This is an HRTF set, not a measured room. Choose it under Custom HRTF (HRIR) instead."
+msgstr "Dies ist ein HRTF-Satz, kein gemessener Raum. Stattdessen unter Eigene HRTF (HRIR) auswählen."
+
+msgctxt "#39356"
+msgid "The room has been prepared and will be used from the next thing you play."
+msgstr "Der Raum wurde vorbereitet und wird ab der nächsten Wiedergabe verwendet."
+
+msgctxt "#39357"
+msgid "This room was prepared before from the same file and will be used from the next thing you play."
+msgstr "Dieser Raum wurde bereits aus derselben Datei vorbereitet und wird ab der nächsten Wiedergabe verwendet."
+
+msgctxt "#39358"
+msgid "There is not enough free memory on this device to prepare this file."
+msgstr "Auf diesem Gerät ist nicht genug freier Speicher, um diese Datei vorzubereiten."
+
+msgctxt "#39359"
+msgid "The file could not be read to the end. If it is on the network, try again, or copy it to the SOFA folder first."
+msgstr "Die Datei konnte nicht bis zum Ende gelesen werden. Liegt sie im Netzwerk, erneut versuchen oder sie zuerst in den SOFA-Ordner kopieren."
+
+msgctxt "#39360"
+msgid "The prepared room could not be saved. Check there is space left on the device."
+msgstr "Der vorbereitete Raum konnte nicht gespeichert werden. Bitte prüfen, ob auf dem Gerät noch Speicherplatz frei ist."
+
+msgctxt "#39361"
+msgid "The spatial audio engine on this system cannot prepare rooms."
+msgstr "Die Raumklang-Engine auf diesem System kann keine Räume vorbereiten."
+
+msgctxt "#39362"
+msgid "The spatial audio engine could not prepare this file."
+msgstr "Die Raumklang-Engine konnte diese Datei nicht vorbereiten."
+
+msgctxt "#39363"
+msgid "The prepared room is missing. Choose the room again; the built-in HRTF plays meanwhile."
+msgstr "Der vorbereitete Raum fehlt. Den Raum erneut auswählen; bis dahin wird die integrierte HRTF verwendet."
+
+msgctxt "#39364"
+msgid "Binaural config.yaml"
+msgstr "Binaurale config.yaml"
+
+msgctxt "#39365"
+msgid "Not applied: {0}"
+msgstr "Nicht angewendet: {0}"
+
+msgctxt "#39366"
+msgid "Not applied: this engine cannot read it."
+msgstr "Nicht angewendet: Diese Engine kann sie nicht lesen."
+
+msgctxt "#39367"
+msgid "This prepared room cannot be read: it is incomplete, or was written by a different version of the spatial audio engine. Prepare it again from its SOFA file."
+msgstr "Dieser vorbereitete Raum kann nicht gelesen werden: Er ist unvollständig oder wurde von einer anderen Version der Raumklang-Engine geschrieben. Ihn erneut aus seiner SOFA-Datei vorbereiten."
+
+msgctxt "#39368"
+msgid "Saved as {0} in the SOFA folder: a prepared room, the room set reduced to what plays, a few MB that loads in a moment. Nothing else is needed from now on, so the .sofa file can be deleted - choose the .room here instead, or copy it to another box."
+msgstr "Als {0} im SOFA-Ordner gespeichert: ein vorbereiteter Raum, der Raumdatensatz auf das reduziert, was wiedergegeben wird, wenige MB, die sofort geladen sind. Mehr wird ab jetzt nicht benötigt, die .sofa-Datei kann also gelöscht werden - hier stattdessen die .room-Datei wählen oder sie auf ein anderes Gerät kopieren."
+
+msgctxt "#39369"
+msgid "{0} is a prepared room, the room set reduced to what plays: it needs nothing else, and can be copied to another box as it is."
+msgstr "{0} ist ein vorbereiteter Raum, der Raumdatensatz auf das reduziert, was wiedergegeben wird: Er braucht nichts weiter und kann unverändert auf ein anderes Gerät kopiert werden."
+
+msgctxt "#39370"
+msgid "The chosen file itself is no longer needed, and can be moved or deleted."
+msgstr "Die gewählte Datei selbst wird nicht mehr benötigt und kann verschoben oder gelöscht werden."
+
+msgctxt "#39371"
+msgid "Its HRIR grid has been prepared for 48 kHz, so films at that rate start with it; a film at another rate prepares its own the first time and keeps it."
+msgstr "Ihr HRIR-Raster wurde für 48 kHz vorbereitet, Filme mit dieser Rate starten also damit; ein Film mit einer anderen Rate bereitet beim ersten Mal sein eigenes vor und behält es."
 
 msgctxt "#40000"
 msgid "Versions"
