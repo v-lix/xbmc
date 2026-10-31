@@ -469,6 +469,13 @@ bool CGUILargeTextureManager::IsBackgroundMotion() const
   return (m_scrolling || m_moved) && DeferBackgrounds();
 }
 
+bool CGUILargeTextureManager::DelaysSelectionImages()
+{
+  return DeferBackgrounds() &&
+         CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+             CSettings::SETTING_LOOKANDFEEL_DELAYSELECTIONIMAGES);
+}
+
 bool CGUILargeTextureManager::DeferBackgrounds()
 {
   return CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(

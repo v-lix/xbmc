@@ -106,6 +106,9 @@ public:
   // previous frame. Controls processed before the moving one see it a frame late.
   bool IsBackgroundMotion() const;
 
+  // True if window images following the selection wait like background images.
+  static bool DelaysSelectionImages();
+
   // Admit GPU work for an existing request. This does not acquire another reference.
   // A background consumer's demand waits while the image is held.
   void RequestImageUpload(const std::string& path, bool background = false);

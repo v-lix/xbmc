@@ -120,6 +120,8 @@ public:
    */
   bool GetItemInt(int &value, const CGUIListItem *item, int contextWindow, int info) const;
   bool GetItemBool(const CGUIListItem *item, int contextWindow, int condition) const;
+  // A list item info, or a skin variable whose conditions or labels use one.
+  bool IsListItemDependentInfo(int info) const;
 
   /*! \brief Set currently playing file item
    */

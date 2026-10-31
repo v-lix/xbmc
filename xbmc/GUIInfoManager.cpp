@@ -11630,6 +11630,27 @@ bool CGUIInfoManager::IsListItemInfo(int info) const
   return (iResolvedInfo >= LISTITEM_START && iResolvedInfo <= LISTITEM_END);
 }
 
+bool CGUIInfoManager::IsListItemDependentInfo(int info) const
+{
+  if (IsListItemInfo(info))
+    return true;
+  if (info < CONDITIONAL_LABEL_START || info > CONDITIONAL_LABEL_END)
+    return false;
+
+  info -= CONDITIONAL_LABEL_START;
+  std::optional<CSkinVariableString> variable;
+  {
+    std::unique_lock<CCriticalSection> lock(m_critInfo);
+    if (info >= static_cast<int>(m_skinVariableStrings.size()))
+      return false;
+
+    variable = m_skinVariableStrings[info];
+  }
+
+  // Checked on the copy, with the lock let go: a skin variable may hold another.
+  return variable->IsListItemDependent();
+}
+
 bool CGUIInfoManager::GetItemInt(int &value, const CGUIListItem *item, int contextWindow, int info) const
 {
   value = 0;

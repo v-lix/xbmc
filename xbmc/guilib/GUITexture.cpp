@@ -21,16 +21,21 @@ namespace
 {
 // Declared screen coverage is a conservative background heuristic, not a test
 // of decoded pixel size or actual visibility after clipping and transforms.
-bool IsBackgroundSized(float posX, float posY, float width, float height)
+bool IsBackgroundSized(float posX, float posY, float width, float height, float share = 0.5f)
 {
   const CGraphicContext& gfx = CServiceBroker::GetWinSystem()->GetGfxContext();
   const float screenWidth =
       gfx.ScaleFinalXCoord(posX + width, posY) - gfx.ScaleFinalXCoord(posX, posY);
   const float screenHeight =
       gfx.ScaleFinalYCoord(posX, posY + height) - gfx.ScaleFinalYCoord(posX, posY);
-  return 2 * screenWidth * screenHeight >=
-         static_cast<float>(gfx.GetWidth()) * static_cast<float>(gfx.GetHeight());
+  return screenWidth * screenHeight >=
+         share * static_cast<float>(gfx.GetWidth()) * static_cast<float>(gfx.GetHeight());
 }
+
+// A window image that follows the selection, such as an info panel poster,
+// waits with background images from a tenth of the screen, so small logos and
+// flags still change at once.
+constexpr float SELECTION_IMAGE_SHARE = 0.1f;
 } // namespace
 
 CreateGUITextureFunc CGUITexture::m_createGUITextureFunc;
@@ -152,11 +157,18 @@ CGUITexture::CGUITexture(const CGUITexture& right)
   // A copy of an allocated texture, such as a crossfade's outgoing image,
   // continues showing it, so its first request is not a new background image.
   m_continuation = right.IsAllocated();
+  m_followsSelection = right.m_followsSelection;
 }
 
 bool CGUITexture::IsBackgroundRequest() const
 {
-  return !m_continuation && IsBackgroundSized(m_posX, m_posY, m_width, m_height);
+  if (m_continuation)
+    return false;
+  if (IsBackgroundSized(m_posX, m_posY, m_width, m_height))
+    return true;
+  return m_followsSelection &&
+         IsBackgroundSized(m_posX, m_posY, m_width, m_height, SELECTION_IMAGE_SHARE) &&
+         CServiceBroker::GetGUI()->GetLargeTextureManager().DelaysSelectionImages();
 }
 
 bool CGUITexture::AllocateOnDemand()

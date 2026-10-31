@@ -62,6 +62,17 @@ previous frame: the incoming image is shown at once if it is ready; otherwise,
 also when there is no incoming image, the last outgoing image that shows
 anything is kept at full strength, and fades as usual once the GUI is still.
 
+Its child setting "Also delay images of the selected item"
+(`lookandfeel.delayselectionimages`, off by default, available only while the
+parent is on) treats a window image that follows the selection as a background
+image too, from a tenth of the screen, such as the poster in a list view's info
+panel. A window image is one that is not part of a list row: list rows show
+their own items and are never delayed this way. It follows the selection when
+its texture uses list item info, directly or through a skin variable's labels
+or conditions, so playback artwork such as the now-playing cover is not
+delayed. Smaller images such as logos and flags still change at once, and
+images with a constant texture are unaffected.
+
 The previous crossfade image stays until the new one is ready. Cache grace and
 fade durations are unchanged. These are conservative admission rules, not exact
 visibility or decoded-size tests: transformed/auto-sized images may bypass the
@@ -155,10 +166,13 @@ does not exercise real driver scheduling.
 manager and jobs, including private publication, shared consumers, cancellation,
 cache grace, stale callbacks and admission failures. `tools/test-gui-upload-demand.py`
 executes the frontend allocation, clipping, polling, idle redraw and fade paths,
-including background fades ended or held by motion and empty incoming images.
+including background fades ended or held by motion and empty incoming images,
+and which window images count as selection images.
+`tools/test-gui-selection-labels.py` checks which labels follow the selection,
+through container infos and nested skin variables.
 `tools/test-gui-background-defer.py` checks deferred decoding, foreground promotion,
-per-request expiry, held reuse and completion, the setting on and off, motion
-reports, composition
+per-request expiry, held reuse and completion, the setting on and off, its child
+setting, motion reports, composition
 with draw-demand uploads, the actual control and animation Animate methods'
 motion reports and the group list's report call. The list and panel scroll tests
 verify that containers report their scroller's active frames.

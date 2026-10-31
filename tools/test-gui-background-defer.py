@@ -90,7 +90,9 @@ static void MotionReport(){{State s;Harness h(s);Check(!h.images.IsBackgroundMot
   Check(!h.images.IsBackgroundMotion(),"motion report ends after a still frame");++cases;}
  {State s;s.delayBackgrounds=false;Harness h(s);h.images.SetScrolling();Check(!h.images.IsBackgroundMotion(),"disabled setting reports no background motion");
   h.images.ProcessDeferred();Check(!h.images.IsBackgroundMotion(),"disabled setting reports no background motion");++cases;}}
-int main(){try{QuietAndScroll();ForegroundAndSharing();MixedUrgency();DeferredRelease();PerRequestTimeout();PollAndDrawDemand();Rejection();HeldReuse();ForegroundReuse();CompletionHold();SharedDecode();SettingToggle();MotionReport();std::printf("PASS %u cases %u checks; actual deferred manager/demand composition; host fixtures\n",cases,checks);return 0;}catch(const std::exception&e){std::fprintf(stderr,"FAIL %s\n",e.what());return 1;}}
+static void SelectionSetting(){for(int mode=0;mode<4;++mode){State s;s.delayBackgrounds=mode&1;s.delaySelection=mode&2;Harness h(s);
+ Check(h.images.DelaysSelectionImages()==(mode==3),"selection images wait only with both settings on");++cases;}}
+int main(){try{QuietAndScroll();ForegroundAndSharing();MixedUrgency();DeferredRelease();PerRequestTimeout();PollAndDrawDemand();Rejection();HeldReuse();ForegroundReuse();CompletionHold();SharedDecode();SettingToggle();MotionReport();SelectionSetting();std::printf("PASS %u cases %u checks; actual deferred manager/demand composition; host fixtures\n",cases,checks);return 0;}catch(const std::exception&e){std::fprintf(stderr,"FAIL %s\n",e.what());return 1;}}
 '''
 
 def manager_source(files):
@@ -205,6 +207,8 @@ def mutations(files):
       ('motion-previous-frame-ignored',LARGE,'void CGUILargeTextureManager::ProcessDeferred(','  m_moved = scrolling;\n','','motion is reported through the next frame'),
       ('motion-report-sticky',LARGE,'void CGUILargeTextureManager::ProcessDeferred(','  m_moved = scrolling;','  m_moved = m_moved || scrolling;','motion report ends after a still frame'),
       ('motion-ignores-setting',LARGE,'bool CGUILargeTextureManager::IsBackgroundMotion(','return (m_scrolling || m_moved) && DeferBackgrounds();','return m_scrolling || m_moved;','disabled setting reports no background motion'),
+      ('selection-ignores-parent',LARGE,'bool CGUILargeTextureManager::DelaysSelectionImages(','  return DeferBackgrounds() &&\n         CServiceBroker','  return CServiceBroker','selection images wait only with both settings on'),
+      ('selection-ignores-child',LARGE,'bool CGUILargeTextureManager::DelaysSelectionImages(','  return DeferBackgrounds() &&\n         CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(\n             CSettings::SETTING_LOOKANDFEEL_DELAYSELECTIONIMAGES);','  return DeferBackgrounds();','selection images wait only with both settings on'),
       ('repeating-is-motion',CONTROL,'bool CGUIControl::Animate(',' && !anim.IsRepeating()','','repeating animation is not motion'),
       ('applied-is-motion',CONTROL,'bool CGUIControl::Animate(','anim.GetState() == ANIM_STATE_IN_PROCESS','anim.GetProcess() != ANIM_PROCESS_NONE','finished animation stops reporting'),
       ('delay-is-motion',CONTROL,'bool CGUIControl::Animate(','anim.GetState() == ANIM_STATE_IN_PROCESS','(anim.GetState() == ANIM_STATE_IN_PROCESS || anim.GetState() == ANIM_STATE_DELAYED)','delay alone is not motion'),
@@ -213,8 +217,8 @@ def mutations(files):
       ('overwrite-cache-policy',LARGE,'void CGUILargeTextureManager::QueueImage(','    it->second->AddRef();','    it->second->AddRef(); it->second->m_useCache=useCache;','promotion preserves first consumer cache policy'),
       ('rejected-decode-stranded',LARGE,'CGUILargeTextureManager::queueIterator CGUILargeTextureManager::StartQueuedImage(','if (it->first == 0)','if (false)','rejected immediate/deferred/promoted decoder becomes load failure, not stranded'),
       ('cancel-job-zero',LARGE,'void CGUILargeTextureManager::ReleaseImage(','          if (it->first != 0)\n','', 'released deferred request never calls CancelJob zero'),
-      ('quarter-screen',TEXTURE,'bool IsBackgroundSized(','return 2 * screenWidth','return 4 * screenWidth','image short of half screen is not background'),
-      ('full-screen-only',TEXTURE,'bool IsBackgroundSized(','return 2 * screenWidth','return 1 * screenWidth','half-screen image is a background')]
+      ('quarter-screen',TEXTURE,'bool IsBackgroundSized(','float share = 0.5f','float share = 0.25f','image short of half screen is not background'),
+      ('full-screen-only',TEXTURE,'bool IsBackgroundSized(','float share = 0.5f','float share = 1.0f','half-screen image is a background')]
     for name,path,signature,old,new,witness in definitions:yield name,edit(files,path,signature,old,new),witness,path
 
 def callsites(files):

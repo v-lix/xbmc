@@ -19,6 +19,8 @@
 #include "utils/StringUtils.h"
 #include "utils/log.h"
 
+#include <algorithm>
+
 using namespace KODI::GUILIB::GUIINFO;
 
 CGUIInfoLabel::CGUIInfoLabel(const std::string &label, const std::string &fallback /*= ""*/, int context /*= 0*/)
@@ -40,6 +42,20 @@ void CGUIInfoLabel::SetLabel(const std::string &label, const std::string &fallba
   Parse(label, m_infoLabel, context);
   Parse(fallback, m_infoFallback, context);
   m_fallback = fallback;
+  m_listItemDependent.reset();
+}
+
+bool CGUIInfoLabel::IsListItemDependent() const
+{
+  if (!m_listItemDependent)
+  {
+    const CGUIInfoManager& infoMgr = CServiceBroker::GetGUI()->GetInfoManager();
+    const auto dependent = [&infoMgr](const CInfoPortion& portion)
+    { return portion.m_info && infoMgr.IsListItemDependentInfo(portion.m_info); };
+    m_listItemDependent = std::any_of(m_infoLabel.begin(), m_infoLabel.end(), dependent) ||
+                          std::any_of(m_infoFallback.begin(), m_infoFallback.end(), dependent);
+  }
+  return *m_listItemDependent;
 }
 
 bool CGUIInfoLabel::LabelNeedsUpdate(int context,
