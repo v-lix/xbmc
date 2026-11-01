@@ -399,6 +399,10 @@ bool aml_native_gui_size_changing();
 // called by the GUI present path (main thread) to show the OSD again
 void aml_native_gui_osd_present(bool swapped);
 void aml_native_gui_playback_stopped();
+// Main thread. Turns the kernel tear trace (/sys/class/video/tear_trace) on
+// while video is configured and debug logging is on, off otherwise, and copies
+// its output into the log about four times a second.
+void aml_tear_trace_poll(bool video_configured);
 void aml_handle_display_stereo_mode(const int stereo_mode);
 void aml_enable_freeScale(const RESOLUTION_INFO &res);
 void aml_disable_freeScale();

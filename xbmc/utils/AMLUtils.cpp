@@ -7085,8 +7085,13 @@ bool aml_native_gui_size_changing()
   return s_nativeGuiSuspended != s_nativeGuiSuspendedBefore;
 }
 
+// GUI buffer swaps, counted for the tear trace's once-a-second summary.
+static std::atomic<unsigned int> s_tearTraceGuiSwaps{0};
+
 void aml_native_gui_osd_present(bool swapped)
 {
+  if (swapped)
+    s_tearTraceGuiSwaps.fetch_add(1, std::memory_order_relaxed);
   if (!s_nativeGuiOsdHold)
     return;
   // two GUI frames of the new size, or a 1 s fallback should the GUI not redraw
@@ -7108,6 +7113,281 @@ void aml_native_gui_playback_stopped()
   // a GUI sizing refresh without queuing the old playback resolution.
   if (s_nativeGuiSuspended)
     CServiceBroker::GetWinSystem()->GetGfxContext().RequestVideoResolutionRefresh();
+}
+
+namespace
+{
+// DDR bandwidth monitor (/sys/class/aml_ddr) for the tear trace. While the
+// trace is on, its four channels measure the GPU, VPU reads, VPU writes and
+// the decoders, sampled about every 12M DMC cycles; the previous mode, window
+// and port selection are restored when the trace stops.
+struct AMLDdrMonitor
+{
+  bool active{false};
+  std::string prevMode;
+  std::string prevClock;
+  std::vector<unsigned long long> prevPorts;
+  std::chrono::steady_clock::time_point nextStat;
+
+  static std::string Path(const char* node) { return std::string("/sys/class/aml_ddr/") + node; }
+
+  static std::vector<std::string> Lines(const std::string& path)
+  {
+    std::vector<std::string> lines;
+    std::ifstream file(path);
+    std::string line;
+    while (std::getline(file, line))
+      if (!line.empty())
+        lines.push_back(line);
+    return lines;
+  }
+
+  static bool Write(const std::string& path, const std::string& value)
+  {
+    try
+    {
+      CSysfsPath node{path};
+      if (!node.Exists())
+        return false;
+      node.Set(value);
+      return true;
+    }
+    catch (const std::exception&)
+    {
+      return false;
+    }
+  }
+
+  static void SetPorts(int ch, const std::vector<int>& ids)
+  {
+    Write(Path("port"), StringUtils::Format("{}:-1", ch));
+    for (int id : ids)
+      Write(Path("port"), StringUtils::Format("{}:{}", ch, id));
+  }
+
+  void Start()
+  {
+    if (active)
+      return;
+    const auto mode = Lines(Path("mode"));
+    if (mode.empty())
+    {
+      CLog::Log(LOGDEBUG, "p3i-ddr unsupported: {} is missing", Path("mode"));
+      return;
+    }
+    prevMode = mode[0].substr(0, 1);
+    const auto clock = Lines(Path("irq_clock"));
+    prevClock = clock.empty() ? "" : clock[0];
+    prevPorts.clear();
+    for (const auto& line : Lines(Path("port")))
+    {
+      int ch;
+      unsigned long long mask;
+      if (sscanf(line.c_str(), "ch %d:%llx", &ch, &mask) == 2 && ch >= 0 && ch < 8)
+      {
+        if (prevPorts.size() <= static_cast<size_t>(ch))
+          prevPorts.resize(ch + 1, 0);
+        prevPorts[ch] = mask;
+      }
+    }
+
+    std::vector<int> gpu, vpuRead, vpuWrite, decoder;
+    for (const auto& line : Lines(Path("name_of_ports")))
+    {
+      int id;
+      char name[64] = {};
+      if (sscanf(line.c_str(), "%d, %63[^\n]", &id, name) != 2)
+        continue;
+      const std::string n = name;
+      if (StringUtils::StartsWith(n, "MALI"))
+        gpu.push_back(id);
+      else if (StringUtils::StartsWith(n, "VPU READ") || n == "VPU1" || n == "VPU2" || n == "VPU3")
+        vpuRead.push_back(id);
+      else if (StringUtils::StartsWith(n, "VPU WRITE"))
+        vpuWrite.push_back(id);
+      else if (n == "VDEC" || StringUtils::StartsWith(n, "HEVC"))
+        decoder.push_back(id);
+    }
+    const auto ids = [](const std::vector<int>& v) {
+      std::string s;
+      for (int id : v)
+        s += (s.empty() ? "" : ",") + std::to_string(id);
+      return s;
+    };
+    SetPorts(0, gpu);
+    SetPorts(1, vpuRead);
+    SetPorts(2, vpuWrite);
+    SetPorts(3, decoder);
+    Write(Path("irq_clock"), "12000000");
+    if (!Write(Path("mode"), "1"))
+    {
+      CLog::Log(LOGDEBUG, "p3i-ddr unsupported: {} rejected enable", Path("mode"));
+      return;
+    }
+    Write(Path("usage_stat"), "0");
+    active = true;
+    nextStat = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    const auto freq = Lines(Path("freq"));
+    CLog::Log(LOGDEBUG,
+              "p3i-ddr on ch0=gpu[{}] ch1=vpu_read[{}] ch2=vpu_write[{}] ch3=decoder[{}] "
+              "irq_clock=12000000 freq={} prev_mode={} prev_irq_clock={}",
+              ids(gpu), ids(vpuRead), ids(vpuWrite), ids(decoder),
+              freq.empty() ? "?" : freq[0], prevMode, prevClock);
+  }
+
+  void Stop()
+  {
+    if (!active)
+      return;
+    active = false;
+    Write(Path("mode"), prevMode.empty() ? "0" : prevMode);
+    if (!prevClock.empty())
+      Write(Path("irq_clock"), prevClock);
+    for (size_t ch = 0; ch < prevPorts.size(); ch++)
+    {
+      std::vector<int> bits;
+      for (int bit = 0; bit < 64; bit++)
+        if (prevPorts[ch] & (1ULL << bit))
+          bits.push_back(bit);
+      SetPorts(static_cast<int>(ch), bits);
+    }
+    CLog::Log(LOGDEBUG, "p3i-ddr off, restored mode={} irq_clock={}", prevMode, prevClock);
+  }
+
+  // Instant sample (the last DMC window) on every poll, and the window
+  // average/maximum/distribution once a second.
+  void Poll(long long monoUs)
+  {
+    if (!active)
+      return;
+    std::string now;
+    for (const auto& line : Lines(Path("bandwidth")))
+    {
+      int kbs, pct, rem, ch;
+      unsigned long long mask;
+      if (sscanf(line.c_str(), "Total bandwidth: %d KB/s, usage: %d.%d%%", &kbs, &pct, &rem) == 3)
+        now += StringUtils::Format(" total_kbs={} usage={}.{:02d}", kbs, pct, rem);
+      else if (sscanf(line.c_str(), "ch:%d port:%llx: %d KB/s", &ch, &mask, &kbs) == 3)
+        now += StringUtils::Format(" ch{}={}", ch, kbs);
+    }
+    if (!now.empty())
+      CLog::Log(LOGDEBUG, "p3i-ddr mono_us={} now{}", monoUs, now);
+
+    const auto clock = std::chrono::steady_clock::now();
+    if (clock < nextStat)
+      return;
+    nextStat = clock + std::chrono::seconds(1);
+    std::string stat;
+    for (const auto& line : Lines(Path("usage_stat")))
+    {
+      long long avg;
+      long max;
+      int kbs, pct, rem, ch, lo, hi, count;
+      unsigned long long mask;
+      if (sscanf(line.c_str(), "MAX bandwidth: %d KB/s, usage: %d.%d%%", &kbs, &pct, &rem) == 3)
+        stat += StringUtils::Format(" max_kbs={} max_usage={}.{:02d}", kbs, pct, rem);
+      else if (sscanf(line.c_str(), "AVG bandwidth: %lld KB/s, usage: %d.%d%%, samples:%d", &avg,
+                      &pct, &rem, &count) == 4)
+        stat += StringUtils::Format(" avg_kbs={} avg_usage={}.{:02d} samples={}", avg, pct, rem,
+                                    count);
+      else if (sscanf(line.c_str(), "%d, %llx, %lld, %ld, %d", &ch, &mask, &avg, &max, &kbs) == 5)
+        stat += StringUtils::Format(" ch{}=avg:{}/max:{}/at_peak:{}", ch, avg, max, kbs);
+      else if (sscanf(line.c_str(), "%d%% ~ %d%%: %d", &lo, &hi, &count) == 3)
+        stat += StringUtils::Format(" u{}={}", lo, count);
+    }
+    if (!stat.empty())
+      CLog::Log(LOGDEBUG, "p3i-ddr mono_us={} stat{}", monoUs, stat);
+    Write(Path("usage_stat"), "0");
+  }
+};
+} // namespace
+
+// The kernel records where each video vsync ISR runs, whether the VD1 canvas
+// switch it queued is live by the next vsync, whether a canvas set about to be
+// rewritten is on screen, and where each RDMA channel completes. Kernel event
+// times are CLOCK_MONOTONIC microseconds; mono_us is the same clock at the
+// read, so events can be placed against the window lines of this log.
+void aml_tear_trace_poll(bool video_configured)
+{
+  static std::mutex lock;
+  static bool enabled = false;
+  static bool unsupported = false;
+  static bool reset = false;
+  static std::chrono::steady_clock::time_point next;
+  static std::string context;
+  static const std::string path = "/sys/class/video/tear_trace";
+  static AMLDdrMonitor ddr;
+  static std::chrono::steady_clock::time_point nextSwaps;
+
+  std::lock_guard<std::mutex> guard(lock);
+  const bool want = video_configured && !unsupported && PLAYBACK_DIAGNOSTICS::Enabled();
+  const auto now = std::chrono::steady_clock::now();
+  // A previous process may have left the kernel trace on; clear it once.
+  if (want != enabled || !reset)
+  {
+    reset = true;
+    try
+    {
+      CSysfsPath knob{path};
+      if (!knob.Exists())
+      {
+        unsupported = true;
+        CLog::Log(LOGDEBUG, "p3i-tear unsupported: {} is missing in this kernel", path);
+        return;
+      }
+      knob.Set(want ? 1 : 0);
+    }
+    catch (const std::exception&)
+    {
+      unsupported = true;
+      CLog::Log(LOGDEBUG, "p3i-tear unsupported: {} rejected the write", path);
+      return;
+    }
+    enabled = want;
+    context.clear();
+    next = now;
+    nextSwaps = now + std::chrono::seconds(1);
+    s_tearTraceGuiSwaps.store(0, std::memory_order_relaxed);
+    CLog::Log(LOGDEBUG, "p3i-tear trace {}", enabled ? "on" : "off");
+    if (enabled)
+      ddr.Start();
+    else
+      ddr.Stop();
+  }
+  if (!enabled || now < next)
+    return;
+  next = now + std::chrono::milliseconds(250);
+
+  if (auto* winSystem = CServiceBroker::GetWinSystem())
+  {
+    const RESOLUTION_INFO info = winSystem->GetGfxContext().GetResInfo();
+    const std::string current = StringUtils::Format(
+        "gui={}x{} screen={}x{} refresh={:.3f} native_gui_suspended={}", info.iWidth,
+        info.iHeight, info.iScreenWidth, info.iScreenHeight, info.fRefreshRate,
+        s_nativeGuiSuspended.load());
+    if (current != context)
+    {
+      context = current;
+      CLog::Log(LOGDEBUG, "p3i-tear context {}", context);
+    }
+  }
+
+  std::ifstream file(path);
+  const auto monoUs =
+      std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+  std::string line;
+  while (std::getline(file, line))
+  {
+    if (!line.empty() && line != "tear-off")
+      CLog::Log(LOGDEBUG, "p3i-tear mono_us={} {}", monoUs, line);
+  }
+  ddr.Poll(monoUs);
+  if (now >= nextSwaps)
+  {
+    nextSwaps = now + std::chrono::seconds(1);
+    CLog::Log(LOGDEBUG, "p3i-tear mono_us={} gui-swaps per_s={}", monoUs,
+              s_tearTraceGuiSwaps.exchange(0, std::memory_order_relaxed));
+  }
 }
 
 void aml_handle_display_stereo_mode(const int stereo_mode)

@@ -549,6 +549,9 @@ void CRenderManager::FrameMove()
   }
 
 #if defined(HAS_LIBAMCODEC)
+  // Configured video: follow the debug log level for the kernel tear trace.
+  aml_tear_trace_poll(true);
+
   if (m_amlPresenter)
   {
     if (CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode() != RENDER_STEREO_MODE_OFF)
@@ -732,6 +735,7 @@ void CRenderManager::UnInitOnMain()
 #endif
 #if defined(HAS_LIBAMCODEC)
   StopAMLPresenter(false);
+  aml_tear_trace_poll(false);
 #endif
   aml_set_disc_menu_visible(false);
   // Playback is ending: no disc menu graphics any more. Render thread only,
