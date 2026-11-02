@@ -1,0 +1,232 @@
+{
+  "scope": "Local validation plus supplied CoreELEC Mali-G52 probe hardware comparison",
+  "build": "Zig 0.13.0, arm-linux-gnueabihf.2.17, cortex_a7, PIC/PIE, -O2 -s, -Wall -Wextra -Werror",
+  "arm_qemu_self_test": "RESULT=PASS test=self-test pointer_bits=32 metadata_bytes=68",
+  "arm_elf_copy_relocations": false,
+  "asan_ubsan_host_ordinary_controls": [
+    {
+      "test": "self-test",
+      "exit_code": 0,
+      "seconds": 0.025
+    },
+    {
+      "test": "width-zero",
+      "exit_code": 1,
+      "seconds": 0.006
+    },
+    {
+      "test": "width-too-large",
+      "exit_code": 1,
+      "seconds": 0.004
+    },
+    {
+      "test": "bad-numeric",
+      "exit_code": 1,
+      "seconds": 0.004
+    },
+    {
+      "test": "missing-photos",
+      "exit_code": 1,
+      "seconds": 0.004
+    },
+    {
+      "test": "bad-pattern",
+      "exit_code": 1,
+      "seconds": 0.004
+    },
+    {
+      "test": "bad-profile",
+      "exit_code": 1,
+      "seconds": 0.003
+    },
+    {
+      "test": "bad-watchdog",
+      "exit_code": 1,
+      "seconds": 0.004
+    },
+    {
+      "test": "pacing-too-long",
+      "exit_code": 1,
+      "seconds": 0.003
+    },
+    {
+      "test": "private-ABI-rejected-on-host",
+      "exit_code": 2,
+      "seconds": 0.024
+    },
+    {
+      "test": "memory-mode-no-Mali",
+      "exit_code": 1,
+      "seconds": 0.025
+    },
+    {
+      "test": "watchdog",
+      "exit_code": 124,
+      "seconds": 1.031
+    },
+    {
+      "test": "interrupt-reaps-child",
+      "exit_code": 143,
+      "child_reaped": true
+    },
+    {
+      "test": "crash-is-not-timeout",
+      "exit_code": 137,
+      "child_reaped": true
+    },
+    {
+      "test": "alpha-128",
+      "exit_code": 0,
+      "seconds": 0.126,
+      "pixel_comparisons": 26,
+      "measured_frames": 16
+    },
+    {
+      "test": "odd-lifecycle",
+      "exit_code": 0,
+      "seconds": 0.207,
+      "pixel_comparisons": 78,
+      "measured_frames": 48
+    },
+    {
+      "test": "one-pixel",
+      "exit_code": 0,
+      "seconds": 0.105,
+      "pixel_comparisons": 26,
+      "measured_frames": 16
+    },
+    {
+      "test": "noise",
+      "exit_code": 0,
+      "seconds": 0.125,
+      "pixel_comparisons": 26,
+      "measured_frames": 16
+    },
+    {
+      "test": "photos-resize",
+      "exit_code": 0,
+      "seconds": 0.129,
+      "pixel_comparisons": 26,
+      "measured_frames": 16
+    },
+    {
+      "test": "detail-4k",
+      "exit_code": 0,
+      "seconds": 12.42,
+      "pixel_comparisons": 26,
+      "measured_frames": 16
+    },
+    {
+      "test": "noise-odd-4k",
+      "exit_code": 0,
+      "seconds": 11.894,
+      "pixel_comparisons": 26,
+      "measured_frames": 16
+    },
+    {
+      "test": "bad-photo-rejected",
+      "exit_code": 1,
+      "seconds": 0.085
+    }
+  ],
+  "shell_runner_cases": [
+    {
+      "test": "all",
+      "passed": true,
+      "case_count": 13
+    },
+    {
+      "test": "memory-only",
+      "passed": true,
+      "case_count": 4
+    },
+    {
+      "test": "memory-failure",
+      "passed": true,
+      "case_count": 2
+    },
+    {
+      "test": "plain",
+      "passed": true,
+      "case_count": 8
+    },
+    {
+      "test": "split",
+      "passed": true,
+      "case_count": 8
+    },
+    {
+      "test": "photo-paths",
+      "passed": true,
+      "case_count": 9
+    },
+    {
+      "test": "control-failure",
+      "passed": true,
+      "case_count": 2
+    },
+    {
+      "test": "AFBC-failure",
+      "passed": true,
+      "case_count": 6
+    },
+    {
+      "test": "timeout",
+      "passed": true,
+      "case_count": 4
+    },
+    {
+      "test": "crash",
+      "passed": true,
+      "case_count": 4
+    },
+    {
+      "test": "unknown-library",
+      "passed": true,
+      "case_count": 2
+    },
+    {
+      "test": "self-test-failure",
+      "passed": true,
+      "case_count": 1
+    },
+    {
+      "test": "reject ['--label', '../bad']",
+      "passed": true
+    },
+    {
+      "test": "reject ['--frames', '0']",
+      "passed": true
+    },
+    {
+      "test": "reject ['--fps', '-1']",
+      "passed": true
+    },
+    {
+      "test": "reject ['--rounds', '9999999999']",
+      "passed": true
+    },
+    {
+      "test": "reject ['--profile', 'bad']",
+      "passed": true
+    },
+    {
+      "test": "reject ['--image-a', '/tmp/afbc-fanart-runner-isk2431t/a space.jpg']",
+      "passed": true
+    },
+    {
+      "test": "reject ['--fps', '1', '--frames', '600']",
+      "passed": true
+    },
+    {
+      "test": "reject ['--frames', '08']",
+      "passed": true
+    }
+  ],
+  "driver_layout_validation": "layout-validation.json",
+  "hardware_afbc_crossfade_tested": true,
+  "revision": 2,
+  "hardware_uncached_ion_memory_tested": true,
+  "memory_mode_host_check": "Without an ION allocator, memory mode reaches the expected allocator error without opening a blocking Mali-library FIFO or applying the private ABI gate.",
+  "hardware_results": "hardware-validation.json"
+}

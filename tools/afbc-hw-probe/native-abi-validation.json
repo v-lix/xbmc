@@ -1,0 +1,74 @@
+[
+  {
+    "input_format": "0x10bb688",
+    "reached_external_wrapper": true,
+    "wrapper_arguments": [
+      {
+        "format": "0x10bb688",
+        "flags": 0,
+        "descriptor": [
+          0,
+          0,
+          0,
+          0,
+          512,
+          0,
+          0,
+          0,
+          3,
+          4294967295,
+          4294967295,
+          0,
+          2,
+          2,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "return_value": null
+  },
+  {
+    "input_format": "0x360bb688",
+    "reached_external_wrapper": true,
+    "wrapper_arguments": [
+      {
+        "format": "0x360bb688",
+        "flags": 0,
+        "descriptor": [
+          0,
+          0,
+          0,
+          0,
+          512,
+          0,
+          0,
+          0,
+          3,
+          4294967295,
+          4294967295,
+          0,
+          2,
+          2,
+          2,
+          0,
+          17544840,
+          0,
+          1610612992,
+          0
+        ]
+      }
+    ],
+    "return_value": null
+  },
+  {
+    "input_format": "0x0",
+    "reached_external_wrapper": false,
+    "wrapper_arguments": [],
+    "return_value": "0x300c"
+  }
+]

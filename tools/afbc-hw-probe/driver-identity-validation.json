@@ -1,0 +1,10 @@
+{
+  "source_sha256": "949b043bd373a7779d4338a87ecdd929e0430dfddcb092de7a4e6cda3a905397",
+  "stripped_sha256": "789adf85dc9c630bb049249bf7e28ed40380e919ae1f379a352167d3107ec445",
+  "matches_target_report_sha256": true,
+  "strip_command": "GNU arm-linux-gnueabihf-strip (binutils 2.40), default options",
+  "allocated_sections_identical": true,
+  "allocated_section_count": 26,
+  "source_bytes": 35998196,
+  "stripped_bytes": 27754432
+}

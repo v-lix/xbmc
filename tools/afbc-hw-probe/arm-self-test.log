@@ -1,0 +1,6 @@
+watchdog_seconds=20 watchdog_child_pid=31390
+pass=0 pixels_checked=16384 mismatched_pixels=0 max_channel_error=0
+pixel_mismatch x=0 y=0 got=0,0,0,255 expected=255,0,0,255
+pass=0 pixels_checked=16384 mismatched_pixels=1 max_channel_error=255
+pointer_bits=32 metadata_size=68 format_offset=48 fd_offset=56
+RESULT=PASS test=self-test

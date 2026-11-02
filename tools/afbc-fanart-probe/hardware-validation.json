@@ -1,0 +1,273 @@
+{
+  "scope": "User-supplied CoreELEC Mali-G52 before/after hardware runs; not a guarantee for other devices or drivers.",
+  "kernel_fix_commit": "a0110f2b158631f98f31556de4a8e70902db6a61",
+  "input_archives": [
+    {
+      "file": "probe-before.zip",
+      "sha256": "206951907b137e72561f61de21b6f2922d98ca5186a5630542d61aaffa66543d"
+    },
+    {
+      "file": "probe-after.zip",
+      "sha256": "d3e0fc0a15ecacd8706c91e4cf9dde2bffa72c38d458ca6f184813f30aae21cb"
+    }
+  ],
+  "before_gpu_failed_runs": 3,
+  "before_cpu_memory_failed_runs": 1,
+  "before_cpu_memory_total_runs": 3,
+  "after_gpu_passed_runs": 6,
+  "after_pixel_comparisons": 1872,
+  "after_guard_checks": 120,
+  "after_pixel_mismatches": 0,
+  "after_guard_damage": 0,
+  "runs": [
+    {
+      "zip": "probe-after.zip",
+      "archive": "afbc-fanart-results-idle-20261103T040100Z-4342.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "local-128-alpha\tPASS\t0",
+        "local-4k-detail\tPASS\t0",
+        "afbc-128-alpha\tPASS\t0",
+        "afbc-1080-detail\tPASS\t0",
+        "afbc-4k-detail\tPASS\t0",
+        "afbc-4k-noise\tPASS\t0",
+        "afbc-odd-detail\tPASS\t0",
+        "afbc-split-128-alpha\tPASS\t0",
+        "afbc-split-1080-detail\tPASS\t0",
+        "afbc-split-4k-detail\tPASS\t0",
+        "afbc-split-4k-noise\tPASS\t0",
+        "afbc-split-odd-detail\tPASS\t0"
+      ],
+      "marker": true,
+      "pixel_checks": 312,
+      "max_mismatched_pixels": 0,
+      "guard_checks": 20,
+      "max_guard_errors": 0,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-after.zip",
+      "archive": "afbc-fanart-results-idle-20261103T041035Z-4554.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "local-128-alpha\tPASS\t0",
+        "local-4k-detail\tPASS\t0",
+        "afbc-128-alpha\tPASS\t0",
+        "afbc-1080-detail\tPASS\t0",
+        "afbc-4k-detail\tPASS\t0",
+        "afbc-4k-noise\tPASS\t0",
+        "afbc-odd-detail\tPASS\t0",
+        "afbc-split-128-alpha\tPASS\t0",
+        "afbc-split-1080-detail\tPASS\t0",
+        "afbc-split-4k-detail\tPASS\t0",
+        "afbc-split-4k-noise\tPASS\t0",
+        "afbc-split-odd-detail\tPASS\t0"
+      ],
+      "marker": true,
+      "pixel_checks": 312,
+      "max_mismatched_pixels": 0,
+      "guard_checks": 20,
+      "max_guard_errors": 0,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-after.zip",
+      "archive": "afbc-fanart-results-idle-20261103T041753Z-4456.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "local-128-alpha\tPASS\t0",
+        "local-4k-detail\tPASS\t0",
+        "afbc-128-alpha\tPASS\t0",
+        "afbc-1080-detail\tPASS\t0",
+        "afbc-4k-detail\tPASS\t0",
+        "afbc-4k-noise\tPASS\t0",
+        "afbc-odd-detail\tPASS\t0",
+        "afbc-split-128-alpha\tPASS\t0",
+        "afbc-split-1080-detail\tPASS\t0",
+        "afbc-split-4k-detail\tPASS\t0",
+        "afbc-split-4k-noise\tPASS\t0",
+        "afbc-split-odd-detail\tPASS\t0"
+      ],
+      "marker": true,
+      "pixel_checks": 312,
+      "max_mismatched_pixels": 0,
+      "guard_checks": 20,
+      "max_guard_errors": 0,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-after.zip",
+      "archive": "afbc-fanart-results-idle-20261103T042935Z-4271.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "local-128-alpha\tPASS\t0",
+        "local-4k-detail\tPASS\t0",
+        "afbc-128-alpha\tPASS\t0",
+        "afbc-1080-detail\tPASS\t0",
+        "afbc-4k-detail\tPASS\t0",
+        "afbc-4k-noise\tPASS\t0",
+        "afbc-odd-detail\tPASS\t0",
+        "afbc-split-128-alpha\tPASS\t0",
+        "afbc-split-1080-detail\tPASS\t0",
+        "afbc-split-4k-detail\tPASS\t0",
+        "afbc-split-4k-noise\tPASS\t0",
+        "afbc-split-odd-detail\tPASS\t0"
+      ],
+      "marker": true,
+      "pixel_checks": 312,
+      "max_mismatched_pixels": 0,
+      "guard_checks": 20,
+      "max_guard_errors": 0,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-after.zip",
+      "archive": "afbc-fanart-results-idle-20261103T043820Z-4291.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "local-128-alpha\tPASS\t0",
+        "local-4k-detail\tPASS\t0",
+        "afbc-128-alpha\tPASS\t0",
+        "afbc-1080-detail\tPASS\t0",
+        "afbc-4k-detail\tPASS\t0",
+        "afbc-4k-noise\tPASS\t0",
+        "afbc-odd-detail\tPASS\t0",
+        "afbc-split-128-alpha\tPASS\t0",
+        "afbc-split-1080-detail\tPASS\t0",
+        "afbc-split-4k-detail\tPASS\t0",
+        "afbc-split-4k-noise\tPASS\t0",
+        "afbc-split-odd-detail\tPASS\t0"
+      ],
+      "marker": true,
+      "pixel_checks": 312,
+      "max_mismatched_pixels": 0,
+      "guard_checks": 20,
+      "max_guard_errors": 0,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-after.zip",
+      "archive": "afbc-fanart-results-idle-20261103T044602Z-4385.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "local-128-alpha\tPASS\t0",
+        "local-4k-detail\tPASS\t0",
+        "afbc-128-alpha\tPASS\t0",
+        "afbc-1080-detail\tPASS\t0",
+        "afbc-4k-detail\tPASS\t0",
+        "afbc-4k-noise\tPASS\t0",
+        "afbc-odd-detail\tPASS\t0",
+        "afbc-split-128-alpha\tPASS\t0",
+        "afbc-split-1080-detail\tPASS\t0",
+        "afbc-split-4k-detail\tPASS\t0",
+        "afbc-split-4k-noise\tPASS\t0",
+        "afbc-split-odd-detail\tPASS\t0"
+      ],
+      "marker": true,
+      "pixel_checks": 312,
+      "max_mismatched_pixels": 0,
+      "guard_checks": 20,
+      "max_guard_errors": 0,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-before.zip",
+      "archive": "afbc-fanart-results-cold-memory-20261103T034106Z-4412.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "memory-128\tPASS\t0",
+        "memory-1080\tPASS\t0",
+        "memory-4k\tPASS\t0"
+      ],
+      "marker": false,
+      "pixel_checks": 0,
+      "max_mismatched_pixels": 0,
+      "guard_checks": 0,
+      "max_guard_errors": 0,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-before.zip",
+      "archive": "afbc-fanart-results-cold-memory-20261103T034322Z-4096.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "memory-128\tPASS\t0",
+        "memory-1080\tFAIL\t1"
+      ],
+      "marker": false,
+      "pixel_checks": 0,
+      "max_mismatched_pixels": 0,
+      "guard_checks": 0,
+      "max_guard_errors": 0,
+      "zero_damage": [
+        "memory_check stage=before-cache-pressure checked_bytes=8552448 changed_bytes=105856 zeroed_bytes=105856 first_offset=256 last_offset=8540287 first_value=0x00 expected=0xa5",
+        "memory_check stage=after-cache-pressure checked_bytes=8552448 changed_bytes=107328 zeroed_bytes=107328 first_offset=192 last_offset=8540287 first_value=0x00 expected=0xa5"
+      ]
+    },
+    {
+      "zip": "probe-before.zip",
+      "archive": "afbc-fanart-results-cold-memory-20261103T034441Z-4012.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "memory-128\tPASS\t0",
+        "memory-1080\tPASS\t0",
+        "memory-4k\tPASS\t0"
+      ],
+      "marker": false,
+      "pixel_checks": 0,
+      "max_mismatched_pixels": 0,
+      "guard_checks": 0,
+      "max_guard_errors": 0,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-before.zip",
+      "archive": "afbc-fanart-results-idle-20261103T034612Z-4071.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "local-128-alpha\tPASS\t0",
+        "local-4k-detail\tPASS\t0",
+        "afbc-128-alpha\tFAIL\t1"
+      ],
+      "marker": false,
+      "pixel_checks": 78,
+      "max_mismatched_pixels": 15723,
+      "guard_checks": 2,
+      "max_guard_errors": 15424,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-before.zip",
+      "archive": "afbc-fanart-results-idle-20261103T034812Z-4078.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "local-128-alpha\tPASS\t0",
+        "local-4k-detail\tPASS\t0",
+        "afbc-128-alpha\tPASS\t0",
+        "afbc-1080-detail\tFAIL\t1"
+      ],
+      "marker": false,
+      "pixel_checks": 104,
+      "max_mismatched_pixels": 6131,
+      "guard_checks": 4,
+      "max_guard_errors": 30784,
+      "zero_damage": []
+    },
+    {
+      "zip": "probe-before.zip",
+      "archive": "afbc-fanart-results-idle-20261103T035301Z-4455.tar.gz",
+      "cases": [
+        "self-test\tPASS\t0",
+        "local-128-alpha\tPASS\t0",
+        "local-4k-detail\tPASS\t0",
+        "afbc-128-alpha\tFAIL\t1"
+      ],
+      "marker": false,
+      "pixel_checks": 78,
+      "max_mismatched_pixels": 10300,
+      "guard_checks": 2,
+      "max_guard_errors": 15296,
+      "zero_damage": []
+    }
+  ]
+}

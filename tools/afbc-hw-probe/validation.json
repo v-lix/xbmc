@@ -1,0 +1,204 @@
+{
+  "version": 2,
+  "target": "ARMv7 Linux hard-float, glibc 2.17 target",
+  "probe_sha256": "2dfe4246bf3d78c475ce3a71d73d3fc6eb2aa29380635a007348b51b37e7f1a3",
+  "known_mali_sha256": "949b043bd373a7779d4338a87ecdd929e0430dfddcb092de7a4e6cda3a905397",
+  "arm_self_test": "PASS (shipped executable under QEMU, Debian ARM glibc runtime)",
+  "host_sanitizer_self_test": "PASS",
+  "gles_control": "PASS (Mesa llvmpipe, ASan/UBSan; 32768 pixels across two patterns, zero mismatches)",
+  "elf_checks": "PASS (ARM32 hard-float PIE, no COPY relocations)",
+  "native_metadata_dispatch": "PASS (C-generated metadata, original Mali dispatch in Unicorn; registry lookup mocked, stopped before memory wrapper)",
+  "runner_checks": [
+    {
+      "name": "all-original",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info",
+        "local",
+        "linear",
+        "afbc",
+        "afbc-split"
+      ],
+      "returncode": 0,
+      "external_timeout_available": false
+    },
+    {
+      "name": "all-stripped",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info",
+        "local",
+        "linear",
+        "afbc",
+        "afbc-split"
+      ],
+      "returncode": 0,
+      "external_timeout_available": false
+    },
+    {
+      "name": "split-only",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info",
+        "local",
+        "linear",
+        "afbc-split"
+      ],
+      "returncode": 0,
+      "external_timeout_available": false
+    },
+    {
+      "name": "plain-only",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info",
+        "local",
+        "linear",
+        "afbc"
+      ],
+      "returncode": 0,
+      "external_timeout_available": false
+    },
+    {
+      "name": "linear-fail",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info",
+        "local",
+        "linear"
+      ],
+      "returncode": 1,
+      "external_timeout_available": false
+    },
+    {
+      "name": "afbc-fail",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info",
+        "local",
+        "linear",
+        "afbc"
+      ],
+      "returncode": 1,
+      "external_timeout_available": false
+    },
+    {
+      "name": "timeout",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info"
+      ],
+      "returncode": 1,
+      "external_timeout_available": false
+    },
+    {
+      "name": "crash",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info"
+      ],
+      "returncode": 1,
+      "external_timeout_available": false
+    },
+    {
+      "name": "self-test-fail",
+      "passed": true,
+      "cases": [
+        "self-test"
+      ],
+      "returncode": 1,
+      "external_timeout_available": false
+    },
+    {
+      "name": "unknown-driver",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info",
+        "local",
+        "private-imports"
+      ],
+      "returncode": 0,
+      "external_timeout_available": false
+    },
+    {
+      "name": "info-only",
+      "passed": true,
+      "cases": [
+        "self-test",
+        "info"
+      ],
+      "returncode": 0,
+      "external_timeout_available": false
+    }
+  ],
+  "mali_hardware_import_render": "NOT RUN; first target attempt stopped before tests",
+  "osd_scanout": "NOT TESTED; probe performs no OSD submission",
+  "known_stripped_mali_sha256": "789adf85dc9c630bb049249bf7e28ed40380e919ae1f379a352167d3107ec445",
+  "watchdog_checks": [
+    {
+      "test": "supervised-self-test",
+      "exit_code": 0,
+      "seconds": 0.036
+    },
+    {
+      "test": "deadline-kills-blocked-child",
+      "exit_code": 124,
+      "seconds": 1.033
+    },
+    {
+      "test": "child-failure-propagated",
+      "exit_code": 1,
+      "seconds": 0.025
+    },
+    {
+      "test": "invalid-deadline-rejected",
+      "exit_code": 1,
+      "seconds": 0.004
+    },
+    {
+      "test": "parent-interrupt-cleans-child",
+      "exit_code": 143,
+      "child_reaped": true
+    },
+    {
+      "test": "child-crash-is-not-timeout",
+      "exit_code": 137,
+      "child_reaped": true
+    }
+  ],
+  "arm_identity_checks": [
+    {
+      "identity": "949b043bd373a7779d4338a87ecdd929e0430dfddcb092de7a4e6cda3a905397",
+      "exit_code": 1,
+      "passed": true,
+      "scope": "identity gate and expected missing-library error; no GPU"
+    },
+    {
+      "identity": "789adf85dc9c630bb049249bf7e28ed40380e919ae1f379a352167d3107ec445",
+      "exit_code": 1,
+      "passed": true,
+      "scope": "identity gate and expected missing-library error; no GPU"
+    },
+    {
+      "identity": "unrecognized",
+      "exit_code": 2,
+      "passed": true,
+      "scope": "identity gate and expected missing-library error; no GPU"
+    }
+  ],
+  "first_target_report": {
+    "probe_version": 1,
+    "gpu_tests_started": false,
+    "runner_error": "missing external timeout command",
+    "installed_mali_is_verified_stripped_original": true
+  }
+}

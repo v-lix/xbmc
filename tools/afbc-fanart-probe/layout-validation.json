@@ -1,0 +1,97 @@
+{
+  "driver_sha256": "949b043bd373a7779d4338a87ecdd929e0430dfddcb092de7a4e6cda3a905397",
+  "method": "Unicorn executes unchanged egl_color_buffer_wrap_external_planar and layout helpers; memset PLT stubbed; captured at eglp_color_buffer_alloc before kernel interaction",
+  "scope": "CPU layout calculations only; not GPU import, execution or performance",
+  "results": [
+    {
+      "width": 128,
+      "height": 128,
+      "format": "0x360bb688",
+      "driver_header_offset": 1024,
+      "driver_padded_width": 128,
+      "driver_body_row_stride": 8192,
+      "allocation_bytes": 135168
+    },
+    {
+      "width": 128,
+      "height": 128,
+      "format": "0x760bb688",
+      "driver_header_offset": 1024,
+      "driver_padded_width": 128,
+      "driver_body_row_stride": 8192,
+      "allocation_bytes": 135168
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "format": "0x360bb688",
+      "driver_header_offset": 131072,
+      "driver_padded_width": 1920,
+      "driver_body_row_stride": 122880,
+      "allocation_bytes": 8552448
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "format": "0x760bb688",
+      "driver_header_offset": 131072,
+      "driver_padded_width": 1920,
+      "driver_body_row_stride": 122880,
+      "allocation_bytes": 8552448
+    },
+    {
+      "width": 3840,
+      "height": 2160,
+      "format": "0x360bb688",
+      "driver_header_offset": 519168,
+      "driver_padded_width": 3840,
+      "driver_body_row_stride": 245760,
+      "allocation_bytes": 33763328
+    },
+    {
+      "width": 3840,
+      "height": 2160,
+      "format": "0x760bb688",
+      "driver_header_offset": 519168,
+      "driver_padded_width": 3840,
+      "driver_body_row_stride": 245760,
+      "allocation_bytes": 33763328
+    },
+    {
+      "width": 3839,
+      "height": 2159,
+      "format": "0x360bb688",
+      "driver_header_offset": 519168,
+      "driver_padded_width": 3840,
+      "driver_body_row_stride": 245760,
+      "allocation_bytes": 33763328
+    },
+    {
+      "width": 3839,
+      "height": 2159,
+      "format": "0x760bb688",
+      "driver_header_offset": 519168,
+      "driver_padded_width": 3840,
+      "driver_body_row_stride": 245760,
+      "allocation_bytes": 33763328
+    },
+    {
+      "width": 129,
+      "height": 129,
+      "format": "0x360bb688",
+      "driver_header_offset": 2048,
+      "driver_padded_width": 144,
+      "driver_body_row_stride": 9216,
+      "allocation_bytes": 151552
+    },
+    {
+      "width": 129,
+      "height": 129,
+      "format": "0x760bb688",
+      "driver_header_offset": 2048,
+      "driver_padded_width": 144,
+      "driver_body_row_stride": 9216,
+      "allocation_bytes": 151552
+    }
+  ]
+}
