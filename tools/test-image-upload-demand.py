@@ -62,6 +62,8 @@ struct State {
 static thread_local State*currentState=nullptr;
 struct CTexture {
  State*state;bool uploaded=false;
+ bool m_uploadingInWorker=false,backgroundTexture=false;
+ void SetBackgroundTexture(bool background){backgroundTexture=background;}
  explicit CTexture(State*s):state(s){}
  ~CTexture(){++state->destroyed;if(uploaded&&heldLocks)++state->gpuDestroyedWithLock;}
  unsigned GetWidth()const{Check(state->leases==0,"metadata read after upload lease release");return 64;}

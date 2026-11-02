@@ -106,7 +106,10 @@ static void DirectConsumers(){State s;Harness h(s);CTextureArray a;
  Check(h.images.GetImage("B",a,true,true,false,true)&&a.size()==1&&h.images.HasDirectConsumer("B"),"loaded direct consumer is reported");a.Free();
  h.images.ReleaseImage("B",false);Check(h.images.HasDirectConsumer("B"),"other release keeps loaded direct consumer");
  h.images.ReleaseImage("B",false,true);Check(!h.images.HasDirectConsumer("B")&&h.images.m_allocatedLookup.count("B"),"released loaded direct consumer is no longer reported");++cases;}
-int main(){try{QuietAndScroll();ForegroundAndSharing();MixedUrgency();DeferredRelease();PerRequestTimeout();PollAndDrawDemand();Rejection();HeldReuse();ForegroundReuse();CompletionHold();SharedDecode();SettingToggle();MotionReport();SelectionSetting();DirectConsumers();std::printf("PASS %u cases %u checks; actual deferred manager/demand composition; host fixtures\n",cases,checks);return 0;}catch(const std::exception&e){std::fprintf(stderr,"FAIL %s\n",e.what());return 1;}}
+static void BackgroundTextureHint(){for(int mode=0;mode<3;++mode){State s;s.async=false;s.delayBackgrounds=false;Harness h(s);
+ Ask(h,"A",mode==0);if(mode==2)Ask(h,"A",true);h.Next();CTextureArray array;Check(h.Get(array)&&array.size()==1,"hint fixture publishes decoded image");
+ Check(array.m_textures[0]->backgroundTexture==(mode!=1),"background hint is independent of motion delay and follows a joined decode");array.Free();++cases;}}
+int main(){try{QuietAndScroll();ForegroundAndSharing();MixedUrgency();DeferredRelease();PerRequestTimeout();PollAndDrawDemand();Rejection();HeldReuse();ForegroundReuse();CompletionHold();SharedDecode();SettingToggle();MotionReport();SelectionSetting();DirectConsumers();BackgroundTextureHint();std::printf("PASS %u cases %u checks; actual deferred manager/demand composition; host fixtures\n",cases,checks);return 0;}catch(const std::exception&e){std::fprintf(stderr,"FAIL %s\n",e.what());return 1;}}
 '''
 
 def manager_source(files):
@@ -234,7 +237,7 @@ def mutations(files):
       ('queued-direct-not-counted',LARGE,'void CGUILargeTextureManager::QueueImage(','  image->m_directRefs = direct ? 1 : 0;\n','','queued direct consumer is reported'),
       ('joined-direct-not-counted',LARGE,'void CGUILargeTextureManager::QueueImage(','    if (direct)\n      it->second->m_directRefs++;\n','','joining direct consumer is counted'),
       ('loaded-direct-not-counted',LARGE,'bool CGUILargeTextureManager::GetImage(','      if (direct)\n        image->m_directRefs++;\n','','loaded direct consumer is reported'),
-      ('poll-counts-direct',LARGE,'bool CGUILargeTextureManager::GetImage(','  if (firstRequest)\n    QueueImage(path, useCache, defer, direct);','  if (firstRequest || direct)\n    QueueImage(path, useCache, defer, direct);','direct poll adds no reference'),
+      ('poll-counts-direct',LARGE,'bool CGUILargeTextureManager::GetImage(','  if (firstRequest)\n    QueueImage(path, useCache, defer, background, direct);','  if (firstRequest || direct)\n    QueueImage(path, useCache, defer, background, direct);','direct poll adds no reference'),
       ('queued-release-ignores-kind',LARGE,'void CGUILargeTextureManager::ReleaseImage(','    CLargeTexture *image = queueIt->second;\n    if (direct && image->m_directRefs)\n      image->m_directRefs--;\n','    CLargeTexture *image = queueIt->second;\n','released direct consumers are no longer reported'),
       ('queued-release-drops-direct',LARGE,'void CGUILargeTextureManager::ReleaseImage(','    CLargeTexture *image = queueIt->second;\n    if (direct && image->m_directRefs)','    CLargeTexture *image = queueIt->second;\n    if (image->m_directRefs)','other release keeps direct consumers'),
       ('loaded-release-ignores-kind',LARGE,'void CGUILargeTextureManager::ReleaseImage(','    const unsigned int uploadJobID = image->m_uploadJobID;\n    if (direct && image->m_directRefs)\n      image->m_directRefs--;\n','    const unsigned int uploadJobID = image->m_uploadJobID;\n','released loaded direct consumer is no longer reported'),

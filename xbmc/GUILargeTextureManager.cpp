@@ -251,7 +251,7 @@ bool CGUILargeTextureManager::GetImage(const std::string& path,
   }
 
   if (firstRequest)
-    QueueImage(path, useCache, defer, direct);
+    QueueImage(path, useCache, defer, background, direct);
 
   return true;
 }
@@ -370,6 +370,7 @@ void CGUILargeTextureManager::ReleaseImage(const std::string& path, bool immedia
 void CGUILargeTextureManager::QueueImage(const std::string& path,
                                          bool useCache,
                                          bool defer,
+                                         bool backgroundTexture,
                                          bool direct)
 {
   if (path.empty())
@@ -381,6 +382,7 @@ void CGUILargeTextureManager::QueueImage(const std::string& path,
   auto it = m_queuedLookup.find(path);
   if (it != m_queuedLookup.end())
   {
+    it->second->m_backgroundTexture |= backgroundTexture;
     it->second->AddRef();
     if (direct)
       it->second->m_directRefs++;
@@ -413,6 +415,7 @@ void CGUILargeTextureManager::QueueImage(const std::string& path,
   image->m_asyncUpload =
       CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_guiAsyncTextureUpload;
   image->m_useCache = useCache;
+  image->m_backgroundTexture = backgroundTexture;
   image->m_background = defer;
   image->m_directRefs = direct ? 1 : 0;
   image->m_deferredSince = CTimeUtils::GetFrameTime();
@@ -531,6 +534,7 @@ void CGUILargeTextureManager::OnJobComplete(unsigned int jobID, bool success, CJ
       CLargeTexture *image = it->second;
       if (success)
       {
+        loader->m_texture->SetBackgroundTexture(image->m_backgroundTexture);
         if (image->m_asyncUpload)
           image->m_pendingTexture = std::move(loader->m_texture);
         else

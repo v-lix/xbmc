@@ -178,6 +178,7 @@ private:
     unsigned int m_deferredSince{0};
     // A background consumer asked for this image, whether or not a foreground one did.
     bool m_background{false};
+    bool m_backgroundTexture{false};
     // Not handed to background consumers, nor uploaded unless a foreground
     // consumer demands it, until motion stops or the request times out.
     bool m_held{false};
@@ -191,6 +192,7 @@ private:
   void QueueImage(const std::string& path,
                   bool useCache = true,
                   bool defer = false,
+                  bool backgroundTexture = false,
                   bool direct = false);
   void QueueUpload(CLargeTexture* image);
   void CancelUpload(unsigned int jobID);
