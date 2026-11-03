@@ -95,6 +95,7 @@ PRELUDE = r'''
 #include <tuple>
 #include <utility>
 #include <vector>
+namespace GUI_RENDER_TIMING { enum class Stage { Items, Info, Text, Load, Release, Layouts }; struct Scope { explicit Scope(Stage, bool = true) {} }; inline void Motion() {} inline void Input() {} inline void LayoutsFreed(unsigned) {} } // Temporary GUI timing hooks.
 #include "guilib/Tween.h"
 
 #define SCROLLING_GAP @GAP@

@@ -18,7 +18,8 @@ import subprocess
 
 FILES = ('xbmc/guilib/GUITexture.cpp', 'xbmc/guilib/GUITexture.h',
          'xbmc/guilib/GUIImage.cpp', 'xbmc/guilib/GUIControl.cpp',
-         'xbmc/windowing/GraphicContext.cpp', 'xbmc/utils/Geometry.h', 'xbmc/guilib/GUIImage.h')
+         'xbmc/windowing/GraphicContext.cpp', 'xbmc/utils/Geometry.h', 'xbmc/guilib/GUIImage.h',
+         'xbmc/guilib/GUIRenderTiming.h')
 
 
 def function(source, signature):
@@ -34,6 +35,7 @@ def function(source, signature):
 
 
 PRELUDE = r'''
+#include "guilib/GUIRenderTiming.h"
 #include "utils/Geometry.h"
 #include <algorithm>
 #include <array>
@@ -429,7 +431,32 @@ static void Crossfade(){
  {Reset();CGUIImage image;image.m_texture=ReadyTexture("in",10,10,40,40,100);for(const char*p:{"a","b"})image.m_fadingTextures.push_back(new CGUIImage::CFadingTexture(ReadyTexture(p).get(),50));
   image.DoRender();Check(image.m_texture->crossfades.empty()&&image.m_texture->draws==1,"three layers are drawn separately");}
 }
-int main(){try{Admission();OuterCullAndAutosize();PublicationAndFades();Copies();Replacement();BackgroundClassification();DeferredIncomingFade();BackgroundCopies();DemandClassification();MotionEndsFade();MotionEmptyIncoming();SelectionImages();PosterExemption();UploadAhead();Crossfade();std::printf("PASS %u frontend checks\n",checks);return 0;}catch(const std::exception&e){std::fprintf(stderr,"FAIL: %s\n",e.what());return 1;}}
+static void CrossfadeCounts(){
+ {using GUI_RENDER_TIMING::CrossfadePath;using GUI_RENDER_TIMING::paths;using Paths=std::vector<CrossfadePath>;
+  // A background pair is counted where its single draw is submitted, as clipped
+  // when nothing is visible, and not at all in the opaque pass or when declined.
+  {Reset();auto in=ReadyTexture("in",0,0,100,100),out=ReadyTexture("out",0,0,100,100);paths.clear();
+   Check(in->IsBackgroundRequest()&&in->RenderCrossfade(*out)&&in->crossfades.size()==1&&paths==Paths{CrossfadePath::Drawn},"background crossfade counts its submitted draw");}
+  {Reset();window.gfx.m_clipRegions.push(CRect(200,200,300,300));auto in=ReadyTexture("in",0,0,100,100),out=ReadyTexture("out",0,0,100,100);paths.clear();
+   Check(in->RenderCrossfade(*out)&&in->crossfades.empty()&&paths==Paths{CrossfadePath::Clipped},"invisible background crossfade counts as clipped");}
+  {Reset();window.gfx.order=RENDER_ORDER_FRONT_TO_BACK;auto in=ReadyTexture("in",0,0,100,100),out=ReadyTexture("out",0,0,100,100);paths.clear();
+   Check(in->RenderCrossfade(*out)&&paths.empty(),"opaque pass counts no crossfade");}
+  {Reset();auto in=ReadyTexture("in",0,0,100,100),out=ReadyTexture("out",0,0,100,100);in->crossfadeSupported=false;paths.clear();
+   Check(!in->RenderCrossfade(*out)&&paths.empty(),"declined pair counts nothing in the texture");}
+  {Reset();auto in=ReadyTexture("in"),out=ReadyTexture("out");paths.clear();
+   Check(!in->IsBackgroundRequest()&&in->RenderCrossfade(*out)&&paths.empty(),"a small image pair is not a background fade");}}
+ // Textures report submitted draws only: a fade blend is two images actually drawn.
+ {using GUI_RENDER_TIMING::drawn;using Drawn=std::vector<const void*>;
+  {Reset();auto in=ReadyTexture("in",0,0,100,100),out=ReadyTexture("out",0,0,100,100);drawn.clear();
+   Check(in->RenderCrossfade(*out)&&drawn==Drawn{in.get(),out.get()},"single-pass pair reports both images");}
+  {Reset();window.gfx.m_clipRegions.push(CRect(200,200,300,300));auto in=ReadyTexture("in",0,0,100,100),out=ReadyTexture("out",0,0,100,100);drawn.clear();
+   Check(in->RenderCrossfade(*out)&&drawn.empty(),"clipped pair reports no image");}
+  {Reset();auto one=ReadyTexture("one");drawn.clear();one->Render();
+   Check(drawn==Drawn{one.get()},"a drawn image reports itself");}
+  {Reset();window.gfx.m_clipRegions.push(CRect(200,200,300,300));auto one=ReadyTexture("one");drawn.clear();one->Render();
+   Check(drawn.empty(),"a clipped image reports nothing");}}
+}
+int main(){try{Admission();OuterCullAndAutosize();PublicationAndFades();Copies();Replacement();BackgroundClassification();DeferredIncomingFade();BackgroundCopies();DemandClassification();MotionEndsFade();MotionEmptyIncoming();SelectionImages();PosterExemption();UploadAhead();Crossfade();CrossfadeCounts();std::printf("PASS %u frontend checks\n",checks);return 0;}catch(const std::exception&e){std::fprintf(stderr,"FAIL: %s\n",e.what());return 1;}}
 '''
 
 
@@ -451,7 +478,15 @@ def source_code(root, sources):
     methods += [function(image, sig) for sig in ('void CGUIImage::Process(', 'void CGUIImage::UpdateInfo(', 'void CGUIImage::Render(', 'bool CGUIImage::ProcessFading(', 'unsigned char CGUIImage::GetFadeLevel(', 'CRect CGUIImage::CalcRenderRegion(')]
     methods += [function(control, 'void CGUIControl::DoRender(')]
     fading=function(sources['xbmc/guilib/GUIImage.h'], 'class CFadingTexture')+';'
-    return PRELUDE.replace('@ASPECT@', aspect).replace('@FADING@', fading).replace('CRect*=nullptr','CRect* = nullptr')+'\n'+'\n\n'.join(methods)+'\n'+TESTS
+    # Temporary GUI timing: record the crossfade path the texture reports.
+    timing = sources['xbmc/guilib/GUIRenderTiming.h'].replace('#pragma once', '#include <vector>')
+    hook = 'inline void Crossfade(CrossfadePath)\n{\n}'
+    assert timing.count(hook) == 1
+    timing = timing.replace(hook, 'inline std::vector<CrossfadePath> paths;\ninline void Crossfade(CrossfadePath path)\n{\n  paths.push_back(path);\n}')
+    drawn = 'inline void TextureDrawn(const void*)\n{\n}'
+    assert timing.count(drawn) == 1
+    timing = timing.replace(drawn, 'inline std::vector<const void*> drawn;\ninline void TextureDrawn(const void* texture)\n{\n  drawn.push_back(texture);\n}')
+    return PRELUDE.replace('#include "guilib/GUIRenderTiming.h"', timing).replace('@ASPECT@', aspect).replace('@FADING@', fading).replace('CRect*=nullptr','CRect* = nullptr')+'\n'+'\n\n'.join(methods)+'\n'+TESTS
 
 
 def semantic_failure(result, witness):

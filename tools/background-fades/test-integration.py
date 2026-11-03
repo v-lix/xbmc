@@ -19,17 +19,30 @@ code = r'''
 #include <cassert>
 #include <memory>
 #include <vector>
+enum {RENDER_ORDER_ALL_BACK_TO_FRONT, RENDER_ORDER_BACK_TO_FRONT, RENDER_ORDER_FRONT_TO_BACK};
+struct Gfx {int order{RENDER_ORDER_BACK_TO_FRONT};int GetRenderOrder(){return order;}};
+struct Window {Gfx gfx;Gfx& GetGfxContext(){return gfx;}};
 struct Settings {bool m_guiSinglePassCrossfade{true};Settings* GetAdvancedSettings(){return this;}};
-static Settings settings;
-struct CServiceBroker {static Settings* GetSettingsComponent(){return &settings;}};
+static Window window;static Settings settings;
+struct CServiceBroker {
+ static Window* GetWinSystem(){return &window;}
+ static Settings* GetSettingsComponent(){return &settings;}
+};
 struct CGUITexture {
- bool ready{true};int draws{0};
- bool ReadyToRender(){return ready;}
+ bool background{true},ready{true};int draws{0};
+ bool ReadyToRender(){return ready;} bool IsBackgroundRequest(){return background;}
  void Render(){++draws;}
  int crossfades{0};bool crossfadeAccepted{true};
  bool lastDissolve{false};
  bool RenderCrossfade(CGUITexture&,bool dissolve){++crossfades;lastDissolve=dissolve;return crossfadeAccepted;}
 };
+namespace GUI_RENDER_TIMING {
+ enum class Stage{Fade};struct Scope{Scope(Stage,bool){}};
+ static bool active{false};bool Active(){return active;}void FadeLayers(const void*,unsigned){}
+ enum class CrossfadePath{Drawn,Clipped,Stack,NotReady,Ineligible,Disabled};
+ static std::vector<CrossfadePath> paths;void Crossfade(CrossfadePath path){paths.push_back(path);}
+ struct FadeDraws{explicit FadeDraws(bool){}};
+}
 struct CGUIControl {unsigned renders{0};void Render(){++renders;}};
 struct CGUIImage:CGUIControl {
  struct CFadingTexture {std::unique_ptr<CGUITexture>m_texture{std::make_unique<CGUITexture>()};bool m_dissolve{false};};
@@ -66,6 +79,24 @@ int main(){
  settings=Settings{};
  // Without a fade the image is drawn directly.
  {CGUIImage i;i.Render();assert(i.m_texture->crossfades==0&&i.m_texture->draws==1&&i.renders==1);}
+ // While debugging, each background fade of the back-to-front pass records its path.
+ {
+  using GUI_RENDER_TIMING::CrossfadePath;using GUI_RENDER_TIMING::paths;GUI_RENDER_TIMING::active=true;
+  const auto path=[](auto setup){window=Window{};settings=Settings{};
+   CGUIImage i;i.Old();setup(i);paths.clear();i.Render();return paths;};
+  using Paths=std::vector<CrossfadePath>;
+  // A single-pass pair is counted where its draw is submitted, in the texture.
+  assert(path([](CGUIImage&){}).empty());
+  assert(path([](CGUIImage& i){i.m_texture->crossfadeAccepted=false;})==Paths{CrossfadePath::Ineligible});
+  assert(path([](CGUIImage& i){i.Old();})==Paths{CrossfadePath::Stack});
+  assert(path([](CGUIImage&){settings.m_guiSinglePassCrossfade=false;})==Paths{CrossfadePath::Disabled});
+  assert(path([](CGUIImage& i){i.m_fadingTextures[0]->m_texture->ready=false;})==Paths{CrossfadePath::NotReady});
+  assert(path([](CGUIImage&){window.gfx.order=RENDER_ORDER_FRONT_TO_BACK;}).empty());
+  assert(path([](CGUIImage& i){window.gfx.order=RENDER_ORDER_FRONT_TO_BACK;i.Old();}).empty());
+  assert(path([](CGUIImage& i){window.gfx.order=RENDER_ORDER_FRONT_TO_BACK;i.m_texture->crossfadeAccepted=false;}).empty());
+  assert(path([](CGUIImage& i){i.m_texture->background=false;}).empty());
+  GUI_RENDER_TIMING::active=false;window=Window{};settings=Settings{};
+ }
 }
 '''
 with tempfile.TemporaryDirectory(prefix='image-dispatch-') as temporary:
@@ -75,4 +106,4 @@ with tempfile.TemporaryDirectory(prefix='image-dispatch-') as temporary:
                     '-fsanitize=address,undefined','-fno-omit-frame-pointer',
                     str(path/'test.cpp'),'-o',str(path/'test')],check=True)
     subprocess.run([str(path/'test')],check=True)
-print('PASS production image render dispatch: single-pass pair with the outgoing image history, declined pair, three layers, unready images, setting and direct draw')
+print('PASS production image render dispatch: single-pass pair with the outgoing image history, declined pair, three layers, unready images, setting, direct draw and crossfade path counts')

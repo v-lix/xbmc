@@ -8,6 +8,8 @@
 
 #include "GUITexture.h"
 
+#include "GUIRenderTiming.h"
+
 #include "GUILargeTextureManager.h"
 #include "ServiceBroker.h"
 #include "Texture.h"
@@ -404,6 +406,7 @@ void CGUITexture::Render(float left,
   float x[4], y[4], z[4];
   ScaleQuad(vertex, x, y, z);
   CServiceBroker::GetWinSystem()->GetGfxContext().CaptureControlQuad(x, y, z);
+  GUI_RENDER_TIMING::TextureDrawn(this);
   Draw(x, y, z, texture, diffuse, orientation);
 }
 
@@ -513,7 +516,11 @@ bool CGUITexture::RenderCrossfade(CGUITexture& outgoing, bool dissolve)
   m_depth = gfx.GetTransformDepth(0);
   const bool clip = m_vertex.Width() > m_width || m_vertex.Height() > m_height;
   if (clip && !gfx.SetClipRegion(m_posX, m_posY, m_width, m_height))
+  {
+    if (IsBackgroundRequest())
+      GUI_RENDER_TIMING::Crossfade(GUI_RENDER_TIMING::CrossfadePath::Clipped);
     return true;
+  }
 
   // Clip and orient each image's coordinates as its own Render would.
   const auto frame = [](const CGUITexture& image)
@@ -543,10 +550,16 @@ bool CGUITexture::RenderCrossfade(CGUITexture& outgoing, bool dissolve)
     float x[4], y[4], z[4];
     ScaleQuad(vertex, x, y, z);
     gfx.CaptureControlQuad(x, y, z);
+    if (IsBackgroundRequest())
+      GUI_RENDER_TIMING::Crossfade(GUI_RENDER_TIMING::CrossfadePath::Drawn);
+    GUI_RENDER_TIMING::TextureDrawn(this);
+    GUI_RENDER_TIMING::TextureDrawn(&outgoing);
     DrawCrossfade(x, y, z, m_texture.m_textures[0].get(), coords, orientation, color,
                   outgoing.m_texture.m_textures[0].get(), outgoingCoords, outgoingOrientation,
                   outgoingColor, groupAlpha);
   }
+  else if (IsBackgroundRequest())
+    GUI_RENDER_TIMING::Crossfade(GUI_RENDER_TIMING::CrossfadePath::Clipped);
 
   if (clip)
     gfx.RestoreClipRegion();
@@ -555,6 +568,7 @@ bool CGUITexture::RenderCrossfade(CGUITexture& outgoing, bool dissolve)
 
 bool CGUITexture::AllocResources()
 {
+  GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Load);
   if (m_info.filename.empty())
     return false;
 
@@ -749,6 +763,9 @@ bool CGUITexture::CalculateSize()
 
 void CGUITexture::FreeResources(bool immediately /* = false */)
 {
+  GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Release);
+  if (m_isAllocated != NO)
+    GUI_RENDER_TIMING::TextureReleased();
   if (m_isAllocated == LARGE || m_isAllocated == LARGE_FAILED)
     CServiceBroker::GetGUI()->GetLargeTextureManager().ReleaseImage(
         m_info.filename, immediately || (m_isAllocated == LARGE_FAILED), m_directConsumer);

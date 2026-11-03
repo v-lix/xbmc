@@ -11,6 +11,7 @@
 #include "GUIComponent.h"
 #include "GUILargeTextureManager.h"
 #include "GUIMessage.h"
+#include "GUIRenderTiming.h"
 #include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
@@ -245,6 +246,15 @@ void CGUIImage::Render()
 {
   if (!IsVisible()) return;
 
+  // CPU fade cost is separate from other GUI work. GPU timing keeps one
+  // render envelope because Mali cannot reliably attribute individual draws.
+  const bool backgroundFade = GUI_RENDER_TIMING::Active() &&
+      !m_fadingTextures.empty() && m_texture->IsBackgroundRequest();
+  GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Fade, backgroundFade);
+  GUI_RENDER_TIMING::FadeDraws draws(backgroundFade);
+  if (backgroundFade)
+    GUI_RENDER_TIMING::FadeLayers(this, static_cast<unsigned int>(m_fadingTextures.size() + 1));
+
   // Draw a crossfade pair in one pass, shading each pixel once instead of once
   // per image. The result equals drawing the outgoing and then the incoming
   // image; an opaque pair keeps the outgoing image opaque and dissolves.
@@ -257,6 +267,22 @@ void CGUIImage::Render()
     CGUIControl::Render();
     return;
   }
+#if defined(TARGET_LINUX) && defined(HAS_LIBAMCODEC) && HAS_GLES >= 2
+  // Count only the back-to-front pass: the front-to-back pass draws nothing
+  // translucent and would count every fade twice.
+  if (backgroundFade && CServiceBroker::GetWinSystem()->GetGfxContext().GetRenderOrder() !=
+                            RENDER_ORDER_FRONT_TO_BACK)
+  {
+    using GUI_RENDER_TIMING::CrossfadePath;
+    GUI_RENDER_TIMING::Crossfade(
+        !CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_guiSinglePassCrossfade
+            ? CrossfadePath::Disabled
+        : m_fadingTextures.size() != 1 ? CrossfadePath::Stack
+        : !m_texture->ReadyToRender() || !m_fadingTextures.front()->m_texture->ReadyToRender()
+            ? CrossfadePath::NotReady
+            : CrossfadePath::Ineligible);
+  }
+#endif
 
   for (auto& itr : m_fadingTextures)
     itr->m_texture->Render();

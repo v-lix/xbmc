@@ -29,6 +29,7 @@ HARNESS = r"""
 void aml_native_gui_osd_present(bool){}
 CAMLVideoMute& aml_video_mute_controller(){static CAMLVideoMute c([](bool){});return c;}
 #include <cassert>
+namespace GUI_RENDER_TIMING { enum class Stage { Idle, Process, FrameMove, Input, Controls, Items, Info, Text, Load, Release, WindowMove, External, Setup, Video, Gui, Fade, AfterRender, Composite, EndRender, Present }; struct Frame { Frame(bool, double) {} }; struct Scope { explicit Scope(Stage, bool = true) {} }; inline Stage SetStage(Stage) { return Stage::Idle; } inline void AttachGPU() {} inline void Presented(bool) {} inline void Input() {} inline void Motion() {} inline bool Active() { return false; } inline void FadeLayers(const void*, unsigned) {} } // Temporary GUI timing hooks.
 #include <chrono>
 #include <memory>
 #include <mutex>
@@ -60,11 +61,14 @@ struct CFileItemList{int Size(){return 0;}};
 struct Params{CFileItemList list;CFileItemList& GetPlaylist(){return list;}};
 struct Playlist{void Add(PLAYLIST::Id,CFileItemList&){} void SetCurrentPlaylist(PLAYLIST::Id){}};
 struct Messenger{void PostMsg(int,int){}};
-struct Gfx {bool IsFullScreenVideo(){return true;}};
+struct Gfx {bool IsFullScreenVideo(){return true;}float GetFPS(){return 60;}};
 struct Window {Gfx gfx;Gfx& GetGfxContext(){return gfx;}bool IsDisplayReadyForVideo(){return displayReady;}};
 struct Manager {int GetActiveWindow(){return 10025;}};
 struct Gui {Manager manager;Manager& GetWindowManager(){return manager;}};
+constexpr int LOG_LEVEL_DEBUG=2;
+struct Logging {int GetLogLevel(){return 0;}};
 struct CServiceBroker{
+ static Logging& GetLogging(){static Logging l;return l;}
  static Gui* GetGUI(){static Gui gui;return &gui;}
  static Window* GetWinSystem(){static Window window;return &window;}
  static Params* GetAppParams(){static Params p;return &p;}

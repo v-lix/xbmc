@@ -35,6 +35,7 @@ def block(source, signature):
 FIXTURE = r'''
 #include "threads/SingleLock.h"
 #include <algorithm>
+namespace GUI_RENDER_TIMING { enum class Stage { Idle, Process, FrameMove, Input, Controls, Items, Info, Text, Load, Release, WindowMove, External, Setup, Video, Gui, Fade, AfterRender, Composite, EndRender, Present }; struct Frame { Frame(bool, double) {} }; struct Scope { explicit Scope(Stage, bool = true) {} }; inline Stage SetStage(Stage) { return Stage::Idle; } inline void AttachGPU() {} inline void Presented(bool) {} inline void Input() {} inline void Motion() {} inline bool Active() { return false; } inline void FadeLayers(const void*, unsigned) {} } // Temporary GUI timing hooks.
 #include <atomic>
 #include <chrono>
 #include <cstdio>

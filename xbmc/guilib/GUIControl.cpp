@@ -8,6 +8,8 @@
 
 #include "GUIControl.h"
 
+#include "GUIRenderTiming.h"
+
 #include "GUIAction.h"
 #include "GUIComponent.h"
 #include "GUIControlProfiler.h"
@@ -716,6 +718,7 @@ bool CGUIControl::OnMouseOver(const CPoint &point)
 
 void CGUIControl::UpdateVisibility(const CGUIListItem *item)
 {
+  GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Info);
   if (m_visibleCondition)
   {
     bool bWasVisible = m_visibleFromSkinCondition;
