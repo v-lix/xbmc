@@ -11,6 +11,7 @@
 #include "ServiceBroker.h"
 #include "TextureCache.h"
 #include "commons/ilog.h"
+#include "guilib/GUIRenderTiming.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/Texture.h"
 #include "settings/AdvancedSettings.h"
@@ -54,6 +55,7 @@ public:
 
   bool DoWork() override
   {
+    GUI_RENDER_TIMING::Work timing(GUI_RENDER_TIMING::Job::Upload);
     // Never call the job manager while holding the upload context lease.
     if (ShouldCancel(0, 0) || m_cancelled->load(std::memory_order_acquire))
       return false;
@@ -71,6 +73,7 @@ private:
 
 bool CImageLoader::DoWork()
 {
+  GUI_RENDER_TIMING::Work timing(GUI_RENDER_TIMING::Job::Decode);
   if (ShouldCancel(0, 0))
     return false;
   // Until a foreground control draws this image, decode it off the render
@@ -565,6 +568,7 @@ CGUILargeTextureManager::queueIterator CGUILargeTextureManager::StartQueuedImage
 
 void CGUILargeTextureManager::SetScrolling()
 {
+  GUI_RENDER_TIMING::Motion();
   m_scrolling = true;
 }
 

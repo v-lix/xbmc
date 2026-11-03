@@ -41,6 +41,7 @@ PRELUDE = r'''
 #include <utility>
 #include <vector>
 namespace PERFORMANCE_CORES{struct CDecodePlacement{void NeededNow(){}struct Scope{explicit Scope(const std::shared_ptr<CDecodePlacement>&){}};};}
+namespace GUI_RENDER_TIMING { enum class Stage { Items, Info, Text, Load, Release }; struct Scope { explicit Scope(Stage, bool = true) {} }; inline void Motion() {} inline void Input() {} enum class Job { Decode, Upload }; struct Work { explicit Work(Job) {} }; } // Temporary GUI timing hooks.
 using namespace std::chrono_literals;
 static thread_local int heldLocks=0;
 struct CCriticalSection {

@@ -49,6 +49,7 @@ FIXTURE = r'''
 #include <string>
 #include <tuple>
 #include <vector>
+namespace GUI_RENDER_TIMING { enum class Stage { Items, Info, Text, Load, Release, Layouts }; struct Scope { explicit Scope(Stage, bool = true) {} }; inline void Motion() {} inline void Input() {} inline void LayoutsFreed(unsigned) {} } // Temporary GUI timing hooks.
 static unsigned checks=0,cases=0,calls=0;
 static uint64_t digest=1469598103934665603ULL;
 static std::vector<std::tuple<int,int,bool>> events;

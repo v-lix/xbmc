@@ -8,6 +8,8 @@
 
 #include "GUIBaseContainer.h"
 
+#include "GUIRenderTiming.h"
+
 #include "FileItem.h"
 #include "GUIInfoManager.h"
 #include "GUILargeTextureManager.h"
@@ -225,6 +227,7 @@ void CGUIBaseContainer::ProcessItem(float posX,
                                     unsigned int currentTime,
                                     CDirtyRegionList& dirtyregions)
 {
+  GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Items);
   if (!m_focusedLayout || !m_layout) return;
 
   // set the origin
@@ -1389,21 +1392,34 @@ void CGUIBaseContainer::SetRenderOffset(const CPoint &offset)
 
 void CGUIBaseContainer::FreeMemory(int keepStart, int keepEnd)
 {
+  GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Layouts);
+  unsigned int freed = 0;
   if (keepStart < keepEnd)
   { // remove before keepStart and after keepEnd
     for (int i = 0; i < keepStart && i < (int)m_items.size(); ++i)
       if (m_items[i]->HasLayouts())
+      {
         m_items[i]->FreeMemory();
+        ++freed;
+      }
     for (int i = std::max(keepEnd + 1, 0); i < (int)m_items.size(); ++i)
       if (m_items[i]->HasLayouts())
+      {
         m_items[i]->FreeMemory();
+        ++freed;
+      }
   }
   else
   { // wrapping
     for (int i = std::max(keepEnd + 1, 0); i < keepStart && i < (int)m_items.size(); ++i)
       if (m_items[i]->HasLayouts())
+      {
         m_items[i]->FreeMemory();
+        ++freed;
+      }
   }
+  if (freed)
+    GUI_RENDER_TIMING::LayoutsFreed(freed);
 }
 
 bool CGUIBaseContainer::InsideLayout(const CGUIListItemLayout *layout, const CPoint &point) const

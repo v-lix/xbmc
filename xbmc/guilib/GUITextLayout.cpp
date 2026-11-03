@@ -8,6 +8,8 @@
 
 #include "GUITextLayout.h"
 
+#include "GUIRenderTiming.h"
+
 #include "GUIColorManager.h"
 #include "GUIComponent.h"
 #include "GUIControl.h"
@@ -246,6 +248,7 @@ bool CGUITextLayout::UpdateW(const std::wstring &text, float maxWidth /*= 0*/, b
 
 void CGUITextLayout::UpdateCommon(const std::wstring &text, float maxWidth, bool forceLTRReadingOrder)
 {
+  GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Text);
   // parse the text for style information
   vecText parsedText;
   std::vector<UTILS::COLOR::Color> colors;
@@ -260,6 +263,7 @@ void CGUITextLayout::UpdateStyled(const vecText& text,
                                   float maxWidth,
                                   bool forceLTRReadingOrder)
 {
+  GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Text);
   // empty out our previous string
   m_lines.clear();
   m_colors = colors;

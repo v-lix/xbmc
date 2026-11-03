@@ -7,6 +7,7 @@
  */
 
 #include "Application.h"
+#include "guilib/GUIRenderTiming.h"
 #include "utils/GUIFrameTiming.h"
 #include "utils/DetectorAdmission.h"
 #if defined(HAS_LIBAMCODEC)
@@ -894,6 +895,7 @@ bool CApplication::OnSettingsSaving() const
 
 void CApplication::Render()
 {
+  GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Setup);
   m_lastRenderAttempt = {};
 #ifdef HAS_LIBAMCODEC
   m_lastRenderDisplay = m_lastRenderTargetGeneration = 0;
@@ -918,6 +920,8 @@ void CApplication::Render()
   }
 
   auto* renderSystem = CServiceBroker::GetRenderSystem();
+  if (renderSystem->CanRender())
+    GUI_RENDER_TIMING::AttachGPU();
   if (!renderSystem->BeginRender())
   {
     m_lastRenderAttempt.status = RenderAttemptStatus::BEGIN_REJECTED;
@@ -935,13 +939,16 @@ void CApplication::Render()
   std::unique_ptr<CWinSystemBase, decltype(cancel)> composite(
       CServiceBroker::GetWinSystem(), cancel);
 
+  GUI_RENDER_TIMING::SetStage(GUI_RENDER_TIMING::Stage::Video);
   // render video layer
   CServiceBroker::GetGUI()->GetWindowManager().RenderEx();
 
+  GUI_RENDER_TIMING::SetStage(GUI_RENDER_TIMING::Stage::Composite);
   // render gui layer (into the disc menu composite's buffer while it is active)
   if (m_bStop || !renderSystem->IsRenderTargetCurrent(target) ||
       !CServiceBroker::GetWinSystem()->BeginGuiComposite())
     return;
+  GUI_RENDER_TIMING::SetStage(GUI_RENDER_TIMING::Stage::Gui);
   if (appPower->GetRenderGUI() && !m_skipGuiRender)
   {
     if (CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode())
@@ -960,6 +967,7 @@ void CApplication::Render()
     {
       hasRendered |= CServiceBroker::GetGUI()->GetWindowManager().Render();
     }
+    GUI_RENDER_TIMING::SetStage(GUI_RENDER_TIMING::Stage::AfterRender);
     // execute post rendering actions (finalize window closing)
     CServiceBroker::GetGUI()->GetWindowManager().AfterRender();
 
@@ -968,12 +976,14 @@ void CApplication::Render()
   m_lastRenderAttempt.guiRendered = hasRendered;
   if (m_bStop || !renderSystem->IsRenderTargetCurrent(target))
     return;
+  GUI_RENDER_TIMING::SetStage(GUI_RENDER_TIMING::Stage::Composite);
   if (!CServiceBroker::GetWinSystem()->EndGuiComposite())
     return;
   composite.release();
   if (m_bStop || !renderSystem->IsRenderTargetCurrent(target))
     return;
 
+  GUI_RENDER_TIMING::SetStage(GUI_RENDER_TIMING::Stage::EndRender);
   if (!renderSystem->EndRender())
   {
     m_lastRenderAttempt.status = RenderAttemptStatus::END_REJECTED;
@@ -996,17 +1006,22 @@ void CApplication::Render()
 
   if (m_bStop || !renderSystem->IsRenderTargetCurrent(target))
     return;
+  GUI_RENDER_TIMING::SetStage(GUI_RENDER_TIMING::Stage::Present);
   renderSystem->ResetPresentResult();
   CServiceBroker::GetWinSystem()->GetGfxContext().Flip(hasRendered,
                                                        appPlayer->IsRenderingVideoLayer());
 
   m_lastRenderAttempt.status = RenderAttemptStatus::COMMANDS_COMPLETED;
   m_lastRenderAttempt.present = renderSystem->GetPresentResult();
+  GUI_RENDER_TIMING::Presented(hasRendered &&
+                               (m_lastRenderAttempt.present == PresentResult::SWAP_ACCEPTED ||
+                                m_lastRenderAttempt.present == PresentResult::UNREPORTED));
   CTimeUtils::UpdateFrameTime(hasRendered);
 }
 
 bool CApplication::OnAction(const CAction &action)
 {
+  GUI_RENDER_TIMING::Input();
   if (GetComponent<CApplicationActionListeners>())
   {
     GetComponent<CApplicationActionListeners>()->NotifyActionListenersPre(action);
@@ -1928,13 +1943,17 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
       }
     }
 
-    HandlePortEvents();
-    CServiceBroker::GetInputManager().Process(CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindowOrDialog(), frameTime);
-    // Input can move focus. Focus and unfocus actions are queued as thread
-    // messages; deliver them before this frame processes controls, so that it
-    // already shows their effect, such as a list restoring its column, rather
-    // than the list's previous selection for one frame.
-    CServiceBroker::GetGUI()->GetWindowManager().DispatchThreadMessages();
+    {
+      GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Input);
+      HandlePortEvents();
+      CServiceBroker::GetInputManager().Process(
+          CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindowOrDialog(), frameTime);
+      // Input can move focus. Focus and unfocus actions are queued as thread
+      // messages; deliver them before this frame processes controls, so that it
+      // already shows their effect, such as a list restoring its column, rather
+      // than the list's previous selection for one frame.
+      CServiceBroker::GetGUI()->GetWindowManager().DispatchThreadMessages();
+    }
 
     if (processGUI && renderGUI)
     {
@@ -1945,6 +1964,7 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
     // Open the door for external calls e.g. Python exactly here.
     if (m_WaitingExternalCalls)
     {
+      GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::External);
       CSingleExit ex(CServiceBroker::GetWinSystem()->GetGfxContext());
       m_frameMoveGuard.unlock();
 
@@ -1983,9 +2003,15 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
     if (!m_bStop)
     {
       if (!m_skipGuiRender)
+      {
+        GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::Controls);
         CServiceBroker::GetGUI()->GetWindowManager().Process(CTimeUtils::GetFrameTime());
+      }
     }
-    CServiceBroker::GetGUI()->GetWindowManager().FrameMove();
+    {
+      GUI_RENDER_TIMING::Scope timing(GUI_RENDER_TIMING::Stage::WindowMove);
+      CServiceBroker::GetGUI()->GetWindowManager().FrameMove();
+    }
   }
 
   appPlayer->FrameMove();
@@ -2055,11 +2081,16 @@ int CApplication::Run()
   {
     PERFORMANCE_CORES::MaintainRenderThread();
     GUI_FRAME_TIMING::Frame guiFrame;
+    const bool renderTimingEnabled =
+        CServiceBroker::GetLogging().GetLogLevel() >= LOG_LEVEL_DEBUG;
+    GUI_RENDER_TIMING::Frame renderTiming(renderTimingEnabled,
+        renderTimingEnabled ? CServiceBroker::GetWinSystem()->GetGfxContext().GetFPS() : 0);
     // Animate and render a frame
 
     lastFrameTime = std::chrono::steady_clock::now();
     {
       GUI_FRAME_TIMING::Scope timing(GUI_FRAME_TIMING::Region::Process);
+      GUI_RENDER_TIMING::Scope renderTiming(GUI_RENDER_TIMING::Stage::Process);
       Process();
     }
 
@@ -2067,6 +2098,7 @@ int CApplication::Run()
     if (!m_bStop)
     {
       GUI_FRAME_TIMING::Scope timing(GUI_FRAME_TIMING::Region::FrameMove);
+      GUI_RENDER_TIMING::Scope renderTiming(GUI_RENDER_TIMING::Stage::FrameMove);
       FrameMove(true, renderGUI);
     }
 
