@@ -11,6 +11,9 @@
 #include "GUIComponent.h"
 #include "GUILargeTextureManager.h"
 #include "GUIMessage.h"
+#if defined(TARGET_LINUX) && defined(HAS_LIBAMCODEC) && HAS_GLES >= 2
+#include "GUIBackgroundBlend.h"
+#endif
 #include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
@@ -244,6 +247,35 @@ void CGUIImage::Render()
 {
   if (!IsVisible()) return;
 
+#if defined(TARGET_LINUX) && defined(HAS_LIBAMCODEC) && HAS_GLES >= 2
+  if (!m_fadingTextures.empty() && m_texture->IsBackgroundRequest())
+  {
+    auto& gfx = CServiceBroker::GetWinSystem()->GetGfxContext();
+    const int blendRes =
+        CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_guiBackgroundBlendRes;
+    // Preserve opaque front-to-back occlusion. Only a wholly translucent fade
+    // can be replaced by one composited quad at the image control's depth.
+    // Outside a fade the original full-resolution texture is drawn directly.
+    if (blendRes > 0 && gfx.GetRenderOrder() != RENDER_ORDER_FRONT_TO_BACK &&
+        gfx.GetStereoMode() == RENDER_STEREO_MODE_OFF && m_texture->ReadyToRender() &&
+        m_texture->HasAlpha() &&
+        std::all_of(m_fadingTextures.begin(), m_fadingTextures.end(),
+                    [](const CFadingTexture* texture) {
+                      return texture->m_texture->ReadyToRender() && texture->m_texture->HasAlpha();
+                    }) &&
+        GUI_BACKGROUND_BLEND::Draw(blendRes, gfx.GetTransformDepth(),
+                                   [this]
+                                   {
+                                     for (auto* texture : m_fadingTextures)
+                                       texture->m_texture->Render();
+                                     m_texture->Render();
+                                   }))
+    {
+      CGUIControl::Render();
+      return;
+    }
+  }
+#endif
   for (auto& itr : m_fadingTextures)
     itr->m_texture->Render();
 

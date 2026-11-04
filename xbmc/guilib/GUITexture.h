@@ -139,6 +139,7 @@ public:
     return m_isAllocated == NORMAL_FAILED || m_isAllocated == LARGE_FAILED;
   }
   bool ReadyToRender() const;
+  bool HasAlpha() const;
   bool IsBackgroundRequest() const;
   void SetFollowsSelection(bool follows) { m_followsSelection = follows; }
 

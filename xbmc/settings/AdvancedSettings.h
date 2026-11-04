@@ -357,6 +357,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_guiAFBCFanart{false};
     bool m_guiAFBCImages{false};
     bool m_guiLimitBackgroundFades{true};
+    int m_guiBackgroundBlendRes{0};
 
     unsigned int m_addonPackageFolderSize;
 

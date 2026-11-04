@@ -13,6 +13,7 @@
 #include "guilib/IDirtyRegionSolver.h"
 #if defined(TARGET_LINUX) && defined(HAS_LIBAMCODEC) && HAS_GLES >= 2
 #include "guilib/AMLAFBCTexture.h"
+#include "guilib/GUIBackgroundBlend.h"
 #endif
 #include "log.h"
 #include "settings/AdvancedSettings.h"
@@ -619,6 +620,7 @@ void CEGLContextUtils::DestroyContext()
   m_textureUploadDisabled = true;
 
 #if defined(TARGET_LINUX) && defined(HAS_LIBAMCODEC) && HAS_GLES >= 2
+  GUI_BACKGROUND_BLEND::ReleaseContext(m_eglContext);
   if (m_eglUploadContext != EGL_NO_CONTEXT &&
       CAMLAFBCTexture::HasConversionResources(m_eglUploadContext))
   {

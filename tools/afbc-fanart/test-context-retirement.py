@@ -30,6 +30,7 @@ int eglMakeCurrent(int,int,int,int context){
 }
 int eglDestroyContext(int,int context){order.push_back(20+context);deletedContext++;return 1;}
 int eglDestroySurface(int,int){order.push_back(30);return 1;}
+namespace GUI_BACKGROUND_BLEND { void ReleaseContext(int context){assert(context==1);} }
 struct CAMLAFBCTexture{
  static bool HasConversionResources(int context){assert(context==2);return hasCache;}
  static void ReleaseConversionResources(int context){

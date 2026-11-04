@@ -219,6 +219,18 @@ bool CGUITexture::Process(unsigned int currentTime)
   return changed;
 }
 
+bool CGUITexture::HasAlpha() const
+{
+  auto color =
+      m_info.diffuseColor ? static_cast<UTILS::COLOR::Color>(m_info.diffuseColor) : m_diffuseColor;
+  const unsigned int alpha = m_alpha * (color >> 24) / 255;
+  color = (color & 0x00ffffff) | (alpha << 24);
+  color = CServiceBroker::GetWinSystem()->GetGfxContext().MergeColor(color);
+  return (color >> 24) != 255 ||
+         (m_currentFrame < m_texture.size() && m_texture.m_textures[m_currentFrame]->HasAlpha()) ||
+         (m_diffuse.size() && m_diffuse.m_textures[0]->HasAlpha());
+}
+
 void CGUITexture::Render(int32_t depthOffset, int32_t overrideDepth)
 {
   if (!m_visible)

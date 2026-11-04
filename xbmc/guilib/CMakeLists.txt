@@ -179,8 +179,11 @@ if(TARGET OpenGL::GL OR TARGET OpenGL::GLES)
     list(APPEND HEADERS GUIFontTTFGLES.h
                         GUITextureGLES.h)
     if(TARGET AML::AML AND CORE_SYSTEM_NAME STREQUAL linux)
-      list(APPEND SOURCES AMLAFBCTexture.cpp)
-      list(APPEND HEADERS AMLAFBCTexture.h AMLAFBCTexturePolicy.h)
+      list(APPEND SOURCES AMLAFBCTexture.cpp
+                          GUIBackgroundBlend.cpp)
+      list(APPEND HEADERS AMLAFBCTexture.h
+                          AMLAFBCTexturePolicy.h
+                          GUIBackgroundBlend.h)
     endif()
   endif()
 
