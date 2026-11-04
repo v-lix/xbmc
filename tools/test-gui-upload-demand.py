@@ -137,10 +137,10 @@ class CGUIImage:public CGUIControl {public:
  CGUIImage(){m_texture=std::make_unique<CGUITexture>();}~CGUIImage(){for(auto*p:m_fadingTextures)delete p;}
  void Process(unsigned,CDirtyRegionList&)override;void Render()override;CRect CalcRenderRegion()const override;
  bool ProcessFading(CFadingTexture*,unsigned,unsigned,bool&);unsigned char GetFadeLevel(unsigned)const;
- void UpdateInfo(const CGUIListItem*);void SetFileName(const std::string&file){m_texture->SetFileName(file);}bool HasProcessed()const{return true;}
+ void UpdateInfo(const CGUIListItem*);void SetFileName(const std::string&file,bool=false,bool=true){m_texture->SetFileName(file);}bool HasProcessed()const{return true;}
  bool IsAnimating(int)const{return false;}bool IsVisibleFromSkin()const{return true;}int m_parentID=0;
  void UpdateDiffuseColor(const CGUIListItem*){}std::unique_ptr<CGUITexture>m_texture;std::vector<CFadingTexture*>m_fadingTextures;
- ImageInfo m_info;std::string m_currentFallback;unsigned m_crossFadeTime=100,m_currentFadeTime=0,m_lastRenderTime=0;
+ ImageInfo m_info;std::string m_currentFallback;std::optional<std::pair<std::string,bool>>m_pendingBackground;unsigned m_crossFadeTime=100,m_currentFadeTime=0,m_lastRenderTime=0;
  unsigned m_diffuseColor=0xffffffff,m_lastDiffuseColor=0xffffffff;};
 static unsigned checks=0;static void Check(bool ok,const char*message){++checks;if(!ok)throw std::runtime_error(message);}
 static void Reset(){window=Window{};gui=GUI{};}

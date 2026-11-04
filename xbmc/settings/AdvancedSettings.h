@@ -356,6 +356,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_guiAsyncTextureUpload{false};
     bool m_guiAFBCFanart{false};
     bool m_guiAFBCImages{false};
+    bool m_guiLimitBackgroundFades{true};
 
     unsigned int m_addonPackageFolderSize;
 

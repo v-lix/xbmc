@@ -12,6 +12,8 @@
 #include "GUILargeTextureManager.h"
 #include "GUIMessage.h"
 #include "ServiceBroker.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/log.h"
 
 #include <algorithm>
@@ -228,6 +230,13 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
   if (m_texture->Process(currentTime))
     MarkDirtyRegion();
 
+  if (m_pendingBackground && (m_fadingTextures.empty() || !m_crossFadeTime))
+  {
+    auto request = std::move(*m_pendingBackground);
+    m_pendingBackground.reset();
+    SetFileName(request.first, false, request.second);
+  }
+
   CGUIControl::Process(currentTime, dirtyregions);
 }
 
@@ -304,6 +313,14 @@ void CGUIImage::FreeTextures(bool immediately /* = false */)
     delete m_fadingTextures[i];
   m_fadingTextures.clear();
   m_currentTexture.clear();
+  if (m_pendingBackground && m_info.IsConstant())
+  {
+    // A hidden constant image has no UpdateInfo call to restore its latest
+    // filename. Preserve the queued request for its next resource allocation.
+    m_texture->SetUseCache(m_pendingBackground->second);
+    m_texture->SetFileName(m_pendingBackground->first);
+  }
+  m_pendingBackground.reset();
   if (!m_info.IsConstant()) // constant textures never change
     m_texture->SetFileName("");
 }
@@ -383,7 +400,18 @@ void CGUIImage::SetFileName(const std::string& strFileName, bool setConstant, co
   if (setConstant)
     m_info.SetLabel(strFileName, "", GetParentID());
 
-  // Set whether or not to use cache
+  if (m_crossFadeTime && !m_fadingTextures.empty() && m_texture->ReadyToRender() &&
+      m_texture->IsBackgroundRequest() && strFileName != m_currentTexture &&
+      CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_guiLimitBackgroundFades)
+  {
+    // Never interrupt a visible background fade with a third image. Retain
+    // only the latest selection, without starting its decode or upload yet.
+    // Keeping the active pair avoids a brightness jump from dropping a layer.
+    m_pendingBackground = std::make_pair(strFileName, useCache);
+    return;
+  }
+  // Returning to the current incoming image also withdraws a queued selection.
+  m_pendingBackground.reset();
   m_texture->SetUseCache(useCache);
 
   if (m_crossFadeTime)

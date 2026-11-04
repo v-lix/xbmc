@@ -17,6 +17,8 @@
 #include "GUITexture.h"
 #include "guilib/guiinfo/GUIInfoLabel.h"
 
+#include <optional>
+#include <utility>
 #include <vector>
 
 /*!
@@ -111,6 +113,8 @@ protected:
   std::vector<CFadingTexture *> m_fadingTextures;
   std::string m_currentTexture;
   std::string m_currentFallback;
+  // Finish an active background transition before displaying the latest request.
+  std::optional<std::pair<std::string, bool>> m_pendingBackground;
 
   unsigned int m_crossFadeTime;
   unsigned int m_currentFadeTime;
