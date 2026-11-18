@@ -1904,9 +1904,44 @@ unsigned int aml_gui_dv_output_mode()
   return s_guiDvOutputMode.load(std::memory_order_relaxed);
 }
 
+void aml_super_scaler_dv_peaking(bool keep)
+{
+  // G12A, G12B and SM1: the one super scaler core whose peaking this is about
+  const int family = aml_get_cpufamily_id();
+  if (family != AML_G12A && family != AML_G12B && family != AML_SM1)
+    return;
+
+  // Dolby Vision playback switches the box's picture processing off on every
+  // frame (amdolby_vision video_effect_bypass -> DV PQ bypass), which takes the
+  // super scaler's peaking away. With debug_bypass_vpp_pq 3 the DV driver leaves
+  // the processing as it is. Peaking switched on before a DV session starts then
+  // stays on for that session; switched on during a session that started with
+  // the bypass, it goes off again. So aml_dv_open() re-arms it before each
+  // playback while the setting is on.
+  const auto write = [](const char* path, const char* command)
+  {
+    try
+    {
+      CSysfsPath(path, std::string(command));
+    }
+    catch (const std::exception&)
+    {
+      CLog::Log(LOGWARNING, "AMLUtils::aml_super_scaler_dv_peaking: {} refused '{}'", path,
+                command);
+    }
+  };
+  write("/sys/class/amdolby_vision/debug",
+        keep ? "debug_bypass_vpp_pq 3" : "debug_bypass_vpp_pq 0");
+  if (keep)
+    write("/sys/class/amvecm/debug", "sr peaking_en");
+}
+
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries, bool swDecoded,
                  std::shared_ptr<const void> session, StreamHdrType originalSourceHdrType, bool startupBlackout)
 {
+  if (settings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_SUPERSCALER))
+    aml_super_scaler_dv_peaking(true);
+
   // Detect PM4K once at playback start for OSD visibility override.
   // MUST stay above the CDVCoreGuard: GetWindow()/GetProperty() take the gfx
   // context lock / window critsec, which the main thread holds while it takes

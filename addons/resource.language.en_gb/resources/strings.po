@@ -8798,7 +8798,15 @@ msgctxt "#14295"
 msgid "4:4:4"
 msgstr ""
 
-#empty strings from id 143296 to 14297
+#: system/settings/settings.xml
+msgctxt "#14296"
+msgid "Video super scaler"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#14297"
+msgid "Upscale video with the video processor's super-resolution block for a crisper picture. It works when this device does the upscaling, by at least twice the size, for example 1080p or 720p video played in a 2160p display mode. Use 2160p as the display resolution and leave 1080p and 720p modes out of the whitelist, so that the display mode does not switch to the video's resolution, where the TV upscales instead. Changes apply immediately."
+msgstr ""
 
 #. CoreELEC: Amlogic vsync-driven reference clock toggle
 #: system/settings/settings.xml

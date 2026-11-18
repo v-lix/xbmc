@@ -29,6 +29,7 @@
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "settings/lib/Setting.h"
+#include "settings/lib/SettingsManager.h"
 #include "guilib/DispResource.h"
 #include "utils/AMLUtils.h"
 #include "utils/PlaybackDiagnostics.h"
@@ -43,6 +44,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 
 #include "system_egl.h"
@@ -73,6 +75,79 @@ CWinSystemAmlogic::CWinSystemAmlogic()
   m_libinput->Start();
 }
 
+namespace
+{
+// amvideo scaler path 5 (CORE0_AFTER_PPS): the standard scaler first, then the
+// super scaler's fixed 2x onto the output size. The kernel itself puts the
+// super scaler first when it scales both axes; scaling to half the output size
+// first keeps more detail for video below 1080p and gives the same picture at
+// 1080p.
+constexpr int SCALER_PATH_SR_AFTER_PPS = 5;
+
+// Exists while Kodi has the super scaler on and holds the scaler path value it
+// replaced (empty when it did not change the path). It lives in /run, a tmpfs,
+// so it lasts exactly as long as the kernel values it describes: across Kodi
+// restarts, until reboot.
+constexpr const char* SUPER_SCALER_STATE = "/run/kodi-amlogic-superscaler";
+
+bool SuperScalerOwned()
+{
+  return std::ifstream(SUPER_SCALER_STATE).good();
+}
+
+void SetVideoSuperScaler(bool enable)
+{
+  CLog::Log(LOGINFO, "CWinSystemAmlogic: video super scaler {}", enable ? "on" : "off");
+  // G12A, G12B and SM1: one super scaler core (core 0), which path 5 refers to
+  const int family = aml_get_cpufamily_id();
+  CSysfsPath pathSel("/sys/module/amvideo/parameters/scaler_path_sel");
+  const bool setPath =
+      (family == AML_G12A || family == AML_G12B || family == AML_SM1) && pathSel.Exists();
+  if (enable)
+  {
+    // keep the value saved by an earlier Kodi run: the path may already be 5
+    if (!SuperScalerOwned())
+    {
+      std::string before;
+      if (setPath)
+      {
+        if (const auto current = pathSel.Get<int>())
+          before = std::to_string(*current);
+      }
+      std::ofstream(SUPER_SCALER_STATE) << before;
+    }
+    if (setPath)
+      pathSel.Set(SCALER_PATH_SR_AFTER_PPS);
+  }
+  else if (SuperScalerOwned())
+  {
+    int before;
+    std::ifstream state(SUPER_SCALER_STATE);
+    if (setPath && state >> before)
+      pathSel.Set(before);
+    state.close();
+    std::remove(SUPER_SCALER_STATE);
+  }
+  CSysfsPath("/sys/module/amvideo/parameters/super_scaler", enable ? 1 : 0);
+  // keep its peaking during Dolby Vision too, as for SDR and HDR10
+  aml_super_scaler_dv_peaking(enable);
+  // The video layer re-plans its scaler only on a frame geometry change or
+  // when asked to, so ask for it: the change then shows on the next frame.
+  CSysfsPath("/sys/class/video/force_property_change", 1);
+}
+
+// Apply the saved value: at startup and whenever a profile's settings load
+// (loading does not report changed values). Off only undoes what Kodi turned
+// on, so a value set elsewhere, e.g. by autostart.sh, stays.
+void ApplySavedVideoSuperScaler(const CSettings& settings)
+{
+  if (settings.GetBool(CSettings::SETTING_COREELEC_AMLOGIC_SUPERSCALER))
+    SetVideoSuperScaler(true);
+  else if (SuperScalerOwned())
+    SetVideoSuperScaler(false);
+}
+} // namespace
+
 bool CWinSystemAmlogic::InitWindowSystem()
 {
   return InitWindowSystem({});
@@ -94,6 +169,11 @@ bool CWinSystemAmlogic::InitWindowSystem(CAMLSession::DisplayRequest display)
      CLog::Log(LOGDEBUG, "CWinSystemAmlogic::InitWindowSystem -- disabling noise reduction");
      CSysfsPath("/sys/module/di/parameters/nr2_en", 0);
   }
+
+  ApplySavedVideoSuperScaler(*settings);
+  settings->GetSettingsManager()->RegisterCallback(
+      this, {CSettings::SETTING_COREELEC_AMLOGIC_SUPERSCALER});
+  settings->GetSettingsManager()->RegisterSettingsHandler(this);
 
   m_nativeDisplay = EGL_DEFAULT_DISPLAY;
 
@@ -135,8 +215,31 @@ bool CWinSystemAmlogic::DestroyWindowSystem()
 {
   if (!RetireNativeTransactions())
     return false;
+  if (const auto component = CServiceBroker::GetSettingsComponent())
+  {
+    if (const auto settings = component->GetSettings())
+    {
+      settings->GetSettingsManager()->UnregisterSettingsHandler(this);
+      settings->GetSettingsManager()->UnregisterCallback(this);
+    }
+  }
   m_dolbyVisionAML.reset();
   return true;
+}
+
+void CWinSystemAmlogic::OnSettingChanged(const std::shared_ptr<const CSetting>& setting)
+{
+  if (setting && setting->GetId() == CSettings::SETTING_COREELEC_AMLOGIC_SUPERSCALER)
+    SetVideoSuperScaler(std::static_pointer_cast<const CSettingBool>(setting)->GetValue());
+}
+
+void CWinSystemAmlogic::OnSettingsLoaded()
+{
+  if (const auto component = CServiceBroker::GetSettingsComponent())
+  {
+    if (const auto settings = component->GetSettings())
+      ApplySavedVideoSuperScaler(*settings);
+  }
 }
 
 bool CWinSystemAmlogic::CreateNativeWindow(const std::string& name,

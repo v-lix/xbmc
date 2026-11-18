@@ -6873,12 +6873,12 @@ msgid "4:4:4"
 msgstr "4:4:4"
 
 msgctxt "#14296"
-msgid "Disable Dolby Vision support"
-msgstr "Dolby Vision-Unterstützung deaktivieren"
+msgid "Video super scaler"
+msgstr "Video-Superscaler"
 
 msgctxt "#14297"
-msgid "Use this option to disable Dolby Vision support if available."
-msgstr "Diese Option verwenden, um die Dolby Vision-Unterstützung zu deaktivieren, sofern verfügbar."
+msgid "Upscale video with the video processor's super-resolution block for a crisper picture. It works when this device does the upscaling, by at least twice the size, for example 1080p or 720p video played in a 2160p display mode. Use 2160p as the display resolution and leave 1080p and 720p modes out of the whitelist, so that the display mode does not switch to the video's resolution, where the TV upscales instead. Changes apply immediately."
+msgstr "Skaliert Videos mit dem Super-Resolution-Block des Videoprozessors hoch und sorgt so für ein schärferes Bild. Wirkt, wenn dieses Gerät das Video selbst auf mindestens die doppelte Größe hochskaliert, zum Beispiel 1080p- oder 720p-Videos in einem 2160p-Anzeigemodus. Dafür 2160p als Auflösung verwenden und 1080p- und 720p-Modi nicht in die \"Erlaubten Auflösungen\" aufnehmen, damit der Anzeigemodus nicht zur Auflösung des Videos wechselt, bei der der Fernseher hochskaliert. Änderungen gelten sofort."
 
 msgctxt "#14298"
 msgid "Use display vsync as playback reference clock"

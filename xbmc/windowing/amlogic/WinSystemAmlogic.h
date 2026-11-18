@@ -16,6 +16,8 @@
 #include "system_egl.h"
 #include <EGL/fbdev_window.h>
 #include "DolbyVisionAML.h"
+#include "settings/lib/ISettingCallback.h"
+#include "settings/lib/ISettingsHandler.h"
 
 #include <atomic>
 #include <chrono>
@@ -24,13 +26,18 @@
 
 class IDispResource;
 
-class CWinSystemAmlogic : public CWinSystemBase
+class CWinSystemAmlogic : public CWinSystemBase, public ISettingCallback, public ISettingsHandler
 {
 public:
   CWinSystemAmlogic();
 
   bool InitWindowSystem() override;
   bool DestroyWindowSystem() override;
+
+  // ISettingCallback
+  void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
+  // ISettingsHandler: a profile's settings were loaded
+  void OnSettingsLoaded() override;
 
   bool DestroyWindow() override;
   void UpdateResolutions() override;

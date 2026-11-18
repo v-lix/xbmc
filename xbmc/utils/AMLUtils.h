@@ -204,6 +204,8 @@ unsigned int aml_dv_dolby_vision_mode();
 void aml_dv_open(StreamHdrType hdrType, unsigned int bitDepth, AVColorPrimaries colorPrimaries = AVCOL_PRI_UNSPECIFIED, bool swDecoded = false, std::shared_ptr<const void> session = {}, StreamHdrType originalSourceHdrType = StreamHdrType::HDR_TYPE_NONE, bool startupBlackout = false);
 void aml_dv_close();
 bool aml_dv_playback_active();
+// Video super scaler setting: keep (or stop keeping) its peaking during Dolby Vision.
+void aml_super_scaler_dv_peaking(bool keep);
 // Hold DV_MODE_ON_DEMAND's DV output across the decoder closes of a Blu-ray
 // disc session's segment swaps; false releases it (DV off if no decoder is open).
 void aml_dv_set_disc_hold(bool hold);
