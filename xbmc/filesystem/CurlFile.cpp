@@ -132,6 +132,28 @@ extern "C" int transfer_abort_callback(void *clientp,
     return 0;
 }
 
+/* CCurlFile::Stat's progress state: its blocking requests never enter FillBuffer */
+struct StatProgress
+{
+  const std::function<bool()>* interrupt;
+  bool abortOnData;
+};
+
+/* used by CCurlFile::Stat: stops when the read interrupt fires (libcurl calls this
+   at least about once a second, also while connecting) and, for the GET that
+   replaces a failed HEAD, once data arrives */
+extern "C" int stat_progress_callback(void* clientp,
+                                      curl_off_t dltotal,
+                                      curl_off_t dlnow,
+                                      curl_off_t ultotal,
+                                      curl_off_t ulnow)
+{
+  const auto* progress = static_cast<const StatProgress*>(clientp);
+  if (progress->interrupt && *progress->interrupt && (*progress->interrupt)())
+    return 1;
+  return progress->abortOnData && dlnow > 0 ? 1 : 0;
+}
+
 /* fix for silly behavior of realloc */
 static inline void* realloc_simple(void *ptr, size_t size)
 {
@@ -1105,6 +1127,14 @@ bool CCurlFile::Open(const CURL& url)
 
   m_httpresponse = m_state->Connect(m_bufferSize);
 
+  if (m_httpresponse <= 0 && m_readInterrupt && m_readInterrupt())
+  {
+    // The caller gave up before the server answered; nothing failed.
+    CLog::Log(LOGDEBUG, "CCurlFile::{} - <{}> Interrupted before a response", __FUNCTION__,
+              redactPath);
+    return false;
+  }
+
   if (m_httpresponse <= 0 || (m_failOnError && m_httpresponse >= 400))
   {
     std::string error;
@@ -1535,6 +1565,21 @@ int CCurlFile::Stat(const CURL& url, struct __stat64* buffer)
   g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_NOBODY, 1);
   g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_FILETIME , 1);
 
+  // These requests block in libcurl, so the read interrupt is polled by the
+  // progress callback instead of FillBuffer.
+  StatProgress progress{&m_state->m_readInterrupt, false};
+  const auto interrupted = [this]
+  { return m_state->m_readInterrupt && m_state->m_readInterrupt(); };
+#if LIBCURL_VERSION_NUM >= 0x072000 // 0.7.32
+  if (m_state->m_readInterrupt)
+  {
+    g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_XFERINFOFUNCTION,
+                                stat_progress_callback);
+    g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_XFERINFODATA, &progress);
+    g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_NOPROGRESS, 0);
+  }
+#endif
+
   if(url2.IsProtocol("ftp"))
   {
     // nocwd is less standard, will return empty list for non-existed remote dir on some ftp server, avoid it.
@@ -1545,6 +1590,15 @@ int CCurlFile::Stat(const CURL& url, struct __stat64* buffer)
   }
 
   CURLcode result = g_curlInterface.easy_perform(m_state->m_easyHandle);
+
+  if (interrupted())
+  {
+    // The caller gave up; nothing failed.
+    g_curlInterface.easy_release(&m_state->m_easyHandle, NULL);
+    errno = ENOENT;
+    CLog::Log(LOGDEBUG, "CCurlFile::{} - <{}> Interrupted", __FUNCTION__, url.GetRedacted());
+    return -1;
+  }
 
   if(result == CURLE_HTTP_RETURNED_ERROR)
   {
@@ -1569,7 +1623,10 @@ int CCurlFile::Stat(const CURL& url, struct __stat64* buffer)
     g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_TIMEOUT, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_curlconnecttimeout);
     g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_FILETIME, 1);
 #if LIBCURL_VERSION_NUM >= 0x072000 // 0.7.32
-    g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_XFERINFOFUNCTION, transfer_abort_callback);
+    progress.abortOnData = true;
+    g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_XFERINFOFUNCTION,
+                                stat_progress_callback);
+    g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_XFERINFODATA, &progress);
 #else
     g_curlInterface.easy_setopt(m_state->m_easyHandle, CURLOPT_PROGRESSFUNCTION, transfer_abort_callback);
 #endif
@@ -1577,6 +1634,13 @@ int CCurlFile::Stat(const CURL& url, struct __stat64* buffer)
 
     result = g_curlInterface.easy_perform(m_state->m_easyHandle);
 
+    if (interrupted())
+    {
+      g_curlInterface.easy_release(&m_state->m_easyHandle, NULL);
+      errno = ENOENT;
+      CLog::Log(LOGDEBUG, "CCurlFile::{} - <{}> Interrupted", __FUNCTION__, url.GetRedacted());
+      return -1;
+    }
   }
 
   if( result != CURLE_ABORTED_BY_CALLBACK && result != CURLE_OK )
@@ -1992,11 +2056,19 @@ bool CCurlFile::GetHttpHeader(const CURL &url, CHttpHeader &headers)
   }
 }
 
-bool CCurlFile::GetMimeType(const CURL &url, std::string &content, const std::string &useragent)
+bool CCurlFile::GetMimeType(const CURL& url,
+                            std::string& content,
+                            const std::string& useragent,
+                            const std::function<bool()>& interrupt)
 {
   CCurlFile file;
   if (!useragent.empty())
     file.SetUserAgent(useragent);
+  if (interrupt)
+  {
+    std::function<bool()> copy = interrupt;
+    file.IoControl(IOCTRL_READ_INTERRUPT, &copy);
+  }
 
   struct __stat64 buffer;
   std::string redactUrl = url.GetRedacted();
