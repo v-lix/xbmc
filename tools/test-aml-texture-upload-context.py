@@ -278,6 +278,13 @@ public:
   EGLContext m_eglContext{EGL_NO_CONTEXT};
   EGLConfig m_eglConfig{reinterpret_cast<EGLConfig>(0x2)};
   EGLContext m_eglUploadContext{EGL_NO_CONTEXT};
+  EGLContext m_eglUploadContextHigh{EGL_NO_CONTEXT};
+  std::atomic<bool> m_textureUploadHighPriority{false};
+  // as in EGLUtils.h
+  void SetTextureUploadHighPriority(bool high)
+  {
+    m_textureUploadHighPriority.store(high, std::memory_order_relaxed);
+  }
   EGLSurface m_eglUploadSurface{EGL_NO_SURFACE};
   mutable CCriticalSection m_textureUploadLock;
   PFNEGLSETDAMAGEREGIONKHRPROC m_eglSetDamageRegionKHR{nullptr};

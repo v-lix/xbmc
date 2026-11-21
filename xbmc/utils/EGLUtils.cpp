@@ -482,6 +482,27 @@ bool CEGLContextUtils::CreateContext(CEGLAttributesVec contextAttribs)
       CLog::Log(LOGDEBUG, "EGL texture upload context priority: {:#x}", priority);
     else
       CEGLUtils::Log(LOGWARNING, "Failed to query EGL texture upload context priority");
+
+    // A medium-priority upload waits until no high-priority GUI frame is
+    // queued. With a frame of slack in the display queue there nearly always
+    // is one, so the same upload context also exists at the renderer's
+    // priority, for the window system to select (SetTextureUploadHighPriority).
+    // Kept only when the driver grants HIGH.
+    CEGLAttributesVec highAttribs{uploadContextAttribs};
+    highAttribs.Add({{EGL_CONTEXT_PRIORITY_LEVEL_IMG, EGL_CONTEXT_PRIORITY_HIGH_IMG}});
+    m_eglUploadContextHigh =
+        eglCreateContext(m_eglDisplay, m_eglConfig, m_eglContext, highAttribs.Get());
+    EGLint granted{EGL_CONTEXT_PRIORITY_MEDIUM_IMG};
+    if (m_eglUploadContextHigh != EGL_NO_CONTEXT &&
+        (eglQueryContext(m_eglDisplay, m_eglUploadContextHigh, EGL_CONTEXT_PRIORITY_LEVEL_IMG,
+                         &granted) != EGL_TRUE ||
+         granted != EGL_CONTEXT_PRIORITY_HIGH_IMG))
+    {
+      eglDestroyContext(m_eglDisplay, m_eglUploadContextHigh);
+      m_eglUploadContextHigh = EGL_NO_CONTEXT;
+    }
+    CLog::Log(LOGDEBUG, "EGL high-priority texture upload context: {}",
+              m_eglUploadContextHigh != EGL_NO_CONTEXT ? "available" : "unavailable");
   }
 
   m_bufferAgeSupport = CEGLUtils::HasExtension(m_eglDisplay, "EGL_EXT_buffer_age");
@@ -619,15 +640,15 @@ void CEGLContextUtils::DestroyContext()
   m_textureUploadDisabled = true;
 
 #if defined(TARGET_LINUX) && defined(HAS_LIBAMCODEC) && HAS_GLES >= 2
-  if (m_eglUploadContext != EGL_NO_CONTEXT &&
-      CAMLAFBCTexture::HasConversionResources(m_eglUploadContext))
+  for (EGLContext upload : {m_eglUploadContext, m_eglUploadContextHigh})
   {
+    if (upload == EGL_NO_CONTEXT || !CAMLAFBCTexture::HasConversionResources(upload))
+      continue;
     // The lease lock excludes workers. Delete context-local converter objects
-    // before either EGL context is destroyed; a failed bind only drops metadata.
+    // before any EGL context is destroyed; a failed bind only drops metadata.
     const bool bound = !m_textureUploadPoisoned &&
-        eglMakeCurrent(m_eglDisplay, m_eglUploadSurface, m_eglUploadSurface,
-                       m_eglUploadContext) == EGL_TRUE;
-    CAMLAFBCTexture::ReleaseConversionResources(m_eglUploadContext);
+        eglMakeCurrent(m_eglDisplay, m_eglUploadSurface, m_eglUploadSurface, upload) == EGL_TRUE;
+    CAMLAFBCTexture::ReleaseConversionResources(upload);
     if (bound)
       eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
   }
@@ -644,6 +665,12 @@ void CEGLContextUtils::DestroyContext()
   {
     eglDestroyContext(m_eglDisplay, m_eglUploadContext);
     m_eglUploadContext = EGL_NO_CONTEXT;
+  }
+
+  if (m_eglUploadContextHigh != EGL_NO_CONTEXT)
+  {
+    eglDestroyContext(m_eglDisplay, m_eglUploadContextHigh);
+    m_eglUploadContextHigh = EGL_NO_CONTEXT;
   }
 
   if (m_eglUploadSurface != EGL_NO_SURFACE)
@@ -750,6 +777,29 @@ bool CEGLContextUtils::BindTextureUploadContext(const std::atomic_bool* cancelle
       m_eglDisplay == EGL_NO_DISPLAY || m_eglUploadContext == EGL_NO_CONTEXT)
     return false;
 
+  // The flag is a hint written by the render thread: an upload that binds
+  // just before a change keeps the previous priority for that one upload.
+  if (m_eglUploadContextHigh != EGL_NO_CONTEXT &&
+      m_textureUploadHighPriority.load(std::memory_order_relaxed))
+  {
+    if (eglMakeCurrent(m_eglDisplay, m_eglUploadSurface, m_eglUploadSurface,
+                       m_eglUploadContextHigh) == EGL_TRUE)
+    {
+      m_currentUploadContext = this;
+      lock.release(); // Retained by this exact thread until UnbindTextureUploadContext.
+      return true;
+    }
+    // The medium-priority context below stays usable; it has its own
+    // pbuffer fallback. Do not try the high one again in this generation.
+    CLog::LogF(LOGWARNING, "High-priority texture upload context unavailable (EGL error {:#x})",
+               eglGetError());
+#if defined(TARGET_LINUX) && defined(HAS_LIBAMCODEC) && HAS_GLES >= 2
+    // Not current: only the converter's bookkeeping for this context goes.
+    CAMLAFBCTexture::ReleaseConversionResources(m_eglUploadContextHigh);
+#endif
+    eglDestroyContext(m_eglDisplay, m_eglUploadContextHigh);
+    m_eglUploadContextHigh = EGL_NO_CONTEXT;
+  }
   bool bound = eglMakeCurrent(m_eglDisplay, m_eglUploadSurface, m_eglUploadSurface,
                               m_eglUploadContext) == EGL_TRUE;
   // Extension advertisement is not proof of bindability. Try a compatible

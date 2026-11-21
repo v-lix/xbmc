@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Exercise actual EGL context creation with recorded priority attributes.
 
+Also the second, high-priority upload context: created only when the driver
+grants HIGH, bound only while the window system flags it, retired when it
+cannot be bound and on destruction.
+
 Extends the existing recording driver and retains its lifecycle cases. Priorities
 are simulated hints; this does not establish driver scheduling or performance.
 """
@@ -31,6 +35,14 @@ struct ContextRequest
 std::map<EGLContext,ContextRequest> requests;
 std::map<EGLContext,unsigned> queries;
 bool forceEqualPriority=false,failUploadQuery=false,failUploadCreate=false;
+bool denyHigh=false,failHighBind=false; // driver grants less than HIGH / cannot bind it
+bool RequestedHighUpload(EGLContext context)
+{
+ const auto r=requests.find(context);
+ if(r==requests.end()||r->second.share==EGL_NO_CONTEXT)return false;
+ const auto i=r->second.attributes.find(EGL_CONTEXT_PRIORITY_LEVEL_IMG);
+ return i!=r->second.attributes.end()&&i->second==EGL_CONTEXT_PRIORITY_HIGH_IMG;
+}
 '''
 
 TESTS = r'''
@@ -88,6 +100,54 @@ static void Priority(bool extension,bool explicitPriority,bool overridePriority,
  Check(!LiveResources(),"priority: contexts retired");
  Violations("priority");
 }
+static void HighUpload(bool extension,bool denyHigh,bool failHighBind)
+{
+ Reset(extension?std::set<std::string>{"EGL_IMG_context_priority","EGL_KHR_surfaceless_context"}:
+                 std::set<std::string>{"EGL_KHR_surfaceless_context"},false);
+ fixture::denyHigh=denyHigh;fixture::failHighBind=failHighBind;
+ CWinSystemAmlogicGLESContext win;g_winSystem=&win;
+ auto& egl=win.m_pGLContext;
+ CEGLAttributesVec attrs;attrs.Add({{0x3098,2}});
+ Check(egl.CreateContext(attrs),"high: primary creation remains usable");
+ const auto render=egl.m_eglContext,upload=egl.m_eglUploadContext,high=egl.m_eglUploadContextHigh;
+ const bool granted=extension&&!denyHigh;
+ if(!granted)
+  Check(high==EGL_NO_CONTEXT,"high: no high-priority upload context without a granted HIGH");
+ else
+ {
+  Check(high!=EGL_NO_CONTEXT,"high: high-priority upload context created");
+  Check(Attribute(high,EGL_CONTEXT_PRIORITY_LEVEL_IMG,EGL_CONTEXT_PRIORITY_MEDIUM_IMG)==EGL_CONTEXT_PRIORITY_HIGH_IMG,
+        "high: requested at HIGH");
+  Check(fixture::requests.at(high).share==render&&fixture::requests.at(high).config==egl.m_eglConfig,
+        "high: shares with the renderer, upload config");
+  Check(Attribute(high,0x3098,1)==2,"high: GLES version preserved");
+ }
+ Check(Attribute(upload,EGL_CONTEXT_PRIORITY_LEVEL_IMG,EGL_CONTEXT_PRIORITY_MEDIUM_IMG)==EGL_CONTEXT_PRIORITY_MEDIUM_IMG,
+       "high: ordinary upload context stays medium");
+ CTexture a;UploadOnLoader(a);
+ Check(a.uploaded&&a.uploadContext==upload,"high: medium upload context while not flagged");
+ egl.SetTextureUploadHighPriority(true);
+ const bool expectHigh=granted&&!failHighBind;
+ CTexture b;UploadOnLoader(b);
+ Check(b.uploaded&&b.uploadContext==(expectHigh?high:upload),"high: high-priority context bound while flagged");
+ if(granted&&failHighBind)
+  Check(egl.m_eglUploadContextHigh==EGL_NO_CONTEXT,"high: unbindable high context retired");
+ CTexture c;UploadOnLoader(c);
+ Check(c.uploaded&&c.uploadContext==(expectHigh?high:upload),"high: flag persists until cleared");
+ egl.SetTextureUploadHighPriority(false);
+ CTexture e;UploadOnLoader(e);
+ Check(e.uploaded&&e.uploadContext==upload,"high: back to medium when cleared");
+ egl.DestroyContext();
+ Check(!LiveResources(),"high: contexts retired");
+ Violations("high");
+}
+static void Highs()
+{
+ HighUpload(true,false,false);
+ HighUpload(false,false,false);
+ HighUpload(true,true,false);
+ HighUpload(true,false,true);
+}
 static void Priorities()
 {
  Priority(true,false,false,false,false);
@@ -120,12 +180,18 @@ EGLBoolean eglQueryContext(EGLDisplay, EGLContext context, EGLint, EGLint* value
   const auto& attrs=fixture::requests.at(context).attributes;
   const auto i=attrs.find(EGL_CONTEXT_PRIORITY_LEVEL_IMG);
   *value=fixture::forceEqualPriority?EGL_CONTEXT_PRIORITY_HIGH_IMG:
-         (i==attrs.end()?EGL_CONTEXT_PRIORITY_MEDIUM_IMG:i->second);''')
+         (i==attrs.end()?EGL_CONTEXT_PRIORITY_MEDIUM_IMG:i->second);
+  if(fixture::denyHigh&&fixture::RequestedHighUpload(context))*value=EGL_CONTEXT_PRIORITY_MEDIUM_IMG;''')
+    source = h.replace(source, '  if (draw != read)\n    fixture::Violation("draw and read surfaces differ");', r'''
+  if(fixture::failHighBind&&fixture::RequestedHighUpload(context)){fixture::error=EGL_BAD_ACCESS;return EGL_FALSE;}
+  if (draw != read)
+    fixture::Violation("draw and read surfaces differ");''')
     source = h.replace(source, '  fixture::extensions = std::move(extensions);', r'''
   fixture::requests.clear();fixture::queries.clear();
   fixture::forceEqualPriority=fixture::failUploadQuery=fixture::failUploadCreate=false;
+  fixture::denyHigh=fixture::failHighBind=false;
   fixture::extensions = std::move(extensions);''')
-    source = h.replace(source, 'int main(){try {', TESTS + '\nint main(){try {\n      Priorities();')
+    source = h.replace(source, 'int main(){try {', TESTS + '\nint main(){try {\n      Priorities();\n      Highs();')
     return source
 
 
@@ -147,6 +213,15 @@ def main():
         'no-upload-query': ('if (m_eglUploadContext != EGL_NO_CONTEXT &&\n      CEGLUtils::HasExtension(m_eglDisplay, "EGL_IMG_context_priority"))',
                             'if (false && m_eglUploadContext != EGL_NO_CONTEXT &&\n      CEGLUtils::HasExtension(m_eglDisplay, "EGL_IMG_context_priority"))',
                             'query actual upload hint once'),
+        'ignore-high-flag': ('      m_textureUploadHighPriority.load(std::memory_order_relaxed))',
+                             '      false)', 'high: high-priority context bound while flagged'),
+        'keep-ungranted-high': ('         granted != EGL_CONTEXT_PRIORITY_HIGH_IMG))', '         false))',
+                                'high: no high-priority upload context without a granted HIGH'),
+        'leak-high-context': ('  if (m_eglUploadContextHigh != EGL_NO_CONTEXT)\n  {\n    eglDestroyContext(m_eglDisplay, m_eglUploadContextHigh);',
+                              '  if (false)\n  {\n    eglDestroyContext(m_eglDisplay, m_eglUploadContextHigh);',
+                              'high: contexts retired'),
+        'keep-unbindable-high': ('    eglDestroyContext(m_eglDisplay, m_eglUploadContextHigh);\n    m_eglUploadContextHigh = EGL_NO_CONTEXT;\n  }\n  bool bound',
+                                 '  }\n  bool bound', 'high: unbindable high context retired'),
     }
     for name, (before, after, witness) in mutations.items():
         changed = dict(files)

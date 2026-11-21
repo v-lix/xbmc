@@ -42,6 +42,7 @@ struct CEGLContextUtils{
  CCriticalSection m_textureUploadLock;
  bool m_textureUploadDisabled=false,m_textureUploadPoisoned=false;
  int m_eglDisplay=1,m_eglContext=1,m_eglUploadContext=2,m_eglUploadSurface=3;
+ int m_eglUploadContextHigh=0; // no high-priority upload context in these cases
  void DestroyContext();
 };
 '''+method+r'''

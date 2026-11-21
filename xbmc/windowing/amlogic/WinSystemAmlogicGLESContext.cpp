@@ -1187,6 +1187,7 @@ void CWinSystemAmlogicGLESContext::AbandonAFBCScanoutFrame()
     return;
   m_afbcFrame = false;
   m_afbcPresenter.BeginLinearFrame();
+  m_pGLContext.SetTextureUploadHighPriority(false);
 }
 
 // Chooses where this frame is drawn. Add-ons that draw to framebuffer 0 on
@@ -1200,7 +1201,10 @@ void CWinSystemAmlogicGLESContext::BeginAFBCScanoutFrame()
 {
   m_afbcFrame = false;
   if (!IsPrimaryContextCurrent())
+  {
+    m_pGLContext.SetTextureUploadHighPriority(false);
     return;
+  }
   const auto& advanced = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings();
   const int dirtyRegions = advanced->m_guiAlgorithmDirtyRegions;
   const bool wholeFrames = dirtyRegions == DIRTYREGION_SOLVER_FILL_VIEWPORT_ON_CHANGE ||
@@ -1233,6 +1237,11 @@ void CWinSystemAmlogicGLESContext::BeginAFBCScanoutFrame()
   }
   if (!m_afbcFrame)
     m_afbcPresenter.BeginLinearFrame();
+  // With a third display buffer a GUI frame waits in the display queue, so
+  // an upload can run at the GUI's GPU priority without delaying it; at
+  // medium priority it would wait for a moment with no frame queued. Two
+  // buffers and linear frames keep medium-priority uploads.
+  m_pGLContext.SetTextureUploadHighPriority(m_afbcFrame && m_afbcPresenter.Buffers() >= 3);
 }
 
 bool CWinSystemAmlogicGLESContext::EnsureFbo(CFrameBufferObject& fbo, int& width, int& height)

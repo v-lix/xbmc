@@ -233,6 +233,18 @@ public:
   }
 
   bool BindTextureUploadContext(const std::atomic_bool* cancelled = nullptr);
+  /*!
+   * \brief Whether texture uploads may run at the renderer's GPU priority
+   *
+   * Uploads normally use a medium-priority context so they cannot delay a
+   * frame. A window system that has a frame of slack in its display queue
+   * (three display buffers) reports it here; uploads that bind after that
+   * use a second, high-priority upload context when the driver granted one.
+   */
+  void SetTextureUploadHighPriority(bool high)
+  {
+    m_textureUploadHighPriority.store(high, std::memory_order_relaxed);
+  }
   bool UnbindTextureUploadContext();
   bool HasContext();
   bool HasTextureUploadContext() const;
@@ -251,6 +263,10 @@ private:
   EGLContext m_eglContext{EGL_NO_CONTEXT};
   EGLConfig m_eglConfig{}, m_eglHDRConfig{};
   EGLContext m_eglUploadContext{EGL_NO_CONTEXT};
+  // The same upload context at the renderer's priority, EGL_NO_CONTEXT when
+  // the driver lacks EGL_IMG_context_priority or does not grant it.
+  EGLContext m_eglUploadContextHigh{EGL_NO_CONTEXT};
+  std::atomic<bool> m_textureUploadHighPriority{false};
   // EGL_NO_SURFACE when the upload context is bound surfaceless
   EGLSurface m_eglUploadSurface{EGL_NO_SURFACE};
   mutable CCriticalSection m_textureUploadLock;
