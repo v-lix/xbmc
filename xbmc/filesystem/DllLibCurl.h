@@ -10,6 +10,8 @@
 
 #include "threads/CriticalSection.h"
 
+#include <map>
+#include <set>
 #include <stdio.h>
 #include <string>
 #include <sys/time.h>
@@ -57,6 +59,10 @@ public:
                         fd_set* exc_fd_set,
                         int* max_fd);
   CURLMcode multi_timeout(CURLM* multi_handle, long* timeout);
+  /*!
+   * \brief Wait for transfer activity or a libcurl wakeup such as a completed DNS lookup.
+   */
+  CURLMcode multi_poll(CURLM* multi_handle, int timeout_ms);
   CURLMsg* multi_info_read(CURLM* multi_handle, int* msgs_in_queue);
   CURLMcode multi_cleanup(CURLM* handle);
   curl_slist* slist_append(curl_slist* list, const char* to_append);
@@ -75,6 +81,20 @@ public:
                     CURL_HANDLE** easy_handle,
                     CURLM** multi_handle);
   void easy_release(CURL_HANDLE** easy_handle, CURLM** multi_handle);
+  /*!
+   * \brief Replace the leased session's multi handle to clear its connections and DNS cache.
+   */
+  bool multi_renew(CURLM** multi_handle);
+  /*!
+   * \brief Refresh the session's address pins and attach the easy handle.
+   * The function can replace the multi handle. On success the caller owns the resolve list
+   * until detach.
+   */
+  CURLcode multi_attach(CURLM** multi_handle,
+                        CURL_HANDLE* easy_handle,
+                        const std::string& hostname,
+                        int port,
+                        curl_slist*& resolve_list);
   void easy_duplicate(CURL_HANDLE* easy,
                       const CURLM* multi,
                       CURL_HANDLE** easy_out,
@@ -83,6 +103,18 @@ public:
   void CheckIdle();
 
   /* overloaded load and unload with reference counter */
+
+  struct ResolveHost
+  {
+    std::string address;
+    std::set<int> ports;
+
+    bool operator==(const ResolveHost& other) const
+    {
+      return address == other.address && ports == other.ports;
+    }
+  };
+  using ResolvePins = std::map<std::string, ResolveHost>;
 
   /* structure holding a session info */
   typedef struct SSession
@@ -94,12 +126,20 @@ public:
     bool m_busy;
     CURL_HANDLE* m_easy;
     CURLM* m_multi;
+    // Discovery addresses and ports to refresh before the next transfer.
+    ResolvePins m_pinned;
+    bool m_multiUsed = false;
+    bool m_needsRenewal = false;
   } SSession;
 
   typedef std::vector<SSession> VEC_CURLSESSIONS;
 
   VEC_CURLSESSIONS m_sessions;
   CCriticalSection m_critSection;
+
+private:
+  // The caller holds m_critSection.
+  SSession* FindBusySession(CURLM* multi_handle);
 };
 } // namespace XCURL
 
